@@ -1,0 +1,438 @@
+import "server-only";
+
+import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import type {
+  AdminDashboardPayload,
+  CatalogInventoryCoverage,
+  DashboardAlert,
+  DashboardMetrics,
+  Order,
+  VendorSnapshotEntry,
+} from "@/common/admin/types";
+import { computeShortages } from "@/modules/procurement/procurement.allocate";
+import {
+  aggregatePendingOrderDemand,
+  getInventoryStockForVariants,
+} from "@/modules/procurement/services/procurement.service";
+
+function sortAlertsBySeverity(alerts: DashboardAlert[]): DashboardAlert[] {
+  const rank: Record<string, number> = { critical: 0, warning: 1, attention: 2 };
+  return [...alerts].sort(
+    (a, b) => (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9),
+  );
+}
+
+function buildVendorSnapshot(
+  fulfillment: VendorSnapshotEntry[],
+  lowestPrice: VendorSnapshotEntry[],
+  reliability: VendorSnapshotEntry[],
+): AdminDashboardPayload["vendors"] {
+  return {
+    topByFulfillment: fulfillment.slice(0, 3),
+    lowestAvgPrice: lowestPrice.slice(0, 3),
+    topByPoReliability: reliability.slice(0, 3),
+  };
+}
+
+function buildCatalogCoverage(
+  productsCountResult: { count: number | null } | null,
+  inventoryRows: unknown[] | null | undefined,
+): CatalogInventoryCoverage {
+  const totalProducts = productsCountResult?.count ?? 0;
+  const productIds = new Set<string>();
+  for (const row of inventoryRows ?? []) {
+    const r = row as {
+      product_variants?: { product_id?: string | null } | null;
+    };
+    const pid = r.product_variants?.product_id;
+    if (pid) productIds.add(pid);
+  }
+  return {
+    productsWithStock: productIds.size,
+    totalProducts,
+  };
+}
+
+/** One Supabase client + parallel queries for dashboard API (avoids duplicate SSR client setup). */
+export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload> {
+  const supabase = await createSupabaseServerClient();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startOfDay = today.toISOString();
+
+  const snapshotSince = new Date(today);
+  snapshotSince.setDate(snapshotSince.getDate() - 45);
+  const snapshotSinceIso = snapshotSince.toISOString();
+
+  const [
+    revenueResult,
+    outOfStockResult,
+    lowStockResult,
+    unfulfilledResult,
+    delayedResult,
+    pendingPipe,
+    processingPipe,
+    shippedPipe,
+    deliveredPipe,
+    ordersTodayAgg,
+    inventoryStockRows,
+    recentOrdersForFulfillment,
+    vendorPricesRaw,
+    purchaseOrdersRaw,
+    recentResult,
+    pipelineBlock,
+    productsCountResult,
+    inventoryWithProductRows,
+  ] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("id,total_amount")
+      .gte("created_at", startOfDay)
+      .neq("status", "cancelled"),
+    supabase
+      .from("inventory")
+      .select("variant_id", { count: "exact", head: true })
+      .lte("stock", 0),
+    supabase
+      .from("inventory")
+      .select("variant_id", { count: "exact", head: true })
+      .lt("stock", 10)
+      .gt("stock", 0),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["pending", "processing", "shipped"]),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["pending", "processing", "shipped"])
+      .lt("created_at", startOfDay),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "processing"),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "shipped"),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "delivered"),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", startOfDay)
+      .neq("status", "cancelled"),
+    supabase.from("inventory").select("variant_id,stock"),
+    supabase
+      .from("orders")
+      .select("id,status")
+      .gte("created_at", snapshotSinceIso),
+    supabase
+      .from("vendor_products")
+      .select("vendor_id, base_price, vendors(id, name)"),
+    supabase.from("purchase_orders").select("vendor_id, status"),
+    supabase
+      .from("orders")
+      .select(
+        "id,created_at,status,total_amount,users:users!orders_user_id_fkey(name,phone)",
+      )
+      .order("created_at", { ascending: false })
+      .limit(8),
+    (async () => {
+      let pipelineDemandUnits = 0;
+      let shortageUnits = 0;
+      let pipelineShortageVariants = 0;
+      try {
+        const demandRows = await aggregatePendingOrderDemand();
+        pipelineDemandUnits = demandRows.reduce((s, r) => s + r.demand_qty, 0);
+        const variantIds = demandRows.map((r) => r.variant_id);
+        const stockMap = await getInventoryStockForVariants(variantIds);
+        const demand = new Map(demandRows.map((d) => [d.variant_id, d.demand_qty]));
+        const shortages = computeShortages(demand, stockMap);
+        shortageUnits = shortages.reduce((s, r) => s + r.shortage_qty, 0);
+        pipelineShortageVariants = shortages.length;
+      } catch {
+        /* RBAC or empty */
+      }
+      return { pipelineDemandUnits, shortageUnits, pipelineShortageVariants };
+    })(),
+    supabase.from("products").select("id", { count: "exact", head: true }),
+    supabase
+      .from("inventory")
+      .select("product_variants(product_id)")
+      .gt("stock", 0),
+  ]);
+
+  const todayOrders = revenueResult.data ?? [];
+  const todayIds = todayOrders.map((o) => o.id as string).filter(Boolean);
+
+  const fulfillmentOrderIds = (recentOrdersForFulfillment.data ?? []).map(
+    (r: { id: string }) => r.id,
+  );
+  const orderStatusById = new Map(
+    (recentOrdersForFulfillment.data ?? []).map((r: { id: string; status: string }) => [
+      r.id,
+      r.status,
+    ]),
+  );
+
+  const [marginResult, demandItemsResult, fulfillmentItems] = await Promise.all([
+    todayIds.length === 0
+      ? Promise.resolve({ data: [] as { margin_amount: number | null }[] })
+      : supabase
+          .from("order_items")
+          .select("margin_amount")
+          .in("order_id", todayIds),
+    todayIds.length === 0
+      ? Promise.resolve({ data: [] as { quantity: number | null }[] })
+      : supabase.from("order_items").select("quantity").in("order_id", todayIds),
+    fulfillmentOrderIds.length === 0
+      ? Promise.resolve({
+          data: [] as {
+            vendor_id: string | null;
+            quantity: number | null;
+            order_id: string | null;
+          }[],
+        })
+      : supabase
+          .from("order_items")
+          .select("vendor_id, quantity, order_id")
+          .in("order_id", fulfillmentOrderIds)
+          .not("vendor_id", "is", null),
+  ]);
+
+  const dailyRevenue = todayOrders.reduce(
+    (sum, o) => sum + Number(o.total_amount ?? 0),
+    0,
+  );
+
+  const ordersToday = ordersTodayAgg.count ?? 0;
+  const averageOrderValue =
+    ordersToday > 0 ? dailyRevenue / ordersToday : 0;
+
+  const marginRows = marginResult.data ?? [];
+  const marginToday = marginRows.reduce(
+    (sum, row) => sum + Number(row.margin_amount ?? 0),
+    0,
+  );
+
+  const demandItems = demandItemsResult.data ?? [];
+  const demandTodayUnits = demandItems.reduce(
+    (sum, row) => sum + Math.max(0, Math.floor(Number(row.quantity ?? 0))),
+    0,
+  );
+
+  const stockRows = inventoryStockRows.data ?? [];
+  const availableInventoryUnits = stockRows.reduce(
+    (sum, row) => sum + Math.max(0, Math.floor(Number(row.stock ?? 0))),
+    0,
+  );
+
+  const outOfStockCount = outOfStockResult.count ?? 0;
+  const lowStockItems = lowStockResult.count ?? 0;
+  const productsNeedingRestock = outOfStockCount + lowStockItems;
+
+  const { pipelineDemandUnits, shortageUnits, pipelineShortageVariants } =
+    pipelineBlock;
+
+  const metrics: DashboardMetrics = {
+    dailyRevenue,
+    pendingOrders: pendingPipe.count ?? 0,
+    lowStockItems,
+  };
+
+  const pipeline = {
+    pending: pendingPipe.count ?? 0,
+    processing: processingPipe.count ?? 0,
+    shipped: shippedPipe.count ?? 0,
+    delivered: deliveredPipe.count ?? 0,
+  };
+
+  const alerts: DashboardAlert[] = sortAlertsBySeverity([
+    {
+      id: "out-of-stock",
+      label: "Out of stock SKUs",
+      count: outOfStockCount,
+      severity: "critical",
+      href: "/admin/inventory",
+    },
+    {
+      id: "delayed",
+      label: "Delayed orders (open from prior days)",
+      count: delayedResult.count ?? 0,
+      severity: "critical",
+      href: "/admin/orders",
+    },
+    {
+      id: "low-stock",
+      label: "Low stock SKUs",
+      count: lowStockItems,
+      severity: "warning",
+      href: "/admin/inventory",
+    },
+    {
+      id: "unfulfilled",
+      label: "Unfulfilled orders (in flight)",
+      count: unfulfilledResult.count ?? 0,
+      severity: "attention",
+      href: "/admin/orders",
+    },
+  ]);
+
+  const business = {
+    revenueToday: dailyRevenue,
+    marginToday,
+    ordersToday,
+    averageOrderValue,
+  };
+
+  const procurement = {
+    pipelineDemandUnits,
+    availableInventoryUnits,
+    shortageUnits,
+    pipelineShortageVariants,
+    demandTodayUnits,
+    productsNeedingRestock,
+  };
+
+  const catalogCoverage = buildCatalogCoverage(
+    productsCountResult,
+    inventoryWithProductRows.data ?? [],
+  );
+
+  const fulfillmentRows = fulfillmentItems.data ?? [];
+  const vendorQty = new Map<
+    string,
+    { fulfilled: number; total: number }
+  >();
+  for (const row of fulfillmentRows) {
+    const vid = row.vendor_id;
+    if (!vid) continue;
+    const oid = row.order_id;
+    const q = Math.max(0, Math.floor(Number(row.quantity ?? 0)));
+    const status = oid ? (orderStatusById.get(oid) ?? "") : "";
+    const cur = vendorQty.get(vid) ?? { fulfilled: 0, total: 0 };
+    cur.total += q;
+    if (status === "delivered") cur.fulfilled += q;
+    vendorQty.set(vid, cur);
+  }
+
+  const fulfillmentEntries: VendorSnapshotEntry[] = [];
+  for (const [vendorId, v] of vendorQty) {
+    if (v.total === 0) continue;
+    const rate = (100 * v.fulfilled) / v.total;
+    fulfillmentEntries.push({
+      vendorId,
+      name: null,
+      headline: "Unit fulfillment (45d)",
+      value: `${rate.toFixed(0)}% · ${v.fulfilled}/${v.total} units`,
+    });
+  }
+
+  type VpRow = {
+    vendor_id: string | null;
+    base_price: number | null;
+    vendors: { id?: string; name?: string | null } | null;
+  };
+  const priceRows = (vendorPricesRaw.data ?? []) as unknown as VpRow[];
+  const priceAgg = new Map<string, { sum: number; n: number; name: string | null }>();
+  for (const row of priceRows) {
+    const vid = row.vendor_id;
+    if (!vid) continue;
+    const price = Number(row.base_price ?? 0);
+    const name = (row.vendors?.name as string | null) ?? null;
+    const cur = priceAgg.get(vid) ?? { sum: 0, n: 0, name };
+    cur.sum += price;
+    cur.n += 1;
+    if (name) cur.name = name;
+    priceAgg.set(vid, cur);
+  }
+  const lowestPriceWithAvg = [...priceAgg.entries()].map(
+    ([vendorId, { sum, n, name }]) => {
+      const avg = sum / Math.max(1, n);
+      return {
+        vendorId,
+        name,
+        headline: "Avg. list price",
+        value: `₹${avg.toLocaleString("en-IN", { maximumFractionDigits: 0 })} · ${n} SKUs`,
+        avg,
+      };
+    },
+  );
+  lowestPriceWithAvg.sort((a, b) => a.avg - b.avg);
+  const lowestPriceEntries: VendorSnapshotEntry[] = lowestPriceWithAvg.map(
+    ({ avg: _avg, ...entry }) => entry,
+  );
+
+  type PoRow = { vendor_id: string | null; status: string | null };
+  const poRows = (purchaseOrdersRaw.data ?? []) as PoRow[];
+  const poAgg = new Map<
+    string,
+    { delivered: number; total: number }
+  >();
+  for (const row of poRows) {
+    const vid = row.vendor_id;
+    if (!vid) continue;
+    const cur = poAgg.get(vid) ?? { delivered: 0, total: 0 };
+    cur.total += 1;
+    if ((row.status ?? "").toLowerCase() === "delivered") cur.delivered += 1;
+    poAgg.set(vid, cur);
+  }
+
+  const nameByVendor = new Map<string, string | null>();
+  for (const row of priceRows) {
+    if (row.vendor_id && row.vendors?.name != null) {
+      nameByVendor.set(row.vendor_id, row.vendors.name);
+    }
+  }
+
+  const reliabilityWithRate = [...poAgg.entries()]
+    .filter(([, v]) => v.total >= 2)
+    .map(([vendorId, v]) => {
+      const rate = (100 * v.delivered) / v.total;
+      return {
+        vendorId,
+        name: nameByVendor.get(vendorId) ?? null,
+        headline: "Purchase order close rate",
+        value: `${rate.toFixed(0)}% · ${v.delivered}/${v.total} POs`,
+        rate,
+      };
+    });
+  reliabilityWithRate.sort((a, b) => b.rate - a.rate);
+  const reliabilityEntries: VendorSnapshotEntry[] = reliabilityWithRate.map(
+    ({ rate: _rate, ...entry }) => entry,
+  );
+
+  for (const e of fulfillmentEntries) {
+    e.name = nameByVendor.get(e.vendorId) ?? e.name;
+  }
+  fulfillmentEntries.sort((a, b) => {
+    const ra = Number(a.value.match(/^([\d.]+)/)?.[1]) || 0;
+    const rb = Number(b.value.match(/^([\d.]+)/)?.[1]) || 0;
+    return rb - ra;
+  });
+
+  const vendors = buildVendorSnapshot(
+    fulfillmentEntries,
+    lowestPriceEntries,
+    reliabilityEntries,
+  );
+
+  return {
+    metrics,
+    alerts,
+    pipeline,
+    business,
+    procurement,
+    catalogCoverage,
+    vendors,
+    recentOrders: (recentResult.data ?? []) as unknown as Order[],
+  };
+}
