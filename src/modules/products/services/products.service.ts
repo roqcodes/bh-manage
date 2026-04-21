@@ -23,7 +23,7 @@ export async function getProducts(
     supabase
       .from("products")
       .select(
-        "id,name,description,category_id,image_url,is_active,is_veg,created_at,categories(id,name,parent_id,image_url,created_at)",
+        "id,name,description,category_id,image_url,is_active,created_at,categories(id,name,parent_id,image_url,created_at)",
       )
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1),
@@ -42,8 +42,6 @@ export interface ProductCatalogStats {
   total: number;
   active: number;
   inactive: number;
-  veg: number;
-  nonVeg: number;
   categoriesCount: number;
   uncategorized: number;
   categoryCounts: Record<string, number>;
@@ -56,7 +54,6 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
   const [
     totalResult,
     activeResult,
-    vegResult,
     categoriesCountResult,
     categoryRowsResult,
   ] = await Promise.all([
@@ -65,17 +62,12 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
       .from("products")
       .select("id", { count: "exact", head: true })
       .eq("is_active", true),
-    supabase
-      .from("products")
-      .select("id", { count: "exact", head: true })
-      .eq("is_veg", true),
     supabase.from("categories").select("id", { count: "exact", head: true }),
     supabase.from("products").select("category_id"),
   ]);
 
   const total = totalResult.count ?? 0;
   const active = activeResult.count ?? 0;
-  const veg = vegResult.count ?? 0;
 
   const categoryCounts: Record<string, number> = {};
   let uncategorized = 0;
@@ -94,8 +86,6 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
     total,
     active,
     inactive: Math.max(0, total - active),
-    veg,
-    nonVeg: Math.max(0, total - veg),
     categoriesCount: categoriesCountResult.count ?? 0,
     uncategorized,
     categoryCounts,
@@ -110,7 +100,7 @@ export async function getProductById(
   const { data } = await supabase
     .from("products")
     .select(
-      "id,name,description,category_id,image_url,is_active,is_veg,created_at,categories(id,name,parent_id,image_url,created_at)",
+      "id,name,description,category_id,image_url,is_active,created_at,categories(id,name,parent_id,image_url,created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -145,7 +135,6 @@ export async function insertProduct(input: {
   description: string | null;
   categoryId: string | null;
   imageUrl: string | null;
-  isVeg: boolean;
 }): Promise<void> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -154,7 +143,6 @@ export async function insertProduct(input: {
     description: input.description,
     category_id: input.categoryId,
     image_url: input.imageUrl,
-    is_veg: input.isVeg,
     is_active: true,
   });
   if (error) throw new Error(error.message);
@@ -167,7 +155,6 @@ export async function updateProductById(
     description: string | null;
     categoryId: string | null;
     imageUrl: string | null;
-    isVeg: boolean;
   },
 ): Promise<void> {
   await requireAdminOrManagerProfile();
@@ -179,7 +166,6 @@ export async function updateProductById(
       description: input.description,
       category_id: input.categoryId,
       image_url: input.imageUrl,
-      is_veg: input.isVeg,
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

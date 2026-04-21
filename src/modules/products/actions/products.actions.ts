@@ -14,14 +14,12 @@ export async function createProductAction(data: {
   description: string;
   categoryId: string | null;
   imageUrl: string | null;
-  isVeg: boolean;
 }): Promise<void> {
   await insertProduct({
     name: data.name,
     description: data.description || null,
     categoryId: data.categoryId || null,
     imageUrl: data.imageUrl,
-    isVeg: data.isVeg,
   });
   revalidatePath("/admin/products");
 }
@@ -33,7 +31,6 @@ export async function updateProductAction(
     description: string;
     categoryId: string | null;
     imageUrl: string | null;
-    isVeg: boolean;
   },
 ): Promise<void> {
   await updateProductById(id, {
@@ -41,7 +38,6 @@ export async function updateProductAction(
     description: data.description || null,
     categoryId: data.categoryId || null,
     imageUrl: data.imageUrl,
-    isVeg: data.isVeg,
   });
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);

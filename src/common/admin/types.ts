@@ -71,7 +71,6 @@ export interface Product {
   category_id: string | null;
   image_url: string | null;
   is_active: boolean | null;
-  is_veg: boolean | null;
   created_at: string | null;
 }
 

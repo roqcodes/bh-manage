@@ -10,8 +10,6 @@ import {
   ToggleLeft,
   ToggleRight,
   Trash2,
-  Leaf,
-  Drumstick,
   Package,
   CheckCircle2,
   Tag,
@@ -51,8 +49,6 @@ interface ProductCatalogStatsPayload {
   total: number;
   active: number;
   inactive: number;
-  veg: number;
-  nonVeg: number;
   categoriesCount: number;
   uncategorized: number;
   categoryCounts: Record<string, number>;
@@ -253,7 +249,6 @@ function ProductForm({
     const name = (fd.get("name") as string).trim();
     const description = (fd.get("description") as string).trim();
     const categoryId = (fd.get("categoryId") as string) || null;
-    const isVeg = fd.get("isVeg") === "on";
     const imageUrlValue = imageUrl.trim() || null;
     if (!name) return setError("Product name is required.");
     setError(null);
@@ -265,7 +260,6 @@ function ProductForm({
             description,
             categoryId,
             imageUrl: imageUrlValue,
-            isVeg,
           });
         } else {
           await createProductAction({
@@ -273,7 +267,6 @@ function ProductForm({
             description,
             categoryId,
             imageUrl: imageUrlValue,
-            isVeg,
           });
         }
         void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
@@ -353,15 +346,7 @@ function ProductForm({
           ))}
         </select>
       </FieldLabel>
-      <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
-        <input
-          type="checkbox"
-          name="isVeg"
-          defaultChecked={product?.is_veg ?? false}
-          className="h-4 w-4 accent-emerald-500"
-        />
-        Vegetarian / Veg
-      </label>
+
       <FormError message={error} />
       <div className="flex justify-end gap-2 pt-1">
         <SecondaryBtn onClick={onClose}>Cancel</SecondaryBtn>
@@ -527,7 +512,6 @@ function ProductCard({
     ? tintFor(product.category_id)
     : "linear-gradient(135deg, #e2e8f0, #cbd5e1)";
   const isActive = product.is_active ?? false;
-  const isVeg = product.is_veg ?? false;
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_0_0_rgba(255,255,255,0.6)_inset,0_2px_10px_-4px_rgba(15,23,42,0.06),0_20px_40px_-24px_rgba(15,23,42,0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]">
@@ -542,23 +526,8 @@ function ProductCard({
           <ProductFormImage url={product.image_url} />
         </div>
 
-        {/* top badges */}
-        <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] ring-1 backdrop-blur ${
-              isVeg
-                ? "bg-emerald-50/90 text-emerald-700 ring-emerald-500/20"
-                : "bg-rose-50/90 text-rose-700 ring-rose-500/20"
-            }`}
-            title={isVeg ? "Vegetarian" : "Non-vegetarian"}
-          >
-            {isVeg ? (
-              <Leaf className="size-3" aria-hidden />
-            ) : (
-              <Drumstick className="size-3" aria-hidden />
-            )}
-            {isVeg ? "Veg" : "Non-veg"}
-          </span>
+        {/* top level status */}
+        <div className="absolute right-3 top-3">
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] backdrop-blur ring-1 ${
               isActive
@@ -574,6 +543,8 @@ function ProductCard({
             {isActive ? "Active" : "Inactive"}
           </span>
         </div>
+
+
       </div>
 
       {/* Body */}
@@ -704,7 +675,6 @@ export function ProductsPanel({
 
   const activePct =
     stats.total > 0 ? (stats.active / stats.total) * 100 : 0;
-  const vegPct = stats.total > 0 ? (stats.veg / stats.total) * 100 : 0;
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -829,31 +799,7 @@ export function ProductsPanel({
               />
             </KpiCard>
 
-            <KpiCard
-              label="Vegetarian"
-              value={stats.veg.toLocaleString("en-IN")}
-              icon={Leaf}
-              tint="linear-gradient(135deg, #dcfce7, #bbf7d0)"
-              delta={
-                <div className="flex flex-wrap items-center gap-2">
-                  <TrendChip tone="up">
-                    {Math.round(vegPct)}% of catalog
-                  </TrendChip>
-                  {stats.nonVeg > 0 ? (
-                    <TrendChip tone="neutral">
-                      {stats.nonVeg.toLocaleString("en-IN")} non-veg
-                    </TrendChip>
-                  ) : null}
-                </div>
-              }
-            >
-              <InlineRail
-                pct={vegPct}
-                label="Veg share"
-                value={`${stats.veg} / ${stats.total}`}
-                gradient="linear-gradient(90deg, #bbf7d0, #4ade80)"
-              />
-            </KpiCard>
+
 
             <KpiCard
               label="Categories"
