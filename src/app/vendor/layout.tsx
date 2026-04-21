@@ -15,7 +15,14 @@ export default async function VendorLayout({
   return (
     <div className="flex h-full overflow-hidden bg-slate-50">
       <VendorSidebar profile={profile} />
-      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</main>
+      <main className="grid h-full flex-1 grid-rows-[auto_1fr] overflow-hidden">
+        <div className="h-[56px] border-b border-slate-100 bg-white px-6 flex items-center">
+           <h1 className="text-sm font-bold text-slate-900">Vendor Portal</h1>
+        </div>
+        <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

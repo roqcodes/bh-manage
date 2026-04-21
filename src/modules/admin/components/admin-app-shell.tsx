@@ -94,7 +94,7 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
           mobileOpen={mobileNavOpen}
           onNavigate={() => setMobileNavOpen(false)}
         />
-        <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+        <main className="relative z-0 grid h-full flex-1 grid-rows-[auto_1fr] overflow-hidden">
           {/* Ambient background glow */}
           <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 overflow-hidden blur-3xl" aria-hidden>
             <div className="h-[400px] w-[800px] bg-gradient-to-b from-[#2563EB]/5 to-transparent" />
@@ -105,7 +105,9 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
             isMdViewport={isMd}
             onToggleSidebar={handleToggleSidebar}
           />
-          <div className="min-w-0 flex-1">{children}</div>
+          <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom,1rem)]">
+            {children}
+          </div>
         </main>
       </div>
     </AdminSessionProvider>
