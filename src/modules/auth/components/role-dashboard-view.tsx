@@ -14,7 +14,7 @@ export function RoleDashboardView({
   roleLabel: string;
 }) {
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
+    <main className="min-h-full bg-slate-50 px-6 py-10">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <div className="flex flex-col gap-4 rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_10px_20px_rgba(26,26,46,0.05)] lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-3">

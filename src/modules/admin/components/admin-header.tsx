@@ -61,7 +61,7 @@ export function AdminHeader({
 
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-slate-200/70 bg-[#F8FAFC]/85 backdrop-blur-md">
-      <div className="grid grid-cols-1 gap-2 px-4 py-2.5 sm:px-6 md:h-[56px] md:grid-cols-[minmax(0,1fr)_min(100%,28rem)_minmax(0,1fr)] md:items-center md:gap-4 md:py-0">
+      <div className="grid grid-cols-1 gap-2 px-4 py-2 sm:px-6 md:h-[56px] md:grid-cols-[minmax(0,1fr)_min(100%,28rem)_minmax(0,1fr)] md:items-center md:gap-4 md:py-0">
         <div className="flex min-w-0 items-center justify-between md:justify-start">
           <button
             type="button"

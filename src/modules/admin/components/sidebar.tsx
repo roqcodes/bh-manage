@@ -63,7 +63,7 @@ export function AdminSidebar({
   return (
     <aside
       className={[
-        "flex h-screen shrink-0 flex-col border-r border-slate-200/60 bg-white/80 shadow-[4px_0_24px_-8px_rgba(15,23,42,0.12)] backdrop-blur-xl md:shadow-none",
+        "flex h-full shrink-0 flex-col border-r border-slate-200/60 bg-white/80 shadow-[4px_0_24px_-8px_rgba(15,23,42,0.12)] backdrop-blur-xl md:shadow-none",
         /* Mobile drawer: smooth slide; desktop: quick width when collapsing */
         "fixed left-0 top-0 z-40 w-[260px] will-change-transform md:relative md:z-0 md:will-change-auto",
         "transition-transform duration-[380ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:duration-150 motion-reduce:ease-out",

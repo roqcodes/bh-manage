@@ -24,7 +24,7 @@ export function VendorSidebar({ profile }: { profile: UserProfile }) {
   const initial = profile.name?.[0]?.toUpperCase() ?? "V";
 
   return (
-    <aside className="flex h-screen w-[250px] shrink-0 flex-col border-e border-slate-100 bg-white">
+    <aside className="flex h-full w-[250px] shrink-0 flex-col border-e border-slate-100 bg-white">
       <div className="flex items-center gap-3 px-6 py-6">
         <span className="text-[22px] font-black tracking-[-0.05em] text-slate-900">
           Buy<span className="text-[#2563EB]">Hub</span>

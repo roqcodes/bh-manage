@@ -13,7 +13,7 @@ export default async function VendorLayout({
   const profile = await requireVendorAreaAccess();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className="flex h-full overflow-hidden bg-slate-50">
       <VendorSidebar profile={profile} />
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</main>
     </div>

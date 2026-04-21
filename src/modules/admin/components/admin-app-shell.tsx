@@ -16,7 +16,7 @@ import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 
 function AdminRootSkeleton() {
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className="flex h-full overflow-hidden bg-slate-50">
       <div className="w-64 shrink-0 animate-pulse border-r border-slate-100 bg-white" />
       <div className="min-h-0 flex-1 animate-pulse bg-slate-100 p-8">
         <div className="h-8 w-48 rounded-lg bg-slate-200" />
@@ -56,7 +56,7 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
   if (invoicePrintLayout) {
     return (
       <AdminSessionProvider profile={data.profile}>
-        <div className="flex min-h-screen flex-col bg-slate-50 print:bg-white">
+        <div className="flex min-h-full flex-col bg-slate-50 print:bg-white">
           {children}
         </div>
       </AdminSessionProvider>
@@ -73,7 +73,7 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AdminSessionProvider profile={data.profile}>
-      <div className="relative flex h-screen overflow-hidden bg-[#F8FAFC]">
+      <div className="relative flex h-full overflow-hidden bg-[#F8FAFC]">
         <button
           type="button"
           className={[
