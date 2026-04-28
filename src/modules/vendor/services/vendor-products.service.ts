@@ -34,17 +34,26 @@ export async function listMyVendorProducts(
 
 export async function updateMyVendorProduct(
   vendorProductId: string,
-  input: { basePrice: number; stock: number },
+  input: { basePrice?: number; stock?: number },
 ): Promise<void> {
   const profile = await requireVendorProfile();
   const supabase = await createSupabaseServerClient();
 
+  const updateData: Record<string, number> = {};
+  if (input.basePrice !== undefined && input.basePrice > 0) {
+    updateData.base_price = input.basePrice;
+  }
+  if (input.stock !== undefined && input.stock >= 0) {
+    updateData.stock = input.stock;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new Error("No valid fields to update.");
+  }
+
   const { error } = await supabase
     .from("vendor_products")
-    .update({
-      base_price: input.basePrice,
-      stock: input.stock,
-    })
+    .update(updateData)
     .eq("id", vendorProductId)
     .eq("vendor_id", profile.id);
 

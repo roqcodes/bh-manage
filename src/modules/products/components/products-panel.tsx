@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
 import {
   Plus,
@@ -648,11 +649,24 @@ export function ProductsPanel({
 }) {
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [modal, setModal] = useState<"create" | ProductWithCategory | null>(
     null,
   );
-  const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORIES);
+  const activeCategory = searchParams.get("category_id") || ALL_CATEGORIES;
   const [search, setSearch] = useState("");
+
+  function handleCategorySelect(id: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", "0");
+    if (id === ALL_CATEGORIES) {
+      params.delete("category_id");
+    } else {
+      params.set("category_id", id);
+    }
+    router.push(`?${params.toString()}`);
+  }
 
   function handleToggle(product: ProductWithCategory) {
     startTransition(async () => {
@@ -679,11 +693,6 @@ export function ProductsPanel({
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter((p) => {
-      if (activeCategory === UNCATEGORIZED) {
-        if (p.category_id != null) return false;
-      } else if (activeCategory !== ALL_CATEGORIES) {
-        if (p.category_id !== activeCategory) return false;
-      }
       if (q.length > 0) {
         const name = (p.name ?? "").toLowerCase();
         const desc = (p.description ?? "").toLowerCase();
@@ -693,10 +702,9 @@ export function ProductsPanel({
       }
       return true;
     });
-  }, [products, activeCategory, search]);
+  }, [products, search]);
 
-  const isFiltering =
-    activeCategory !== ALL_CATEGORIES || search.trim().length > 0;
+  const isFiltering = search.trim().length > 0;
 
   return (
     <>
@@ -845,7 +853,7 @@ export function ProductsPanel({
           categories={categories}
           stats={stats}
           active={activeCategory}
-          onSelect={setActiveCategory}
+          onSelect={handleCategorySelect}
         />
 
         {/* Products grid */}
@@ -888,7 +896,7 @@ export function ProductsPanel({
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveCategory(ALL_CATEGORIES);
+                    handleCategorySelect(ALL_CATEGORIES);
                     setSearch("");
                   }}
                   className="mt-1 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-bold text-slate-700 transition hover:bg-slate-50"
@@ -931,6 +939,11 @@ export function ProductsPanel({
                 total={total}
                 page={page}
                 basePath="/admin/products"
+                listParams={
+                  activeCategory !== ALL_CATEGORIES
+                    ? { category_id: activeCategory }
+                    : undefined
+                }
               />
             </div>
           ) : null}

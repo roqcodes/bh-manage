@@ -13,7 +13,7 @@ export async function getOrders(
   let query = supabase
     .from("orders")
     .select(
-      "id,created_at,status,total_amount,users:users!orders_user_id_fkey(name,phone)",
+      "id,created_at,status,total_amount,users:users!orders_user_fkey(name,phone)",
     )
     .order("created_at", { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);

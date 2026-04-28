@@ -10,8 +10,8 @@ import {
 
 const updateSchema = z.object({
   vendorProductId: z.string().uuid(),
-  basePrice: z.number().positive("Price must be greater than 0."),
-  stock: z.number().int().min(0, "Stock cannot be negative."),
+  basePrice: z.number().positive("Price must be greater than 0.").optional(),
+  stock: z.number().int().min(0, "Stock cannot be negative.").optional(),
 });
 
 export async function updateVendorCatalogItemAction(

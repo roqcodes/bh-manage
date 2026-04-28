@@ -29,10 +29,16 @@ interface ProductsPayload {
 export function AdminProductsView() {
   const searchParams = useSearchParams();
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
+  const categoryId = searchParams.get("category_id") || null;
 
   const { data, isPending, isError, error } = useQuery({
-    queryKey: adminQueryKeys.products(page),
-    queryFn: () => adminGet<ProductsPayload>(`products?page=${page}`),
+    queryKey: adminQueryKeys.products(page, categoryId),
+    queryFn: () => {
+      const q = new URLSearchParams();
+      q.set("page", page.toString());
+      if (categoryId) q.set("category_id", categoryId);
+      return adminGet<ProductsPayload>(`products?${q.toString()}`);
+    },
     placeholderData: keepPreviousData,
   });
 

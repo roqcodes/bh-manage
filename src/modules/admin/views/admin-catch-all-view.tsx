@@ -18,6 +18,8 @@ import { AdminPurchaseOrdersView } from "@/modules/admin/views/admin-purchase-or
 import { AdminUsersView } from "@/modules/admin/views/admin-users-view";
 import { AdminVendorDetailView } from "@/modules/admin/views/admin-vendor-detail-view";
 import { AdminVendorsView } from "@/modules/admin/views/admin-vendors-view";
+import { AdminCustomerDetailView } from "@/modules/admin/views/admin-customer-detail-view";
+import { AdminCustomersView } from "@/modules/admin/views/admin-customers-view";
 
 function AdminNotFound() {
   return (
@@ -46,6 +48,7 @@ export function AdminCatchAllView() {
     else if (seg === "config") inner = <AdminConfigView />;
     else if (seg === "procurement") inner = <AdminProcurementView />;
     else if (seg === "purchase-orders") inner = <AdminPurchaseOrdersView />;
+    else if (seg === "customers") inner = <AdminCustomersView />;
     else inner = <AdminNotFound />;
   } else if (slug.length === 2) {
     const [a, b] = slug;
@@ -55,6 +58,7 @@ export function AdminCatchAllView() {
     else if (a === "orders") inner = <AdminOrderDetailView />;
     else if (a === "vendors") inner = <AdminVendorDetailView />;
     else if (a === "purchase-orders") inner = <AdminPurchaseOrderByIdView />;
+    else if (a === "customers") inner = <AdminCustomerDetailView />;
     else inner = <AdminNotFound />;
   } else {
     inner = <AdminNotFound />;
