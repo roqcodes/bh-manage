@@ -127,10 +127,10 @@ export async function getProfitMarginReport(
   const byPeriod = new Map<string, { revenue: number; cost: number; orders: number }>();
 
   for (const order of orders ?? []) {
-    const period = new Date(order.created_at).toISOString().slice(0, 7); // YYYY-MM
+    const period = new Date(order.created_at!).toISOString().slice(0, 7); // YYYY-MM
     const revenue = order.total_amount ?? 0;
-    const cost = (order.order_items ?? []).reduce(
-      (sum, item) => sum + (item.base_price ?? 0) * (item.quantity ?? 1),
+    const cost = ((order as any).order_items ?? []).reduce(
+      (sum: number, item: any) => sum + (item.base_price ?? 0) * (item.quantity ?? 1),
       0,
     );
 

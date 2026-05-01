@@ -173,7 +173,7 @@ export async function createOrderFromCart(
       .maybeSingle();
 
     if (invError) {
-      throw new Error(`Failed to read inventory for variant ${update.variantId}`);
+      throw new Error(`Failed to read inventory for variant ${update.variant_id}`);
     }
 
     const currentStock = invData?.stock ?? 0;
@@ -181,11 +181,11 @@ export async function createOrderFromCart(
 
     const { error: updateError } = await supabase
       .from("inventory")
-      .update({ stock: newStock, updated_at: "now()" })
+      .update({ stock: newStock } as any)
       .eq("variant_id", update.variant_id);
 
     if (updateError) {
-      throw new Error(`Failed to update inventory for variant ${update.variantId}`);
+      throw new Error(`Failed to update inventory for variant ${update.variant_id}`);
     }
   }
 
@@ -256,7 +256,7 @@ export async function checkCartAvailability(): Promise<{
       variantId: cartItem.variant_id,
       productName: cartItem.product?.name ?? "Unknown Product",
       quantity: cartItem.quantity,
-      available: hasStock && totalStock >= cartItem.quantity,
+      available: !!(hasStock && totalStock >= cartItem.quantity),
       reason: !hasStock
         ? "No vendors have this item in stock"
         : totalStock < cartItem.quantity

@@ -163,24 +163,26 @@ export async function getCustomerOrderById(
     return null;
   }
 
+  const d = data as any;
+
   return {
-    id: data.id,
-    orderNumber: `ORD-${data.id.slice(0, 8).toUpperCase()}`,
-    status: data.status,
-    paymentStatus: data.payment_status,
-    totalAmount: data.total_amount,
-    createdAt: data.created_at,
-    itemCount: data.order_items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0,
-    address: data.addresses?.[0]
+    id: d.id,
+    orderNumber: `ORD-${d.id.slice(0, 8).toUpperCase()}`,
+    status: d.status,
+    paymentStatus: d.payment_status,
+    totalAmount: d.total_amount,
+    createdAt: d.created_at,
+    itemCount: d.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0,
+    address: d.addresses?.[0]
       ? {
-          line1: data.addresses[0].line1,
-          line2: data.addresses[0].line2,
-          city: data.addresses[0].city,
-          state: data.addresses[0].state,
-          pincode: data.addresses[0].pincode,
+          line1: d.addresses[0].line1,
+          line2: d.addresses[0].line2,
+          city: d.addresses[0].city,
+          state: d.addresses[0].state,
+          pincode: d.addresses[0].pincode,
         }
       : null,
-    items: (data.order_items || []).map((item: any) => ({
+    items: (d.order_items || []).map((item: any) => ({
       id: item.id,
       variantId: item.variant_id,
       productName: item.product_name,

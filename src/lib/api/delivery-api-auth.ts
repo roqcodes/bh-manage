@@ -27,7 +27,7 @@ export async function requireDeliveryApiProfile() {
       };
     }
 
-    if (!user.is_verified) {
+    if (!profile.is_verified) {
       return {
         ok: false as const,
         response: NextResponse.json(

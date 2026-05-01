@@ -8,6 +8,7 @@ import { VendorPurchaseOrderDetailView } from "@/modules/vendor/components/vendo
 
 interface PurchaseOrderDetail {
   id: string;
+  vendor_id: string | null;
   status: string | null;
   total_amount: number | null;
   created_at: string | null;
@@ -89,7 +90,7 @@ export default function VendorPurchaseOrderDetailPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-8 py-10">
-      <VendorPurchaseOrderDetailView po={po} />
+      <VendorPurchaseOrderDetailView po={po as any} />
     </div>
   );
 }

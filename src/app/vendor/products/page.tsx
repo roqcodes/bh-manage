@@ -120,13 +120,13 @@ export default function VendorProductsPage() {
       <VendorSupplyTabNav active={data.tab} />
       {data.tab === "my" ? (
         <VendorProductsPanel
-          rows={data.data as ProductRow[]}
+          rows={data.data as any}
           total={data.total}
           page={data.page}
         />
       ) : (
         <VendorAvailableVariantsPanel
-          rows={data.data as AvailableVariantRow[]}
+          rows={data.data as any}
           total={data.total}
           page={data.page}
         />

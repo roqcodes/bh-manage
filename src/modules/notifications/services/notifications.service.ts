@@ -99,7 +99,7 @@ export async function markAsRead(notificationId: string): Promise<void> {
 
   const supabase = await createSupabaseServerClient();
 
-  const { error } = await supabase.rpc("mark_notification_read", {
+  const { error } = await (supabase.rpc as any)("mark_notification_read", {
     p_notification_id: notificationId,
     p_user_id: profile.id,
   });
@@ -116,7 +116,7 @@ export async function markAllAsRead(): Promise<number> {
 
   const supabase = await createSupabaseServerClient();
 
-  const { data, error } = await supabase.rpc("mark_all_notifications_read", {
+  const { data, error } = await (supabase.rpc as any)("mark_all_notifications_read", {
     p_user_id: profile.id,
   });
 
@@ -135,7 +135,7 @@ export async function createNotification(
 ): Promise<string> {
   const supabase = await createSupabaseServerClient();
 
-  const { data, error } = await supabase.rpc("create_notification", {
+  const { data, error } = await (supabase.rpc as any)("create_notification", {
     p_user_id: userId,
     p_type: type,
     p_title: title,

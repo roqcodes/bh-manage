@@ -171,23 +171,25 @@ export async function getMarketplaceProductById(
     return null;
   }
 
-  const variants = (data.product_variants || []).map((v: any) => ({
+  const d = data as any;
+
+  const variants = (d.product_variants || []).map((v: any) => ({
     id: v.id,
     name: v.name,
     price: v.price,
     mrp: v.mrp,
-    stock: data.inventory?.find((i: any) => i.variant_id === v.id)?.stock || null,
+    stock: d.inventory?.find((i: any) => i.variant_id === v.id)?.stock || null,
   }));
 
   return {
-    id: data.id,
-    name: data.name,
-    description: data.description,
-    category_id: data.category_id,
-    image_url: data.image_url,
-    is_active: data.is_active,
-    created_at: data.created_at,
-    category: data.categories?.[0] || null,
+    id: d.id,
+    name: d.name,
+    description: d.description,
+    category_id: d.category_id,
+    image_url: d.image_url,
+    is_active: d.is_active,
+    created_at: d.created_at,
+    category: d.categories?.[0] || null,
     variants,
   };
 }

@@ -10,6 +10,8 @@ interface PaginationProps {
   page: number;
   basePath: string;
   extraParams?: Record<string, string>;
+  listParams?: Record<string, string>;
+  pageParam?: string;
 }
 
 export function Pagination({
@@ -17,6 +19,8 @@ export function Pagination({
   page,
   basePath,
   extraParams = {},
+  listParams,
+  pageParam = "page",
 }: PaginationProps) {
   const router = useRouter();
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -24,7 +28,7 @@ export function Pagination({
   if (totalPages <= 1) return null;
 
   function buildUrl(p: number) {
-    const params = new URLSearchParams({ ...extraParams, page: String(p) });
+    const params = new URLSearchParams({ ...extraParams, ...listParams, [pageParam]: String(p) });
     return `${basePath}?${params.toString()}`;
   }
 

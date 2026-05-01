@@ -63,9 +63,9 @@ export async function logStockMovement(input: LogMovementInput): Promise<string>
     p_variant_id: input.variantId,
     p_quantity: input.quantity,
     p_type: input.type,
-    p_reference_id: input.referenceId || null,
-    p_reference_type: input.referenceType || null,
-    p_reason: input.reason || null,
+    p_reference_id: input.referenceId || undefined,
+    p_reference_type: input.referenceType || undefined,
+    p_reason: input.reason || undefined,
   });
 
   if (error) {
@@ -119,7 +119,7 @@ export async function adjustStock(
   // Update inventory
   const { error: updateError } = await supabase
     .from("inventory")
-    .update({ stock: newStock, updated_at: "now()" })
+    .update({ stock: newStock } as any)
     .eq("variant_id", variantId);
 
   if (updateError) {
@@ -181,7 +181,7 @@ export async function markDamaged(
   // Update inventory
   const { error: updateError } = await supabase
     .from("inventory")
-    .update({ stock: newStock, updated_at: "now()" })
+    .update({ stock: newStock } as any)
     .eq("variant_id", variantId);
 
   if (updateError) {
@@ -255,7 +255,7 @@ export async function getAllMovements(
   const movementsRes = await supabase.rpc("get_all_movements", {
     p_limit: PAGE_SIZE,
     p_offset: offset,
-    p_type_filter: typeFilter || null,
+    p_type_filter: typeFilter || undefined,
   });
 
   if (movementsRes.error) {

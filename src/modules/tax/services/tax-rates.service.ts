@@ -50,7 +50,7 @@ export async function getTaxRateById(id: string): Promise<TaxRateRow | null> {
 export async function getDefaultTaxRate(): Promise<number> {
   const supabase = await createSupabaseServerClient();
 
-  const { data, error } = await supabase.rpc("get_default_tax_rate");
+  const { data, error } = await (supabase.rpc as any)("get_default_tax_rate");
 
   if (error) throw new Error(error.message);
 
@@ -133,7 +133,7 @@ export async function updateTaxRate(
 
   const { error } = await supabase
     .from("tax_rates")
-    .update(updateData)
+    .update(updateData as any)
     .eq("id", id);
 
   if (error) throw new Error(error.message);

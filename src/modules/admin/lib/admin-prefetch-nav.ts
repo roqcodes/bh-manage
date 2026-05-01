@@ -19,7 +19,7 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
 
   if (p === "/admin/products") {
     return qc.prefetchQuery({
-      queryKey: adminQueryKeys.products(0),
+      queryKey: adminQueryKeys.products(0, null),
       queryFn: () =>
         adminGet("products?page=0"),
       staleTime: STALE,

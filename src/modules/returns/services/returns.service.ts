@@ -60,7 +60,7 @@ export async function createReturn(
     throw new Error("Variant does not match order item");
   }
 
-  if (quantity > orderItem.quantity) {
+  if (quantity > (orderItem.quantity ?? 0)) {
     throw new Error("Return quantity cannot exceed order quantity");
   }
 
@@ -77,7 +77,7 @@ export async function createReturn(
   }
 
   // Calculate refund amount
-  const unitPrice = orderItem.final_price / orderItem.quantity;
+  const unitPrice = (orderItem.final_price ?? 0) / (orderItem.quantity ?? 1);
   const refundAmount = unitPrice * quantity;
 
   const { data, error } = await supabase
@@ -159,9 +159,9 @@ export async function getReturnById(
 
   return {
     ...data,
-    order: data.orders?.[0],
-    variant: data.product_variants?.[0],
-    customer: data.users?.[0],
+    order: (data as any).orders,
+    variant: (data as any).product_variants,
+    customer: (data as any).users,
   } as ReturnWithDetails;
 }
 
@@ -198,9 +198,9 @@ export async function getAllReturns(
 
   const returns = (data ?? []).map((row) => ({
     ...row,
-    order: row.orders?.[0],
-    variant: row.product_variants?.[0],
-    customer: row.users?.[0],
+    order: (row as any).orders,
+    variant: (row as any).product_variants,
+    customer: (row as any).users,
   })) as ReturnWithDetails[];
 
   return {
@@ -223,7 +223,7 @@ export async function updateReturnStatus(
 
   const { data, error } = await supabase
     .from("returns")
-    .update(updateData)
+    .update(updateData as any)
     .eq("id", returnId)
     .select()
     .maybeSingle();

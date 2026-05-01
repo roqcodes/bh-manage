@@ -155,7 +155,7 @@ export default function AdminBillingPage() {
     <div className="flex h-full flex-col p-6">
       <PageHeader
         title="Manual Billing"
-        description="Create invoices for offline/external customers"
+        subtitle="Create invoices for offline/external customers"
       />
 
       {submitMessage && (

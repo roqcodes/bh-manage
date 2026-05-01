@@ -83,7 +83,7 @@ export async function generateInvoice(
 
   const { data, error } = await supabase.rpc("generate_invoice_for_order", {
     p_order_id: orderId,
-    p_gst_number: gstNumber || null,
+    p_gst_number: gstNumber || undefined,
   });
 
   if (error) {

@@ -98,19 +98,14 @@ export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & 
   const supabase = await createSupabaseServerClient();
   const from = page * PAGE_SIZE;
 
-  // We fetch all users (except maybe 'admin' if we want to exclude them, but let's fetch all for a complete list or just those not admin/vendor/delivery)
-  // Since the user says "every customer, their type of account", we'll fetch all users.
+  // Only show pure customers (role IS NULL)
   const [usersResult, countResult, retailCountResult, activeCountResult] = await Promise.all([
     supabase
       .from("users")
       .select("id,name,email,phone,role,is_verified,created_at")
-      .neq("role", "admin") // exclude admins from customer list
+      .is("role", null)
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1),
-    supabase
-      .from("users")
-      .select("id", { count: "exact", head: true })
-      .neq("role", "admin"),
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
@@ -118,7 +113,11 @@ export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & 
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
-      .neq("role", "admin")
+      .is("role", null),
+    supabase
+      .from("users")
+      .select("id", { count: "exact", head: true })
+      .is("role", null)
       .eq("is_verified", true),
   ]);
 

@@ -53,7 +53,7 @@ export async function updateMyVendorProduct(
 
   const { error } = await supabase
     .from("vendor_products")
-    .update(updateData)
+    .update(updateData as any)
     .eq("id", vendorProductId)
     .eq("vendor_id", profile.id);
 

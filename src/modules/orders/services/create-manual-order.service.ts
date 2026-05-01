@@ -154,7 +154,7 @@ export async function createManualOrder(
 
     const { error: updateError } = await supabase
       .from("inventory")
-      .update({ stock: newStock, updated_at: new Date().toISOString() })
+      .update({ stock: newStock } as any)
       .eq("variant_id", update.variant_id);
 
     if (updateError) {
@@ -166,7 +166,7 @@ export async function createManualOrder(
   try {
     await supabase.rpc('generate_invoice_for_order', {
       p_order_id: orderId,
-      p_gst_number: input.gstNumber || null
+      p_gst_number: input.gstNumber || undefined
     });
   } catch (invoiceError) {
     console.error("Failed to generate invoice automatically", invoiceError);

@@ -9,7 +9,7 @@ import { getMovementsForVariant } from "@/modules/inventory/services/stock-movem
  */
 export async function GET(
   request: Request,
-  { params }: { params: { variantId: string } },
+  { params }: { params: Promise<{ variantId: string }> },
 ) {
   try {
     const { variantId } = await params;

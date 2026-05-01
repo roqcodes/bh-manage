@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Package, Plus, Edit2, Check, X } from "lucide-react";
+import { Package, Plus, Edit2, Check, X, Percent } from "lucide-react";
 
 interface TaxRate {
   id: string;
