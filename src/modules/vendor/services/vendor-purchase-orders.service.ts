@@ -33,6 +33,25 @@ export async function listMyPurchaseOrders(
   };
 }
 
+export async function getMyPurchaseOrderStats(): Promise<{
+  pending: number;
+  accepted: number;
+  delivered: number;
+}> {
+  const profile = await requireVendorProfile();
+  const supabase = await createSupabaseServerClient();
+
+  const { data } = await supabase
+    .from("purchase_orders")
+    .select("status");
+
+  const pending = data?.filter((r) => r.status === "pending").length ?? 0;
+  const accepted = data?.filter((r) => r.status === "accepted").length ?? 0;
+  const delivered = data?.filter((r) => r.status === "delivered").length ?? 0;
+
+  return { pending, accepted, delivered };
+}
+
 export async function getMyPurchaseOrderById(
   poId: string,
 ): Promise<VendorPurchaseOrderDetail | null> {

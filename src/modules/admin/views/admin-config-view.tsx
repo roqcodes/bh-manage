@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronRight,
   Settings2,
+  Percent,
 } from "lucide-react";
 
 import { SignOutForm } from "@/modules/auth/components/sign-out-form";
@@ -199,6 +200,14 @@ export function AdminConfigView() {
       <section aria-label="System settings" className="mb-8 lg:mb-10">
         <SectionEyebrow icon={Settings2}>System settings</SectionEyebrow>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ShortcutCard
+            href="/admin/config/tax"
+            icon={Percent}
+            iconBg="bg-violet-100"
+            iconColor="text-violet-600"
+            title="Tax Rates"
+            description="Configure GST rates and tax rules."
+          />
           <SettingPlaceholderCard
             icon={Bell}
             title="Push notifications"

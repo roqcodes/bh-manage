@@ -14,52 +14,7 @@ import { TableShell, EmptyState } from "@/modules/admin/components/empty-state";
 import { Pagination } from "@/modules/admin/components/pagination";
 import { Modal } from "@/modules/admin/components/modal";
 
-function UserProfileModal({
-  user,
-  onClose,
-}: {
-  user: AdminUser;
-  onClose: () => void;
-}) {
-  return (
-    <Modal title="User Profile" onClose={onClose} size="sm">
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 text-lg font-extrabold text-slate-600">
-            {user.name?.[0]?.toUpperCase() ?? "?"}
-          </div>
-          <div>
-            <p className="font-bold text-slate-900">{user.name ?? "—"}</p>
-            <p className="text-xs text-slate-500">{user.email ?? "—"}</p>
-          </div>
-        </div>
-        <div className="space-y-2 rounded-2xl bg-slate-50 p-4 text-sm">
-          <Row label="Phone" value={user.phone ?? "—"} />
-          <Row label="Orders" value={String(user.order_count ?? 0)} />
-          <Row
-            label="Status"
-            value={user.is_verified !== false ? "Active" : "Blocked"}
-          />
-          {user.created_at && (
-            <Row
-              label="Joined"
-              value={format(new Date(user.created_at), "MMM d, yyyy")}
-            />
-          )}
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-semibold text-slate-900">{value}</span>
-    </div>
-  );
-}
+import Link from "next/link";
 
 export function StoresPanel({
   users,
@@ -72,7 +27,6 @@ export function StoresPanel({
 }) {
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
-  const [profileUser, setProfileUser] = useState<AdminUser | null>(null);
 
   function handleBlock(userId: string) {
     startTransition(async () => {
@@ -90,9 +44,6 @@ export function StoresPanel({
 
   return (
     <>
-      {profileUser && (
-        <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
-      )}
 
       <TableShell>
         {users.length === 0 ? (
@@ -151,13 +102,13 @@ export function StoresPanel({
                         {blocked ? "Blocked" : "Active"}
                       </span>
                       <div className="flex gap-1.5">
-                        <button
-                          onClick={() => setProfileUser(user)}
+                        <Link
+                          href={`/admin/customers/${user.id}`}
                           className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
-                          title="View profile"
+                          title="View customer details"
                         >
                           <Eye size={13} />
-                        </button>
+                        </Link>
                         {blocked ? (
                           <button
                             disabled={isPending}

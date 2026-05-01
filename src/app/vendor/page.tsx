@@ -1,21 +1,86 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Package, ClipboardList } from "lucide-react";
 
 import { PageHeader } from "@/modules/admin/components/page-header";
 import { VendorStatsRow } from "@/modules/vendor/components/vendor-stats-row";
 import { VendorPoActivityFeed } from "@/modules/vendor/components/vendor-po-activity-feed";
-import {
-  getVendorDashboardStats,
-  getVendorRecentPurchaseOrders,
-} from "@/modules/vendor/services/vendor-dashboard.service";
 
-export const dynamic = "force-dynamic";
+interface DashboardStats {
+  pendingPo: number;
+  acceptedPo: number;
+  deliveredPo: number;
+  supplySkus: number;
+  lowStockSkus: number;
+}
 
-export default async function VendorHomePage() {
-  const [stats, recent] = await Promise.all([
-    getVendorDashboardStats(),
-    getVendorRecentPurchaseOrders(8),
-  ]);
+interface RecentPo {
+  id: string;
+  status: string;
+  total_amount: number | null;
+  created_at: string | null;
+}
+
+interface DashboardResponse {
+  stats: DashboardStats;
+  recent: RecentPo[];
+}
+
+export default function VendorHomePage() {
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/vendor/dashboard")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch dashboard");
+        return res.json();
+      })
+      .then((result) => {
+        setData(result);
+        setIsError(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setIsError(true);
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-4xl px-8 py-10">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-center">
+            <Package className="mx-auto h-12 w-12 animate-spin text-slate-400" />
+            <p className="mt-4 text-sm text-slate-500">Loading dashboard...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="mx-auto w-full max-w-4xl px-8 py-10">
+        <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white">
+          <div className="text-center">
+            <Package className="mx-auto h-12 w-12 text-slate-400" />
+            <p className="mt-4 text-sm text-slate-500">Failed to load dashboard</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-4xl px-8 py-10">
@@ -25,11 +90,11 @@ export default async function VendorHomePage() {
       />
 
       <div className="mb-8">
-        <VendorStatsRow stats={stats} />
+        <VendorStatsRow stats={data.stats} />
       </div>
 
       <div className="mb-8">
-        <VendorPoActivityFeed recent={recent} />
+        <VendorPoActivityFeed recent={data.recent} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -58,7 +123,7 @@ export default async function VendorHomePage() {
           <h2 className="text-lg font-extrabold text-slate-900">
             Purchase orders
           </h2>
-          
+
           <p className="mt-1 text-sm text-slate-500">
             Review POs, accept them, and mark delivery to update central stock.
           </p>

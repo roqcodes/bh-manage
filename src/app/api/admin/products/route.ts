@@ -13,9 +13,10 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
+  const categoryId = searchParams.get("category_id") || null;
 
   const [{ data, total }, categories, stats] = await Promise.all([
-    getProducts(page),
+    getProducts(page, categoryId),
     getCategories(),
     getProductCatalogStats(),
   ]);

@@ -29,7 +29,7 @@ export async function getOrders(
   let query = supabase
     .from("orders")
     .select(
-      "id,created_at,status,total_amount,users:users!orders_user_id_fkey(id,name,email,phone)",
+      "id,created_at,status,total_amount,users:users!orders_user_fkey(id,name,email,phone)",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })
@@ -97,7 +97,7 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
   const { data } = await supabase
     .from("orders")
     .select(
-      "id,created_at,status,payment_status,total_amount,users:users!orders_user_id_fkey(id,name,email,phone),order_items(id,order_id,variant_id,quantity,price,product_name,vendor_id,base_price,final_price,margin_amount,created_at)",
+      "id,created_at,status,payment_status,total_amount,users:users!orders_user_fkey(id,name,email,phone),order_items(id,order_id,variant_id,quantity,price,product_name,vendor_id,base_price,final_price,margin_amount,created_at)",
     )
     .eq("id", id)
     .maybeSingle();

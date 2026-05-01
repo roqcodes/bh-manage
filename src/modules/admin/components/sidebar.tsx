@@ -15,6 +15,8 @@ import {
   ShoppingCart,
   Package,
   LogOut,
+  UserCircle,
+  Receipt,
 } from "lucide-react";
 
 import type { UserProfile } from "@/common/auth/types";
@@ -24,6 +26,7 @@ const NAV_ITEMS = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Marketplace", href: "/admin/products", icon: LayoutGrid },
   { name: "Orders", href: "/admin/orders", icon: ClipboardList },
+  { name: "Billing", href: "/admin/billing", icon: Receipt },
   { name: "Inventory", href: "/admin/inventory", icon: Warehouse },
   { name: "Procurement", href: "/admin/procurement", icon: ShoppingCart },
   {
@@ -32,6 +35,7 @@ const NAV_ITEMS = [
     icon: Package,
   },
   { name: "Vendors", href: "/admin/vendors", icon: Building2 },
+  { name: "Customers", href: "/admin/customers", icon: UserCircle },
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Delivery", href: "/admin/delivery", icon: Truck },
   { name: "Config", href: "/admin/config", icon: Settings },

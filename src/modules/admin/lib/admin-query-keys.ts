@@ -2,7 +2,7 @@
 export const adminQueryKeys = {
   session: () => ["admin", "session"] as const,
   dashboard: () => ["admin", "dashboard"] as const,
-  products: (page: number) => ["admin", "products", page] as const,
+  products: (page: number, categoryId: string | null) => ["admin", "products", page, categoryId ?? "all"] as const,
   vendors: (page: number) => ["admin", "vendors", page] as const,
   inventory: (page: number) => ["admin", "inventory", page] as const,
   orders: (status: string, userId: string | null, page: number) =>
@@ -16,4 +16,6 @@ export const adminQueryKeys = {
   orderDetail: (id: string) => ["admin", "order", id] as const,
   vendorDetail: (id: string) => ["admin", "vendor", id] as const,
   purchaseOrderDetail: (id: string) => ["admin", "purchase-order", id] as const,
+  customerDetail: (id: string, txPage: number) => ["admin", "customer", id, txPage] as const,
+  customersList: (page: number) => ["admin", "customers", "list", page] as const,
 };

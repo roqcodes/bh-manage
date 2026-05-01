@@ -14,23 +14,35 @@ import { PAGE_SIZE } from "@/common/admin/types";
 
 export async function getProducts(
   page = 0,
+  categoryId: string | null = null,
 ): Promise<Paginated<ProductWithCategory>> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * PAGE_SIZE;
 
-  const [dataResult, countResult] = await Promise.all([
-    supabase
-      .from("products")
-      .select(
-        "id,name,description,category_id,image_url,is_active,created_at,categories(id,name,parent_id,image_url,created_at)",
-      )
-      .order("created_at", { ascending: false })
-      .range(from, from + PAGE_SIZE - 1),
-    supabase
-      .from("products")
-      .select("id", { count: "exact", head: true }),
-  ]);
+  let query = supabase
+    .from("products")
+    .select(
+      "id,name,description,category_id,image_url,is_active,created_at,categories(id,name,parent_id,image_url,created_at)",
+    );
+
+  let countQuery = supabase
+    .from("products")
+    .select("id", { count: "exact", head: true });
+
+  if (categoryId) {
+    if (categoryId === "__uncategorized__") {
+      query = query.is("category_id", null);
+      countQuery = countQuery.is("category_id", null);
+    } else {
+      query = query.eq("category_id", categoryId);
+      countQuery = countQuery.eq("category_id", categoryId);
+    }
+  }
+
+  query = query.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1);
+
+  const [dataResult, countResult] = await Promise.all([query, countQuery]);
 
   return {
     data: (dataResult.data ?? []) as unknown as ProductWithCategory[],
