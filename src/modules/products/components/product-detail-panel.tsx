@@ -11,6 +11,8 @@ import {
   Package,
   Layers,
   Tag,
+  Leaf,
+  Drumstick,
   Sparkles,
   ToggleLeft,
   ToggleRight,
@@ -312,6 +314,7 @@ function ProductEditForm({
     const name = (fd.get("name") as string).trim();
     const description = (fd.get("description") as string).trim();
     const categoryId = (fd.get("categoryId") as string) || null;
+    const isVeg = fd.get("isVeg") === "on";
     const imageUrlValue = imageUrl.trim() || null;
     if (!name) return setError("Name is required.");
     setError(null);
@@ -322,6 +325,7 @@ function ProductEditForm({
           description,
           categoryId,
           imageUrl: imageUrlValue,
+          isVeg,
         });
         await queryClient.invalidateQueries({
           queryKey: adminQueryKeys.productDetail(product.id),
@@ -392,7 +396,15 @@ function ProductEditForm({
           ))}
         </select>
       </FieldLabel>
-
+      <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
+        <input
+          type="checkbox"
+          name="isVeg"
+          defaultChecked={product.is_veg ?? false}
+          className="h-4 w-4 accent-emerald-500"
+        />
+        Vegetarian
+      </label>
       <FormError message={error} />
       <div className="flex justify-end gap-2">
         <SecondaryBtn onClick={onClose}>Cancel</SecondaryBtn>
@@ -529,6 +541,7 @@ export function ProductDetailPanel({
   }
 
   const isActive = product.is_active ?? false;
+  const isVeg = product.is_veg ?? false;
   const shortId = product.id.slice(0, 8).toUpperCase();
 
   const livePriceValue =
@@ -597,7 +610,16 @@ export function ProductDetailPanel({
                     />
                     {isActive ? "Active" : "Inactive"}
                   </span>
-
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] ring-1 ${
+                      isVeg
+                        ? "bg-emerald-50/90 text-emerald-700 ring-emerald-500/20"
+                        : "bg-rose-50/90 text-rose-700 ring-rose-500/20"
+                    }`}
+                  >
+                    {isVeg ? <Leaf className="size-3" /> : <Drumstick className="size-3" />}
+                    {isVeg ? "Veg" : "Non-veg"}
+                  </span>
                   {product.categories?.name ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-sky-50/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-sky-500/15">
                       <Tag className="size-3" />

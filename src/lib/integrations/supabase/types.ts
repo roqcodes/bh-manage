@@ -283,6 +283,7 @@ export interface Database {
           image_url: string | null;
           is_active: boolean | null;
           created_at: string | null;
+          is_veg: boolean | null;
         };
         Insert: {
           id?: string;
@@ -291,6 +292,7 @@ export interface Database {
           category_id?: string | null;
           image_url?: string | null;
           is_active?: boolean | null;
+          is_veg?: boolean | null;
         };
         Update: {
           name?: string | null;
@@ -298,6 +300,7 @@ export interface Database {
           category_id?: string | null;
           image_url?: string | null;
           is_active?: boolean | null;
+          is_veg?: boolean | null;
         };
         Relationships: [];
       };
