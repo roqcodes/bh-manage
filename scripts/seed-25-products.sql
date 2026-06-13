@@ -36,14 +36,13 @@ WITH cat_rows AS (
   RETURNING id, name
 ),
 prod_rows AS (
-  INSERT INTO public.products (name, description, category_id, image_url, is_active, is_veg)
+  INSERT INTO public.products (name, description, category_id, image_url, is_active)
   SELECT
     x.name,
     x.description,
     c.id,
     x.image_url,
-    true,
-    false
+    true
   FROM (
     VALUES
       (

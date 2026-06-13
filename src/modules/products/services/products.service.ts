@@ -9,6 +9,7 @@ import type {
   Paginated,
   ProductWithCategory,
   ProductVariant,
+  VariantImage,
 } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
 
@@ -23,7 +24,7 @@ export async function getProducts(
   let query = supabase
     .from("products")
     .select(
-      "id,name,description,category_id,image_url,is_active,is_veg,created_at,categories(id,name,parent_id,image_url,created_at)",
+      "id,name,description,category_id,image_url,is_active,created_at,categories(id,name,parent_id,image_url,created_at)",
     );
 
   let countQuery = supabase
@@ -54,8 +55,6 @@ export interface ProductCatalogStats {
   total: number;
   active: number;
   inactive: number;
-  veg: number;
-  nonVeg: number;
   categoriesCount: number;
   uncategorized: number;
   categoryCounts: Record<string, number>;
@@ -68,7 +67,6 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
   const [
     totalResult,
     activeResult,
-    vegResult,
     categoriesCountResult,
     categoryRowsResult,
   ] = await Promise.all([
@@ -77,17 +75,12 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
       .from("products")
       .select("id", { count: "exact", head: true })
       .eq("is_active", true),
-    supabase
-      .from("products")
-      .select("id", { count: "exact", head: true })
-      .eq("is_veg", true),
     supabase.from("categories").select("id", { count: "exact", head: true }),
     supabase.from("products").select("category_id"),
   ]);
 
   const total = totalResult.count ?? 0;
   const active = activeResult.count ?? 0;
-  const veg = vegResult.count ?? 0;
 
   const categoryCounts: Record<string, number> = {};
   let uncategorized = 0;
@@ -106,8 +99,6 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
     total,
     active,
     inactive: Math.max(0, total - active),
-    veg,
-    nonVeg: Math.max(0, total - veg),
     categoriesCount: categoriesCountResult.count ?? 0,
     uncategorized,
     categoryCounts,
@@ -122,7 +113,7 @@ export async function getProductById(
   const { data } = await supabase
     .from("products")
     .select(
-      "id,name,description,category_id,image_url,is_active,is_veg,created_at,categories(id,name,parent_id,image_url,created_at)",
+      "id,name,description,category_id,image_url,is_active,created_at,categories(id,name,parent_id,image_url,created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -134,12 +125,43 @@ export async function getProductVariants(
 ): Promise<ProductVariant[]> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("product_variants")
-    .select("id,product_id,name,price,mrp,created_at")
+    .select(
+      "id,product_id,name,price,mrp,created_at,variant_images(id,variant_id,url,is_preview,sort_order,created_at)",
+    )
     .eq("product_id", productId)
     .order("created_at", { ascending: true });
-  return (data ?? []) as ProductVariant[];
+
+  // Fall back to a plain select if the variant_images relation isn't available
+  // yet (e.g. the migration hasn't been applied), so variants still render.
+  if (error) {
+    const { data: plain } = await supabase
+      .from("product_variants")
+      .select("id,product_id,name,price,mrp,created_at")
+      .eq("product_id", productId)
+      .order("created_at", { ascending: true });
+    return ((plain ?? []) as Omit<ProductVariant, "images">[]).map((v) => ({
+      ...v,
+      images: [],
+    }));
+  }
+
+  return ((data ?? []) as unknown as (Omit<ProductVariant, "images"> & {
+    variant_images?: VariantImage[];
+  })[]).map((row) => {
+    const { variant_images, ...variant } = row;
+    return { ...variant, images: sortVariantImages(variant_images ?? []) };
+  });
+}
+
+/** Preview first, then by sort_order, then by creation time for stable display. */
+function sortVariantImages(images: VariantImage[]): VariantImage[] {
+  return [...images].sort((a, b) => {
+    if (a.is_preview !== b.is_preview) return a.is_preview ? -1 : 1;
+    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+    return (a.created_at ?? "").localeCompare(b.created_at ?? "");
+  });
 }
 
 export async function countVariantsForProduct(productId: string): Promise<number> {
@@ -157,7 +179,6 @@ export async function insertProduct(input: {
   description: string | null;
   categoryId: string | null;
   imageUrl: string | null;
-  isVeg: boolean;
 }): Promise<void> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -166,7 +187,6 @@ export async function insertProduct(input: {
     description: input.description,
     category_id: input.categoryId,
     image_url: input.imageUrl,
-    is_veg: input.isVeg,
     is_active: true,
   });
   if (error) throw new Error(error.message);
@@ -179,7 +199,6 @@ export async function updateProductById(
     description: string | null;
     categoryId: string | null;
     imageUrl: string | null;
-    isVeg: boolean;
   },
 ): Promise<void> {
   await requireAdminOrManagerProfile();
@@ -191,7 +210,6 @@ export async function updateProductById(
       description: input.description,
       category_id: input.categoryId,
       image_url: input.imageUrl,
-      is_veg: input.isVeg,
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

@@ -119,7 +119,6 @@ CREATE TABLE public.products (
   image_url text,
   is_active boolean DEFAULT true,
   created_at timestamp without time zone DEFAULT now(),
-  is_veg boolean DEFAULT false,
   CONSTRAINT products_pkey PRIMARY KEY (id),
   CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)
 );

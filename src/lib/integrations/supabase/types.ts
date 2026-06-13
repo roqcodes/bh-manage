@@ -274,6 +274,38 @@ export interface Database {
         };
         Relationships: [];
       };
+      variant_images: {
+        Row: {
+          id: string;
+          variant_id: string;
+          url: string;
+          is_preview: boolean;
+          sort_order: number;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          variant_id: string;
+          url: string;
+          is_preview?: boolean;
+          sort_order?: number;
+          created_at?: string | null;
+        };
+        Update: {
+          variant_id?: string;
+          url?: string;
+          is_preview?: boolean;
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "variant_images_variant_id_fkey";
+            columns: ["variant_id"];
+            referencedRelation: "product_variants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       products: {
         Row: {
           id: string;
@@ -283,7 +315,6 @@ export interface Database {
           image_url: string | null;
           is_active: boolean | null;
           created_at: string | null;
-          is_veg: boolean | null;
         };
         Insert: {
           id?: string;
@@ -292,7 +323,6 @@ export interface Database {
           category_id?: string | null;
           image_url?: string | null;
           is_active?: boolean | null;
-          is_veg?: boolean | null;
         };
         Update: {
           name?: string | null;
@@ -300,7 +330,6 @@ export interface Database {
           category_id?: string | null;
           image_url?: string | null;
           is_active?: boolean | null;
-          is_veg?: boolean | null;
         };
         Relationships: [];
       };

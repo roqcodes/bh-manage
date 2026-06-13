@@ -13,8 +13,6 @@ interface ProductCatalogStatsPayload {
   total: number;
   active: number;
   inactive: number;
-  veg: number;
-  nonVeg: number;
   categoriesCount: number;
   uncategorized: number;
   categoryCounts: Record<string, number>;

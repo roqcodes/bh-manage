@@ -7,6 +7,7 @@ import {
   insertVariantWithInventory,
   updateVariantById,
 } from "@/modules/products/services/product-variants.service";
+import { addVariantImages } from "@/modules/products/services/variant-images.service";
 
 function roundMoney2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -14,14 +15,17 @@ function roundMoney2(n: number): number {
 
 export async function createVariantAction(
   productId: string,
-  data: { name: string; price: number; mrp: number },
+  data: { name: string; price: number; mrp: number; imageUrls?: string[] },
 ): Promise<void> {
-  await insertVariantWithInventory({
+  const variantId = await insertVariantWithInventory({
     productId,
     name: data.name,
     price: roundMoney2(data.price),
     mrp: roundMoney2(data.mrp),
   });
+  if (data.imageUrls && data.imageUrls.length > 0) {
+    await addVariantImages(variantId, data.imageUrls);
+  }
   revalidatePath(`/admin/products/${productId}`);
 }
 

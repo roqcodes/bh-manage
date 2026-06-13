@@ -71,7 +71,6 @@ export interface Product {
   category_id: string | null;
   image_url: string | null;
   is_active: boolean | null;
-  is_veg: boolean | null;
   created_at: string | null;
 }
 
@@ -87,6 +86,15 @@ export interface ProductAtGlanceMetrics {
   variantsWithLivePrice: number;
 }
 
+export interface VariantImage {
+  id: string;
+  variant_id: string;
+  url: string;
+  is_preview: boolean;
+  sort_order: number;
+  created_at: string | null;
+}
+
 export interface ProductVariant {
   id: string;
   product_id: string | null;
@@ -94,6 +102,8 @@ export interface ProductVariant {
   price: number | null;
   mrp: number | null;
   created_at: string | null;
+  /** Ordered images for this variant; preview first. Empty when none. */
+  images: VariantImage[];
 }
 
 export interface VariantWithProduct extends ProductVariant {

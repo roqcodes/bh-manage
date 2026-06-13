@@ -18,7 +18,7 @@ export async function insertVariantWithInventory(input: {
   name: string;
   price: number;
   mrp: number;
-}): Promise<void> {
+}): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
 
@@ -42,6 +42,8 @@ export async function insertVariantWithInventory(input: {
     await supabase.from("product_variants").delete().eq("id", row.id);
     throw e instanceof Error ? e : new Error(String(e));
   }
+
+  return row.id;
 }
 
 export async function updateVariantById(

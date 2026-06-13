@@ -11,12 +11,11 @@ import {
   Package,
   Layers,
   Tag,
-  Leaf,
-  Drumstick,
   Sparkles,
   ToggleLeft,
   ToggleRight,
   Warehouse,
+  Images,
 } from "lucide-react";
 
 import type {
@@ -46,6 +45,9 @@ import {
   selectCls,
   textareaCls,
 } from "@/modules/admin/components/modal";
+import { ProductImageField } from "@/modules/products/components/product-image-field";
+import { VariantImagesField } from "@/modules/products/components/variant-images-field";
+import { VariantImagesManager } from "@/modules/products/components/variant-images-manager";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 
 const BRAND = "#2563EB";
@@ -209,6 +211,9 @@ function VariantForm({
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [imageUploading, setImageUploading] = useState(false);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -225,7 +230,20 @@ function VariantForm({
         if (variant) {
           await updateVariantAction(variant.id, productId, { name, price, mrp });
         } else {
-          await createVariantAction(productId, { name, price, mrp });
+          // Order the chosen preview first so it becomes the variant preview.
+          const orderedImages =
+            previewIndex > 0 && previewIndex < images.length
+              ? [
+                  images[previewIndex],
+                  ...images.filter((_, i) => i !== previewIndex),
+                ]
+              : images;
+          await createVariantAction(productId, {
+            name,
+            price,
+            mrp,
+            imageUrls: orderedImages,
+          });
         }
         await queryClient.invalidateQueries({
           queryKey: adminQueryKeys.productDetail(productId),
@@ -240,12 +258,12 @@ function VariantForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <FieldLabel label="Variant Name (e.g. 500g, 1kg)">
+      <FieldLabel label="Variant Name (e.g. Black, 128 GB)">
         <input
           className={inputCls}
           name="name"
           defaultValue={variant?.name ?? ""}
-          placeholder="e.g. 1 kg"
+          placeholder="e.g. 128 GB / Black"
           required
         />
       </FieldLabel>
@@ -273,11 +291,28 @@ function VariantForm({
           />
         </FieldLabel>
       </div>
+      {!variant ? (
+        <VariantImagesField
+          images={images}
+          previewIndex={previewIndex}
+          onChange={(next, preview) => {
+            setImages(next);
+            setPreviewIndex(preview);
+          }}
+          onUploadingChange={setImageUploading}
+        />
+      ) : null}
       <FormError message={error} />
       <div className="flex justify-end gap-2">
         <SecondaryBtn onClick={onClose}>Cancel</SecondaryBtn>
-        <PrimaryBtn type="submit" disabled={isPending}>
-          {isPending ? "Saving…" : variant ? "Save" : "Add Variant"}
+        <PrimaryBtn type="submit" disabled={isPending || imageUploading}>
+          {imageUploading
+            ? "Uploading…"
+            : isPending
+              ? "Saving…"
+              : variant
+                ? "Save"
+                : "Add Variant"}
         </PrimaryBtn>
       </div>
     </form>
@@ -297,16 +332,11 @@ function ProductEditForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState(product.image_url?.trim() ?? "");
-  const [previewBroken, setPreviewBroken] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
 
   useEffect(() => {
     setImageUrl(product.image_url?.trim() ?? "");
-    setPreviewBroken(false);
   }, [product.id, product.image_url]);
-
-  useEffect(() => {
-    setPreviewBroken(false);
-  }, [imageUrl]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -314,7 +344,6 @@ function ProductEditForm({
     const name = (fd.get("name") as string).trim();
     const description = (fd.get("description") as string).trim();
     const categoryId = (fd.get("categoryId") as string) || null;
-    const isVeg = fd.get("isVeg") === "on";
     const imageUrlValue = imageUrl.trim() || null;
     if (!name) return setError("Name is required.");
     setError(null);
@@ -325,7 +354,6 @@ function ProductEditForm({
           description,
           categoryId,
           imageUrl: imageUrlValue,
-          isVeg,
         });
         await queryClient.invalidateQueries({
           queryKey: adminQueryKeys.productDetail(product.id),
@@ -343,41 +371,11 @@ function ProductEditForm({
       <FieldLabel label="Product Name">
         <input className={inputCls} name="name" defaultValue={product.name ?? ""} required />
       </FieldLabel>
-      <FieldLabel label="Image URL">
-        <input
-          className={inputCls}
-          name="imageUrl"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          placeholder="https://…"
-          autoComplete="off"
-        />
-      </FieldLabel>
-      {imageUrl.trim() ? (
-        <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2">
-          <div className="shrink-0">
-            <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              Preview
-            </p>
-            {!previewBroken ? (
-              <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-white ring-1 ring-slate-100/80">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  key={imageUrl}
-                  src={imageUrl.trim()}
-                  alt=""
-                  className="max-h-full max-w-full rounded-md object-contain"
-                  onError={() => setPreviewBroken(true)}
-                />
-              </div>
-            ) : (
-              <p className="max-w-[10rem] text-[11px] font-medium leading-snug text-amber-700">
-                Could not load. Check the URL.
-              </p>
-            )}
-          </div>
-        </div>
-      ) : null}
+      <ProductImageField
+        value={imageUrl}
+        onChange={setImageUrl}
+        onUploadingChange={setImageUploading}
+      />
       <FieldLabel label="Description">
         <textarea
           className={textareaCls}
@@ -396,23 +394,34 @@ function ProductEditForm({
           ))}
         </select>
       </FieldLabel>
-      <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
-        <input
-          type="checkbox"
-          name="isVeg"
-          defaultChecked={product.is_veg ?? false}
-          className="h-4 w-4 accent-emerald-500"
-        />
-        Vegetarian
-      </label>
       <FormError message={error} />
       <div className="flex justify-end gap-2">
         <SecondaryBtn onClick={onClose}>Cancel</SecondaryBtn>
-        <PrimaryBtn type="submit" disabled={isPending}>
-          {isPending ? "Saving…" : "Save Changes"}
+        <PrimaryBtn type="submit" disabled={isPending || imageUploading}>
+          {imageUploading ? "Uploading…" : isPending ? "Saving…" : "Save Changes"}
         </PrimaryBtn>
       </div>
     </form>
+  );
+}
+
+function VariantThumb({ url }: { url: string | null }) {
+  const [broken, setBroken] = useState(false);
+  if (!url || broken) {
+    return (
+      <div className="flex size-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-50 text-slate-300">
+        <Package strokeWidth={1.5} className="size-7" aria-hidden />
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      className="size-full object-cover"
+      onError={() => setBroken(true)}
+    />
   );
 }
 
@@ -421,15 +430,19 @@ function VariantCard({
   isPending,
   onEdit,
   onDelete,
+  onManageImages,
 }: {
   variant: ProductVariant;
   isPending: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onManageImages: () => void;
 }) {
   const tint = "linear-gradient(135deg, #e0e7ff, #c7d2fe)";
   const price = variant.price ?? null;
   const mrp = variant.mrp ?? null;
+  const images = variant.images ?? [];
+  const preview = images[0] ?? null; // images come preview-first
 
   return (
     <div
@@ -440,7 +453,21 @@ function VariantCard({
         style={{ background: tint }}
         aria-hidden
       />
-      <div className="relative flex items-start justify-between gap-3">
+      <div className="relative flex items-start gap-3">
+        <button
+          type="button"
+          onClick={onManageImages}
+          title="Manage images"
+          className="relative size-16 shrink-0 overflow-hidden rounded-xl border border-slate-200/70 bg-slate-50 shadow-sm transition hover:border-[color:var(--brand)]/40 hover:shadow-md"
+          style={{ ["--brand" as string]: BRAND }}
+        >
+          <VariantThumb url={preview?.url ?? null} />
+          {images.length > 1 ? (
+            <span className="absolute bottom-1 right-1 rounded-md bg-slate-900/75 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-white">
+              +{images.length - 1}
+            </span>
+          ) : null}
+        </button>
         <div className="min-w-0 flex-1">
           <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-slate-400">
             SKU
@@ -448,15 +475,12 @@ function VariantCard({
           <p className="mt-1 line-clamp-2 text-[15px] font-black leading-snug tracking-tight text-slate-950">
             {variant.name ?? "Unnamed variant"}
           </p>
+          <p className="mt-1 text-[11px] font-semibold text-slate-400">
+            {images.length === 0
+              ? "No images"
+              : `${images.length} image${images.length !== 1 ? "s" : ""}`}
+          </p>
         </div>
-        <span className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/55 bg-white/90 shadow-sm">
-          <span
-            className="pointer-events-none absolute inset-0 opacity-[0.4]"
-            style={{ background: tint }}
-            aria-hidden
-          />
-          <Package className="relative size-4 text-slate-600" aria-hidden />
-        </span>
       </div>
 
       <div className="relative mt-4 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-4">
@@ -476,6 +500,14 @@ function VariantCard({
       </div>
 
       <div className="relative mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={onManageImages}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200/80 bg-white py-2.5 text-[12px] font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          <Images className="size-3.5" />
+          Images
+        </button>
         <button
           type="button"
           onClick={onEdit}
@@ -498,6 +530,13 @@ function VariantCard({
   );
 }
 
+type DetailModal =
+  | { kind: "editProduct" }
+  | { kind: "addVariant" }
+  | { kind: "editVariant"; variant: ProductVariant }
+  | { kind: "variantImages"; variant: ProductVariant }
+  | null;
+
 export function ProductDetailPanel({
   product,
   variants,
@@ -513,11 +552,7 @@ export function ProductDetailPanel({
 }) {
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
-  const [modal, setModal] = useState<"editProduct" | "addVariant" | ProductVariant | null>(null);
-
-  function isVariantModal(m: typeof modal): m is ProductVariant {
-    return m !== null && typeof m === "object";
-  }
+  const [modal, setModal] = useState<DetailModal>(null);
 
   function handleDelete(variantId: string) {
     if (!confirm("Delete this variant? This cannot be undone.")) return;
@@ -541,7 +576,6 @@ export function ProductDetailPanel({
   }
 
   const isActive = product.is_active ?? false;
-  const isVeg = product.is_veg ?? false;
   const shortId = product.id.slice(0, 8).toUpperCase();
 
   const livePriceValue =
@@ -564,20 +598,34 @@ export function ProductDetailPanel({
   return (
     <>
       <AnimatePresence>
-        {modal === "editProduct" && (
+        {modal?.kind === "editProduct" && (
           <Modal title="Edit Product" onClose={() => setModal(null)}>
             <ProductEditForm product={product} categories={categories} onClose={() => setModal(null)} />
           </Modal>
         )}
-        {(modal === "addVariant" || isVariantModal(modal)) && (
+        {(modal?.kind === "addVariant" || modal?.kind === "editVariant") && (
           <Modal
-            title={modal === "addVariant" ? "Add Variant" : "Edit Variant"}
+            title={modal.kind === "addVariant" ? "Add Variant" : "Edit Variant"}
             onClose={() => setModal(null)}
             size="sm"
           >
             <VariantForm
               productId={product.id}
-              variant={isVariantModal(modal) ? modal : undefined}
+              variant={modal.kind === "editVariant" ? modal.variant : undefined}
+              onClose={() => setModal(null)}
+            />
+          </Modal>
+        )}
+        {modal?.kind === "variantImages" && (
+          <Modal
+            title="Variant Images"
+            onClose={() => setModal(null)}
+          >
+            <VariantImagesManager
+              productId={product.id}
+              variant={
+                variants.find((v) => v.id === modal.variant.id) ?? modal.variant
+              }
               onClose={() => setModal(null)}
             />
           </Modal>
@@ -609,16 +657,6 @@ export function ProductDetailPanel({
                       className={`size-1.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-slate-400"}`}
                     />
                     {isActive ? "Active" : "Inactive"}
-                  </span>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] ring-1 ${
-                      isVeg
-                        ? "bg-emerald-50/90 text-emerald-700 ring-emerald-500/20"
-                        : "bg-rose-50/90 text-rose-700 ring-rose-500/20"
-                    }`}
-                  >
-                    {isVeg ? <Leaf className="size-3" /> : <Drumstick className="size-3" />}
-                    {isVeg ? "Veg" : "Non-veg"}
                   </span>
                   {product.categories?.name ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-sky-50/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-sky-500/15">
@@ -660,7 +698,7 @@ export function ProductDetailPanel({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setModal("editProduct")}
+                  onClick={() => setModal({ kind: "editProduct" })}
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-[12.5px] font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
                 >
                   <Pencil className="size-3.5" />
@@ -668,7 +706,7 @@ export function ProductDetailPanel({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setModal("addVariant")}
+                  onClick={() => setModal({ kind: "addVariant" })}
                   className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] font-bold text-white shadow-[0_10px_22px_-8px_rgba(37,99,235,0.55)] transition hover:shadow-[0_14px_28px_-8px_rgba(37,99,235,0.6)]"
                   style={{
                     background: `linear-gradient(135deg, ${BRAND}, #b5102f)`,
@@ -772,7 +810,7 @@ export function ProductDetailPanel({
             trailing={
               <button
                 type="button"
-                onClick={() => setModal("addVariant")}
+                onClick={() => setModal({ kind: "addVariant" })}
                 className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-bold text-[color:var(--brand)] transition hover:bg-[color:var(--brand)]/8"
                 style={{ ["--brand" as string]: BRAND }}
               >
@@ -790,12 +828,12 @@ export function ProductDetailPanel({
             >
               <Package className="size-12 text-slate-200" />
               <p className="max-w-sm text-sm font-semibold text-slate-500">
-                No variants yet. Add at least one size or pack to make this product
+                No variants yet. Add at least one variant to make this product
                 purchasable.
               </p>
               <button
                 type="button"
-                onClick={() => setModal("addVariant")}
+                onClick={() => setModal({ kind: "addVariant" })}
                 className="mt-2 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_10px_22px_-8px_rgba(37,99,235,0.55)] transition hover:shadow-[0_14px_28px_-8px_rgba(37,99,235,0.6)]"
                 style={{
                   background: `linear-gradient(135deg, ${BRAND}, #b5102f)`,
@@ -812,7 +850,10 @@ export function ProductDetailPanel({
                   key={v.id}
                   variant={v}
                   isPending={isPending}
-                  onEdit={() => setModal(v)}
+                  onEdit={() => setModal({ kind: "editVariant", variant: v })}
+                  onManageImages={() =>
+                    setModal({ kind: "variantImages", variant: v })
+                  }
                   onDelete={() => handleDelete(v.id)}
                 />
               ))}
