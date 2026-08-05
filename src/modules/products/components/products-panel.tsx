@@ -1,47 +1,28 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
 import {
   Plus,
-  Pencil,
   LayoutGrid,
-  ToggleLeft,
-  ToggleRight,
-  Trash2,
   Package,
   CheckCircle2,
   Tag,
   Search,
   Sparkles,
   Layers,
-  ArrowRight,
+  Pencil,
+  Eye,
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
 import type { Category, ProductWithCategory } from "@/common/admin/types";
-import {
-  createProductAction,
-  deleteProductAction,
-  updateProductAction,
-  toggleProductAction,
-} from "@/modules/products/actions/products.actions";
 import { Pagination } from "@/modules/admin/components/pagination";
-import {
-  Modal,
-  FieldLabel,
-  FormError,
-  PrimaryBtn,
-  SecondaryBtn,
-  inputCls,
-  selectCls,
-  textareaCls,
-} from "@/modules/admin/components/modal";
-import { ProductImageField } from "@/modules/products/components/product-image-field";
+import { ProductManageModal } from "@/modules/products/components/product-manage-modal";
 
 const BRAND = "#2563EB";
 const ALL_CATEGORIES = "__all__";
@@ -195,9 +176,9 @@ function InlineRail({
   );
 }
 
-/* ────────────────────────── product form (modal) ────────────────────────── */
+/* ────────────────────────── product card image ────────────────────────── */
 
-function ProductFormImage({ url }: { url: string | null | undefined }) {
+function ProductCardImage({ url }: { url: string | null | undefined }) {
   const [failed, setFailed] = useState(false);
   const trimmed = url?.trim() ?? "";
   useEffect(() => {
@@ -221,115 +202,10 @@ function ProductFormImage({ url }: { url: string | null | undefined }) {
   );
 }
 
-function ProductForm({
-  product,
-  categories,
-  onClose,
-}: {
-  product?: ProductWithCategory;
-  categories: Category[];
-  onClose: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState(product?.image_url?.trim() ?? "");
-  const [imageUploading, setImageUploading] = useState(false);
-
-  useEffect(() => {
-    setImageUrl(product?.image_url?.trim() ?? "");
-  }, [product?.id]);
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const name = (fd.get("name") as string).trim();
-    const description = (fd.get("description") as string).trim();
-    const categoryId = (fd.get("categoryId") as string) || null;
-    const imageUrlValue = imageUrl.trim() || null;
-    if (!name) return setError("Product name is required.");
-    setError(null);
-    startTransition(async () => {
-      try {
-        if (product) {
-          await updateProductAction(product.id, {
-            name,
-            description,
-            categoryId,
-            imageUrl: imageUrlValue,
-          });
-        } else {
-          await createProductAction({
-            name,
-            description,
-            categoryId,
-            imageUrl: imageUrlValue,
-          });
-        }
-        void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-        onClose();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
-      }
-    });
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <FieldLabel label="Product Name">
-        <input
-          className={inputCls}
-          name="name"
-          defaultValue={product?.name ?? ""}
-          placeholder="e.g. Wireless Mouse"
-          required
-        />
-      </FieldLabel>
-      <ProductImageField
-        value={imageUrl}
-        onChange={setImageUrl}
-        onUploadingChange={setImageUploading}
-      />
-      <FieldLabel label="Description">
-        <textarea
-          className={textareaCls}
-          name="description"
-          defaultValue={product?.description ?? ""}
-          rows={3}
-          placeholder="Optional description…"
-        />
-      </FieldLabel>
-      <FieldLabel label="Category">
-        <select
-          name="categoryId"
-          className={selectCls}
-          defaultValue={product?.category_id ?? ""}
-        >
-          <option value="">No category</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </FieldLabel>
-
-      <FormError message={error} />
-      <div className="flex justify-end gap-2 pt-1">
-        <SecondaryBtn onClick={onClose}>Cancel</SecondaryBtn>
-        <PrimaryBtn type="submit" disabled={isPending || imageUploading}>
-          {imageUploading
-            ? "Uploading…"
-            : isPending
-              ? "Saving…"
-              : product
-                ? "Save Changes"
-                : "Create Product"}
-        </PrimaryBtn>
-      </div>
-    </form>
-  );
-}
+type ManageModalState =
+  | { mode: "create" }
+  | { mode: "edit"; product: ProductWithCategory }
+  | null;
 
 /* ────────────────────────── categories strip ────────────────────────── */
 
@@ -470,25 +346,20 @@ function CategoriesStrip({
 
 function ProductCard({
   product,
-  isPending,
   onEdit,
-  onToggle,
-  onDelete,
 }: {
   product: ProductWithCategory;
-  isPending: boolean;
   onEdit: () => void;
-  onToggle: () => void;
-  onDelete: () => void;
 }) {
   const tint = product.category_id
     ? tintFor(product.category_id)
     : "linear-gradient(135deg, #e2e8f0, #cbd5e1)";
-  const isActive = product.is_active ?? false;
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_0_0_rgba(255,255,255,0.6)_inset,0_2px_10px_-4px_rgba(15,23,42,0.06),0_20px_40px_-24px_rgba(15,23,42,0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]">
-      {/* Image — fixed crop box; photos fill with object-cover */}
+    <Link
+      href={`/admin/products/${product.id}`}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_0_0_rgba(255,255,255,0.6)_inset,0_2px_10px_-4px_rgba(15,23,42,0.06),0_20px_40px_-24px_rgba(15,23,42,0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]"
+    >
       <div className="relative h-44 w-full shrink-0 overflow-hidden bg-slate-50 sm:h-48">
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.18]"
@@ -496,25 +367,7 @@ function ProductCard({
           aria-hidden
         />
         <div className="absolute inset-0">
-          <ProductFormImage url={product.image_url} />
-        </div>
-
-        {/* top badges */}
-        <div className="absolute inset-x-3 top-3 flex items-start justify-end gap-2">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] backdrop-blur ring-1 ${
-              isActive
-                ? "bg-emerald-50/90 text-emerald-700 ring-emerald-500/20"
-                : "bg-slate-100/90 text-slate-500 ring-slate-900/10"
-            }`}
-          >
-            <span
-              className={`size-1.5 rounded-full ${
-                isActive ? "bg-emerald-500" : "bg-slate-400"
-              }`}
-            />
-            {isActive ? "Active" : "Inactive"}
-          </span>
+          <ProductCardImage url={product.image_url} />
         </div>
       </div>
 
@@ -547,58 +400,31 @@ function ProductCard({
           ) : null}
         </div>
 
-        {/* Actions */}
-        <div className="mt-auto pt-4">
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/admin/products/${product.id}`}
-              className="group/primary flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[12px] font-bold text-white shadow-[0_6px_16px_-6px_rgba(37,99,235,0.5)] transition hover:shadow-[0_10px_22px_-6px_rgba(37,99,235,0.55)]"
-              style={{
-                background: `linear-gradient(135deg, ${BRAND}, #b5102f)`,
-              }}
-            >
-              variants
-              <ArrowRight className="size-3.5 transition-transform group-hover/primary:translate-x-0.5" />
-            </Link>
-
-            <button
-              type="button"
-              onClick={onEdit}
-              title="Edit product"
-              className="flex size-9 items-center justify-center rounded-xl border border-slate-200/70 bg-white text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-            >
-              <Pencil className="size-3.5" />
-            </button>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={onToggle}
-              title={isActive ? "Deactivate" : "Activate"}
-              className={`flex size-9 items-center justify-center rounded-xl border transition disabled:opacity-50 ${
-                isActive
-                  ? "border-emerald-200/80 bg-emerald-50/70 text-emerald-600 hover:bg-emerald-50"
-                  : "border-slate-200/70 bg-white text-slate-500 hover:bg-slate-50"
-              }`}
-            >
-              {isActive ? (
-                <ToggleRight className="size-4" />
-              ) : (
-                <ToggleLeft className="size-4" />
-              )}
-            </button>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={onDelete}
-              title="Delete product"
-              className="flex size-9 items-center justify-center rounded-xl border border-rose-100 bg-rose-50/80 text-rose-500 transition hover:border-rose-200 hover:bg-rose-100 disabled:opacity-50"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
+        <div className="mt-auto flex gap-2 pt-4">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-[12px] font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            <Pencil className="size-3.5" aria-hidden />
+            Edit
+          </button>
+          <span
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[12px] font-bold text-white shadow-[0_6px_16px_-6px_rgba(37,99,235,0.5)] transition group-hover:shadow-[0_10px_22px_-6px_rgba(37,99,235,0.55)]"
+            style={{
+              background: `linear-gradient(135deg, ${BRAND}, #b5102f)`,
+            }}
+          >
+            <Eye className="size-3.5" aria-hidden />
+            View
+          </span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -618,12 +444,9 @@ export function ProductsPanel({
   stats: ProductCatalogStatsPayload;
 }) {
   const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [modal, setModal] = useState<"create" | ProductWithCategory | null>(
-    null,
-  );
+  const [modal, setModal] = useState<ManageModalState>(null);
   const activeCategory = searchParams.get("category_id") || ALL_CATEGORIES;
   const [search, setSearch] = useState("");
 
@@ -636,25 +459,6 @@ export function ProductsPanel({
       params.set("category_id", id);
     }
     router.push(`?${params.toString()}`);
-  }
-
-  function handleToggle(product: ProductWithCategory) {
-    startTransition(async () => {
-      await toggleProductAction(product.id, !product.is_active);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-    });
-  }
-
-  function handleDelete(product: ProductWithCategory) {
-    if (!confirm(`Delete product "${product.name ?? "product"}"?`)) return;
-    startTransition(async () => {
-      try {
-        await deleteProductAction(product.id);
-        void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-      } catch (err) {
-        alert(err instanceof Error ? err.message : "Could not delete product.");
-      }
-    });
   }
 
   const activePct =
@@ -680,18 +484,16 @@ export function ProductsPanel({
     <>
     <AnimatePresence>
       {modal && (
-        <Modal
-          title={modal === "create" ? "New Product" : "Edit Product"}
-          onClose={() => setModal(null)}
-          size="md"
-        >
-          <ProductForm
-            key={modal === "create" ? "create" : modal.id}
-            product={modal === "create" ? undefined : modal}
-            categories={categories}
-            onClose={() => setModal(null)}
-          />
-        </Modal>
+        <ProductManageModal
+          key={modal.mode === "create" ? "create" : modal.product.id}
+          mode={modal.mode}
+          product={modal.mode === "edit" ? modal.product : undefined}
+          categories={categories}
+          onClose={() => {
+            setModal(null);
+            void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+          }}
+        />
       )}
     </AnimatePresence>
 
@@ -708,7 +510,7 @@ export function ProductsPanel({
             </p>
           </div>
           <button
-            onClick={() => setModal("create")}
+            onClick={() => setModal({ mode: "create" })}
             className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_10px_22px_-8px_rgba(37,99,235,0.55)] transition hover:shadow-[0_14px_28px_-8px_rgba(37,99,235,0.6)]"
             style={{
               background: `linear-gradient(135deg, ${BRAND}, #b5102f)`,
@@ -874,7 +676,7 @@ export function ProductsPanel({
               ) : (
                 <button
                   type="button"
-                  onClick={() => setModal("create")}
+                  onClick={() => setModal({ mode: "create" })}
                   className="mt-1 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[12.5px] font-bold text-white shadow-[0_8px_18px_-8px_rgba(37,99,235,0.5)] transition hover:shadow-[0_12px_24px_-8px_rgba(37,99,235,0.6)]"
                   style={{
                     background: `linear-gradient(135deg, ${BRAND}, #b5102f)`,
@@ -891,10 +693,7 @@ export function ProductsPanel({
                 <ProductCard
                   key={product.id}
                   product={product}
-                  isPending={isPending}
-                  onEdit={() => setModal(product)}
-                  onToggle={() => handleToggle(product)}
-                  onDelete={() => handleDelete(product)}
+                  onEdit={() => setModal({ mode: "edit", product })}
                 />
               ))}
             </div>

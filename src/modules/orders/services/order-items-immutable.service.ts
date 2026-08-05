@@ -17,7 +17,7 @@ export const ORDER_ITEM_SNAPSHOT_COLUMNS = [
 ] as const;
 
 export interface OrderItemSnapshotInsert {
-  vendor_id: string;
+  vendor_id: string | null;
   base_price: number;
   final_price: number;
   margin_amount: number;
@@ -31,8 +31,8 @@ export interface OrderItemSnapshotInsert {
 export function assertCompleteOrderItemSnapshotForInsert(
   row: Partial<OrderItemSnapshotInsert> & { unit_price?: number },
 ): asserts row is OrderItemSnapshotInsert {
-  if (row.vendor_id == null || String(row.vendor_id).trim() === "") {
-    throw new Error("order_items: vendor_id is required for snapshot.");
+  if (row.vendor_id != null && String(row.vendor_id).trim() === "") {
+    throw new Error("order_items: vendor_id must be null or a non-empty id.");
   }
   if (row.product_name == null || String(row.product_name).trim() === "") {
     throw new Error("order_items: product_name is required for snapshot.");

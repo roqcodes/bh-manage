@@ -118,6 +118,7 @@ CREATE TABLE public.products (
   category_id uuid,
   image_url text,
   is_active boolean DEFAULT true,
+  use_smart_pricing boolean NOT NULL DEFAULT false,
   created_at timestamp without time zone DEFAULT now(),
   CONSTRAINT products_pkey PRIMARY KEY (id),
   CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)

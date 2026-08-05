@@ -24,7 +24,7 @@ export async function getProducts(
   let query = supabase
     .from("products")
     .select(
-      "id,name,description,category_id,image_url,is_active,created_at,categories(id,name,parent_id,image_url,created_at)",
+      "id,name,description,category_id,image_url,is_active,use_smart_pricing,created_at,categories(id,name,parent_id,image_url,created_at)",
     );
 
   let countQuery = supabase
@@ -113,7 +113,7 @@ export async function getProductById(
   const { data } = await supabase
     .from("products")
     .select(
-      "id,name,description,category_id,image_url,is_active,created_at,categories(id,name,parent_id,image_url,created_at)",
+      "id,name,description,category_id,image_url,is_active,use_smart_pricing,created_at,categories(id,name,parent_id,image_url,created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -179,17 +179,22 @@ export async function insertProduct(input: {
   description: string | null;
   categoryId: string | null;
   imageUrl: string | null;
-}): Promise<void> {
+}): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("products").insert({
-    name: input.name,
-    description: input.description,
-    category_id: input.categoryId,
-    image_url: input.imageUrl,
-    is_active: true,
-  });
+  const { data, error } = await supabase
+    .from("products")
+    .insert({
+      name: input.name,
+      description: input.description,
+      category_id: input.categoryId,
+      image_url: input.imageUrl,
+      is_active: true,
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
+  return data.id;
 }
 
 export async function updateProductById(

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Calculator, Cpu, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Cpu, Info, Sparkles } from "lucide-react";
 
 import type { AllocationLine, ProcurementPlan } from "@/modules/procurement/types";
 import {
@@ -9,12 +10,7 @@ import {
   synchronizeProcurementPlanAction,
 } from "@/modules/procurement/actions/procurement.actions";
 import { approveProcurementPlanAction } from "@/modules/purchase-orders/actions/purchase-orders.actions";
-import { previewPricingAction } from "@/modules/pricing/actions/pricing.actions";
-import {
-  PrimaryBtn,
-  FieldLabel,
-  inputCls,
-} from "@/modules/admin/components/modal";
+import { PrimaryBtn } from "@/modules/admin/components/modal";
 
 const CARD =
   "relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]";
@@ -27,16 +23,6 @@ export function ProcurementWorkspace() {
   const [plan, setPlan] = useState<ProcurementPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [approveMsg, setApproveMsg] = useState<string | null>(null);
-
-  const [pProduct, setPProduct] = useState("");
-  const [pVariant, setPVariant] = useState("");
-  const [pVendor, setPVendor] = useState("");
-  const [pBase, setPBase] = useState("");
-  const [preview, setPreview] = useState<{
-    base_price: number;
-    margin_amount: number;
-    final_price: number;
-  } | null>(null);
 
   const lines = plan?.allocations ?? [];
 
@@ -84,29 +70,6 @@ export function ProcurementWorkspace() {
     syncFromAllocations(next);
   }
 
-  function runPreview() {
-    setError(null);
-    setPreview(null);
-    const base = parseFloat(pBase);
-    if (!pProduct || !pVariant || !pVendor || !Number.isFinite(base)) {
-      setError("Pricing preview: fill product, variant, vendor, and base price.");
-      return;
-    }
-    startTransition(async () => {
-      try {
-        const b = await previewPricingAction({
-          productId: pProduct.trim(),
-          variantId: pVariant.trim(),
-          vendorId: pVendor.trim(),
-          basePrice: base,
-        });
-        setPreview(b);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Preview failed.");
-      }
-    });
-  }
-
   function approve() {
     setError(null);
     setApproveMsg(null);
@@ -131,76 +94,41 @@ export function ProcurementWorkspace() {
 
   return (
     <div className="space-y-6 lg:space-y-7">
-      <section className={`${CARD} p-5 sm:p-6`} aria-label="Pricing preview">
-        <div className="mb-4 flex items-center gap-2.5">
-          <span className="flex size-6 items-center justify-center rounded-md border border-slate-200/70 bg-slate-50 text-slate-500 shadow-sm ring-1 ring-white/80">
-            <Calculator className="size-3" aria-hidden />
-          </span>
+      <section className={`${CARD} p-5 sm:p-6`} aria-label="How procurement works">
+        <div className="mb-3 flex items-start gap-3">
+          <Info className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden />
           <div>
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Pricing preview
+              Mode C — Refill central warehouse
             </h2>
-            <p className="mt-0.5 text-sm font-medium text-slate-500">
-              Read-only: base, margin, and final price. No database writes.
+            <p className="mt-2 text-sm font-medium leading-relaxed text-slate-600">
+              Customers buy from <strong>central inventory</strong> at the SKU list price. When
+              orders create a shortage, this engine builds purchase orders from vendors at{" "}
+              <strong>vendor cost</strong> (not customer price).
+            </p>
+            <ol className="mt-3 list-inside list-decimal space-y-1 text-sm text-slate-600">
+              <li>Run engine — compares open order demand vs central stock.</li>
+              <li>Review allocations — lowest vendor cost first per SKU.</li>
+              <li>Approve — creates purchase orders; stock increases when POs are received.</li>
+              <li>
+                Optional — on each product page, enable{" "}
+                <strong>Smart pricing assist</strong> to suggest list prices from vendor cost +
+                margin rules.
+              </li>
+            </ol>
+            <p className="mt-3 text-sm text-slate-500">
+              Manage vendor offers under{" "}
+              <Link href="/admin/vendors" className="font-bold text-[#2563EB] hover:underline">
+                Vendors
+              </Link>
+              . Customer list prices under{" "}
+              <Link href="/admin/products" className="font-bold text-[#2563EB] hover:underline">
+                Products
+              </Link>
+              .
             </p>
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FieldLabel label="Product ID">
-            <input
-              className={inputCls}
-              value={pProduct}
-              onChange={(e) => setPProduct(e.target.value)}
-              placeholder="UUID"
-            />
-          </FieldLabel>
-          <FieldLabel label="Variant ID">
-            <input
-              className={inputCls}
-              value={pVariant}
-              onChange={(e) => setPVariant(e.target.value)}
-              placeholder="UUID"
-            />
-          </FieldLabel>
-          <FieldLabel label="Vendor ID">
-            <input
-              className={inputCls}
-              value={pVendor}
-              onChange={(e) => setPVendor(e.target.value)}
-              placeholder="UUID"
-            />
-          </FieldLabel>
-          <FieldLabel label="Base price (₹)">
-            <input
-              className={inputCls}
-              type="number"
-              step="0.01"
-              value={pBase}
-              onChange={(e) => setPBase(e.target.value)}
-            />
-          </FieldLabel>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <PrimaryBtn type="button" disabled={isPending} onClick={runPreview}>
-            {isPending ? "…" : "Preview"}
-          </PrimaryBtn>
-        </div>
-        {preview ? (
-          <div className={`mt-4 ${INNER}`}>
-            <p>
-              <span className="font-semibold text-slate-600">Base:</span>{" "}
-              ₹{preview.base_price.toFixed(2)}
-            </p>
-            <p>
-              <span className="font-semibold text-slate-600">Margin:</span>{" "}
-              ₹{preview.margin_amount.toFixed(2)}
-            </p>
-            <p>
-              <span className="font-semibold text-slate-600">Final:</span>{" "}
-              ₹{preview.final_price.toFixed(2)}
-            </p>
-          </div>
-        ) : null}
       </section>
 
       <section className={`${CARD} p-5 sm:p-6`} aria-label="Procurement plan">
@@ -214,8 +142,8 @@ export function ProcurementWorkspace() {
                 Procurement plan
               </h2>
               <p className="mt-1 max-w-xl text-sm font-medium leading-relaxed text-slate-500">
-                Demand from pending + processing orders vs inventory; lowest
-                vendor price first.
+                Demand from pending + processing orders vs central inventory; lowest vendor cost
+                first.
               </p>
             </div>
           </div>
@@ -293,7 +221,7 @@ export function ProcurementWorkspace() {
 
         {lines.length === 0 ? (
           <p className="text-sm font-medium text-slate-400">
-            No allocations yet. Run the engine when orders create shortage.
+            No allocations yet. Run the engine when orders create a central stock shortage.
           </p>
         ) : (
           <>
@@ -304,7 +232,7 @@ export function ProcurementWorkspace() {
                     <th className="px-4 py-3">Vendor</th>
                     <th className="min-w-[200px] px-4 py-3">Product · variant</th>
                     <th className="px-4 py-3">Qty</th>
-                    <th className="px-4 py-3">Base ₹</th>
+                    <th className="px-4 py-3">Vendor cost ₹</th>
                     <th className="px-4 py-3">Line ₹</th>
                     <th className="px-4 py-3" />
                   </tr>

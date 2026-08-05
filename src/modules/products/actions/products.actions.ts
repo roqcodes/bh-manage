@@ -14,14 +14,15 @@ export async function createProductAction(data: {
   description: string;
   categoryId: string | null;
   imageUrl: string | null;
-}): Promise<void> {
-  await insertProduct({
+}): Promise<string> {
+  const id = await insertProduct({
     name: data.name,
     description: data.description || null,
     categoryId: data.categoryId || null,
     imageUrl: data.imageUrl,
   });
   revalidatePath("/admin/products");
+  return id;
 }
 
 export async function updateProductAction(

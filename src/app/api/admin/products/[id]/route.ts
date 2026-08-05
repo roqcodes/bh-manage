@@ -32,6 +32,7 @@ export async function GET(
   const glance = await getProductAtGlanceMetrics(
     id,
     variants.map((v) => v.id),
+    product.use_smart_pricing === true,
   );
 
   return NextResponse.json({ product, variants, categories, pricingRule, glance });

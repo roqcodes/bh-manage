@@ -16,7 +16,7 @@ function roundMoney2(n: number): number {
 export async function createVariantAction(
   productId: string,
   data: { name: string; price: number; mrp: number; imageUrls?: string[] },
-): Promise<void> {
+): Promise<string> {
   const variantId = await insertVariantWithInventory({
     productId,
     name: data.name,
@@ -27,6 +27,7 @@ export async function createVariantAction(
     await addVariantImages(variantId, data.imageUrls);
   }
   revalidatePath(`/admin/products/${productId}`);
+  return variantId;
 }
 
 export async function updateVariantAction(

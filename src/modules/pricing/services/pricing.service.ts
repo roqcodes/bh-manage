@@ -3,16 +3,18 @@ import "server-only";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { computeFinalPrice } from "@/modules/pricing/pricing.compute";
-import type { FinalPriceBreakdown, PricingRuleRow } from "@/modules/pricing/types";
+import { resolveSuggestedPrice } from "@/modules/pricing/pricing.resolver";
+import type { PricingRuleRow } from "@/modules/pricing/types";
 
 export type { PricingRuleRow };
 
-export interface VendorOverrideRow {
-  id: string;
-  vendor_id: string | null;
-  variant_id: string | null;
-  override_price: number | null;
-  override_margin: number | null;
+export interface VariantPricingSuggestion {
+  variantId: string;
+  variantName: string;
+  listPrice: number;
+  lowestVendorBase: number | null;
+  suggestedPrice: number | null;
+  centralStock: number;
 }
 
 export async function getActivePricingRuleForProduct(
@@ -39,8 +41,6 @@ export async function getProductPricingRule(
     .from("pricing_rules")
     .select("id,product_id,margin_percent,fixed_markup,is_active")
     .eq("product_id", productId)
-    .order("created_at", { ascending: false })
-    .limit(1)
     .maybeSingle();
   return data as PricingRuleRow | null;
 }
@@ -48,14 +48,9 @@ export async function getProductPricingRule(
 export interface UpsertProductPricingRuleInput {
   margin_percent: number | null;
   fixed_markup: number | null;
-  /** When false or when both margins are null, stored row is inactive. */
   is_active: boolean;
 }
 
-/**
- * One row per product: update by id if present, else insert.
- * If both margin and fixed are null → is_active false; otherwise margin wins if both were set.
- */
 export async function upsertProductPricingRule(
   productId: string,
   input: UpsertProductPricingRuleInput,
@@ -81,19 +76,14 @@ export async function upsertProductPricingRule(
     fixed = null;
   }
 
-  const bothNull =
-    margin == null &&
-    fixed == null;
-
+  const bothNull = margin == null && fixed == null;
   const is_active = bothNull ? false : input.is_active;
 
   const supabase = await createSupabaseServerClient();
   const { data: existing } = await supabase
     .from("pricing_rules")
-    .select("id,product_id,margin_percent,fixed_markup,is_active")
+    .select("id")
     .eq("product_id", productId)
-    .order("created_at", { ascending: false })
-    .limit(1)
     .maybeSingle();
 
   const payload = {
@@ -116,74 +106,101 @@ export async function upsertProductPricingRule(
     return;
   }
 
-  if (bothNull) {
-    return;
-  }
+  if (bothNull) return;
 
   const { error } = await supabase.from("pricing_rules").insert(payload);
   if (error) throw new Error(error.message);
 }
 
-
-export async function getVendorPricingOverride(
-  vendorId: string,
-  variantId: string,
-): Promise<VendorOverrideRow | null> {
+export async function setProductSmartPricing(
+  productId: string,
+  enabled: boolean,
+): Promise<void> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("vendor_pricing_overrides")
-    .select("id,vendor_id,variant_id,override_price,override_margin")
-    .eq("vendor_id", vendorId)
-    .eq("variant_id", variantId)
-    .maybeSingle();
-  return data as VendorOverrideRow | null;
+  const { error } = await supabase
+    .from("products")
+    .update({ use_smart_pricing: enabled })
+    .eq("id", productId);
+  if (error) throw new Error(error.message);
 }
 
-/**
- * Loads rule + override from DB and returns breakdown (read-only).
- */
-export async function computePricingForVariantVendor(
+/** Admin-only per-SKU suggestions (Mode B). Does not change customer prices. */
+export async function getVariantPricingSuggestions(
   productId: string,
-  variantId: string,
-  vendorId: string,
-  basePrice: number,
-): Promise<FinalPriceBreakdown> {
-  const [rule, override] = await Promise.all([
+): Promise<VariantPricingSuggestion[]> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: variants, error: variantRes } = await supabase
+    .from("product_variants")
+    .select("id,name,price")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: true });
+
+  if (variantRes) throw new Error(variantRes.message);
+
+  const variantIds = (variants ?? []).map((v) => v.id as string);
+  if (variantIds.length === 0) return [];
+
+  const [rule, offersRes, invRes] = await Promise.all([
     getActivePricingRuleForProduct(productId),
-    getVendorPricingOverride(vendorId, variantId),
+    supabase
+      .from("vendor_products")
+      .select("variant_id,base_price,stock")
+      .in("variant_id", variantIds)
+      .gt("stock", 0),
+    supabase.from("inventory").select("variant_id,stock").in("variant_id", variantIds),
   ]);
 
-  return computeFinalPrice(
-    basePrice,
-    rule
-      ? {
-          margin_percent: rule.margin_percent,
-          fixed_markup: rule.fixed_markup,
-        }
-      : null,
-    override
-      ? {
-          override_price: override.override_price,
-          override_margin: override.override_margin,
-        }
-      : null,
-  );
+  if (offersRes.error) throw new Error(offersRes.error.message);
+  if (invRes.error) throw new Error(invRes.error.message);
+
+  const variantIdsSet = new Set(variantIds);
+
+  const ruleInput =
+    rule && rule.is_active
+      ? { margin_percent: rule.margin_percent, fixed_markup: rule.fixed_markup }
+      : null;
+
+  const minBase = new Map<string, number>();
+  for (const row of offersRes.data ?? []) {
+    const vid = row.variant_id as string;
+    if (!variantIdsSet.has(vid)) continue;
+    const bp = Number(row.base_price ?? 0);
+    if (!Number.isFinite(bp)) continue;
+    const cur = minBase.get(vid);
+    if (cur === undefined || bp < cur) minBase.set(vid, bp);
+  }
+
+  const stockMap = new Map<string, number>();
+  for (const row of invRes.data ?? []) {
+    const vid = row.variant_id as string;
+    if (!variantIdsSet.has(vid)) continue;
+    stockMap.set(
+      vid,
+      Math.max(0, Math.floor(Number((row as { stock?: number | null }).stock ?? 0))),
+    );
+  }
+
+  return (variants ?? []).map((v) => {
+    const vid = v.id as string;
+    const lowestVendorBase = minBase.get(vid) ?? null;
+    return {
+      variantId: vid,
+      variantName: (v.name as string | null) ?? "SKU",
+      listPrice: Number(v.price ?? 0) || 0,
+      lowestVendorBase,
+      suggestedPrice: resolveSuggestedPrice(lowestVendorBase, ruleInput),
+      centralStock: stockMap.get(vid) ?? 0,
+    };
+  });
 }
 
-/**
- * Preview without persisting anything (uses same reads as compute path).
- */
-export async function previewPricingForVariantVendor(input: {
-  productId: string;
-  variantId: string;
-  vendorId: string;
-  basePrice: number;
-}): Promise<FinalPriceBreakdown> {
-  return computePricingForVariantVendor(
-    input.productId,
-    input.variantId,
-    input.vendorId,
-    input.basePrice,
-  );
+/** Preview margin math for admin (sample base input). */
+export function previewRuleOnBase(
+  basePrice: number,
+  rule: { margin_percent: number | null; fixed_markup: number | null } | null,
+) {
+  return computeFinalPrice(basePrice, rule);
 }

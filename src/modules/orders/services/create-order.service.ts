@@ -43,8 +43,8 @@ export interface OrderLineItem {
  * 2. Validate cart has items
  * 3. Validate address exists and belongs to user
  * 4. For each cart item:
- *    - Check vendor availability (stock > 0)
- *    - Calculate final price (base + margin)
+ *    - Check central warehouse stock
+ *    - Charge SKU list price (reference vendor cost stored for margin reports)
  *    - Build order item snapshot
  * 5. Create order record
  * 6. Create order_items records
@@ -91,12 +91,13 @@ export async function createOrderFromCart(
     try {
       const snapshot = await buildOrderItemSnapshot({
         variantId: cartItem.variant_id,
+        quantity: cartItem.quantity,
       });
 
       orderLineItems.push({
         variantId: cartItem.variant_id,
         quantity: cartItem.quantity,
-        vendorId: snapshot.vendor_id,
+        vendorId: snapshot.vendor_id ?? "",
         basePrice: snapshot.base_price,
         finalPrice: snapshot.final_price,
         marginAmount: snapshot.margin_amount,
@@ -141,7 +142,7 @@ export async function createOrderFromCart(
     variant_id: item.variantId,
     quantity: item.quantity,
     price: item.finalPrice,
-    vendor_id: item.vendorId,
+    vendor_id: item.vendorId || null,
     base_price: item.basePrice,
     final_price: item.finalPrice,
     margin_amount: item.marginAmount,
@@ -210,8 +211,7 @@ export async function createOrderFromCart(
 }
 
 /**
- * Check if cart items are available (have vendor stock).
- * Returns availability status for each cart item.
+ * Check if cart items are available in central warehouse.
  */
 export async function checkCartAvailability(): Promise<{
   available: boolean;
@@ -243,25 +243,28 @@ export async function checkCartAvailability(): Promise<{
   }[] = [];
 
   for (const cartItem of cart.items) {
-    const { data: offers } = await supabase
-      .from("vendor_products")
-      .select("vendor_id,stock")
+    const { data: inv } = await supabase
+      .from("inventory")
+      .select("stock")
       .eq("variant_id", cartItem.variant_id)
-      .gt("stock", 0);
+      .maybeSingle();
 
-    const hasStock = offers && offers.length > 0;
-    const totalStock = offers?.reduce((sum, o) => sum + (o.stock ?? 0), 0) ?? 0;
+    const centralStock = Math.max(
+      0,
+      Math.floor(Number(inv?.stock ?? 0)),
+    );
 
     items.push({
       variantId: cartItem.variant_id,
       productName: cartItem.product?.name ?? "Unknown Product",
       quantity: cartItem.quantity,
-      available: !!(hasStock && totalStock >= cartItem.quantity),
-      reason: !hasStock
-        ? "No vendors have this item in stock"
-        : totalStock < cartItem.quantity
-          ? `Only ${totalStock} units available (requested ${cartItem.quantity})`
-          : undefined,
+      available: centralStock >= cartItem.quantity,
+      reason:
+        centralStock === 0
+          ? "Out of stock in central warehouse"
+          : centralStock < cartItem.quantity
+            ? `Only ${centralStock} in central warehouse (requested ${cartItem.quantity})`
+            : undefined,
     });
   }
 

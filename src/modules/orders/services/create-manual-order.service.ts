@@ -46,20 +46,20 @@ export async function createManualOrder(
 
   for (const item of input.items) {
     try {
-      // Get system snapshot to enforce valid variant/vendor details
       const snapshot = await buildOrderItemSnapshot({
         variantId: item.variantId,
+        quantity: item.quantity,
+        unitPriceOverride: item.unitPrice,
       });
 
-      // Use admin-provided unit price if available, otherwise fallback to system final price
-      const finalPrice = item.unitPrice ?? snapshot.final_price;
+      const finalPrice = snapshot.final_price;
 
       orderLineItems.push({
         variantId: item.variantId,
         quantity: item.quantity,
         vendorId: snapshot.vendor_id,
         basePrice: snapshot.base_price,
-        finalPrice: finalPrice,
+        finalPrice,
         marginAmount: snapshot.margin_amount,
         productName: snapshot.product_name,
       });
@@ -112,7 +112,7 @@ export async function createManualOrder(
     variant_id: item.variantId,
     quantity: item.quantity,
     price: item.finalPrice,
-    vendor_id: item.vendorId,
+    vendor_id: item.vendorId || null,
     base_price: item.basePrice,
     final_price: item.finalPrice,
     margin_amount: item.marginAmount,

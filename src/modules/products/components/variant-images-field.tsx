@@ -18,27 +18,31 @@ function LocalThumb({
   busy,
   onSetPreview,
   onRemove,
+  compact = false,
 }: {
   url: string;
   isPreview: boolean;
   busy: boolean;
   onSetPreview: () => void;
   onRemove: () => void;
+  compact?: boolean;
 }) {
   const [broken, setBroken] = useState(false);
   return (
     <div
-      className={`group relative overflow-hidden rounded-xl border bg-slate-50 transition ${
+      className={`group relative shrink-0 overflow-hidden border bg-slate-50 transition ${
+        compact ? "w-[68px] rounded-md" : "w-full rounded-xl"
+      } ${
         isPreview
           ? "border-[color:var(--brand)] ring-2 ring-[color:var(--brand)]/25"
           : "border-slate-200"
       }`}
       style={{ ["--brand" as string]: BRAND }}
     >
-      <div className="relative aspect-square w-full">
+      <div className={`relative aspect-square w-full ${compact ? "h-[68px]" : ""}`}>
         {broken ? (
           <div className="flex size-full items-center justify-center text-slate-300">
-            <ImageOff className="size-6" aria-hidden />
+            <ImageOff className={compact ? "size-4" : "size-6"} aria-hidden />
           </div>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
@@ -50,26 +54,43 @@ function LocalThumb({
           />
         )}
         {isPreview ? (
-          <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-[color:var(--brand)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
-            <Star className="size-2.5 fill-current" aria-hidden />
-            Preview
+          <span
+            className={`absolute left-1 top-1 inline-flex items-center gap-0.5 rounded-full bg-[color:var(--brand)] font-bold uppercase tracking-wide text-white shadow-sm ${
+              compact ? "px-1 py-px text-[7px]" : "left-1.5 top-1.5 gap-1 px-1.5 py-0.5 text-[9px]"
+            }`}
+          >
+            <Star className={`fill-current ${compact ? "size-2" : "size-2.5"}`} aria-hidden />
+            {!compact ? "Preview" : null}
           </span>
         ) : null}
       </div>
-      <div className="flex items-center gap-1 border-t border-slate-100 bg-white p-1.5">
+      <div
+        className={`flex items-center gap-0.5 border-t border-slate-100 bg-white ${
+          compact ? "p-0.5" : "gap-1 p-1.5"
+        }`}
+      >
         {isPreview ? (
-          <span className="flex-1 text-center text-[10px] font-bold text-[color:var(--brand)]">
-            Preview
-          </span>
+          compact ? (
+            <span className="flex flex-1 justify-center text-[color:var(--brand)]">
+              <Star className="size-2.5 fill-current" aria-hidden />
+            </span>
+          ) : (
+            <span className="flex-1 text-center text-[10px] font-bold text-[color:var(--brand)]">
+              Preview
+            </span>
+          )
         ) : (
           <button
             type="button"
             disabled={busy}
             onClick={onSetPreview}
-            className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-[10px] font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50"
+            className={`inline-flex flex-1 items-center justify-center rounded-md border border-slate-200 bg-white font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50 ${
+              compact ? "p-0.5" : "gap-1 px-1.5 py-1 text-[10px]"
+            }`}
+            title="Set preview"
           >
-            <Star className="size-3" aria-hidden />
-            Preview
+            <Star className={compact ? "size-2.5" : "size-3"} aria-hidden />
+            {!compact ? "Preview" : null}
           </button>
         )}
         <button
@@ -77,9 +98,11 @@ function LocalThumb({
           disabled={busy}
           onClick={onRemove}
           title="Remove image"
-          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-rose-100 bg-rose-50/80 text-rose-500 transition hover:border-rose-200 hover:bg-rose-100 disabled:opacity-50"
+          className={`inline-flex shrink-0 items-center justify-center rounded-md border border-rose-100 bg-rose-50/80 text-rose-500 transition hover:border-rose-200 hover:bg-rose-100 disabled:opacity-50 ${
+            compact ? "size-5" : "size-7"
+          }`}
         >
-          <Trash2 className="size-3" aria-hidden />
+          <Trash2 className={compact ? "size-2.5" : "size-3"} aria-hidden />
         </button>
       </div>
     </div>
@@ -91,11 +114,13 @@ export function VariantImagesField({
   previewIndex,
   onChange,
   onUploadingChange,
+  compact = false,
 }: {
   images: string[];
   previewIndex: number;
   onChange: (images: string[], previewIndex: number) => void;
   onUploadingChange?: (uploading: boolean) => void;
+  compact?: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [urlDraft, setUrlDraft] = useState("");
@@ -164,109 +189,165 @@ export function VariantImagesField({
   }
 
   const busy = upload !== null;
+  const hasImages = images.length > 0;
+
+  const dropZone = CLOUDINARY_CONFIGURED ? (
+    <button
+      type="button"
+      onClick={() => !busy && inputRef.current?.click()}
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (!busy) setDragActive(true);
+      }}
+      onDragLeave={() => setDragActive(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragActive(false);
+        if (!busy) void handleFiles(e.dataTransfer.files);
+      }}
+      disabled={busy}
+      className={`group flex items-center justify-center rounded-lg border border-dashed text-center transition ${
+        compact
+          ? "min-h-[72px] w-full flex-1 flex-col gap-1 px-2"
+          : "w-full flex-col gap-1.5 rounded-xl px-4 py-4"
+      } ${
+        dragActive
+          ? "border-[color:var(--brand)] bg-[color:var(--brand)]/[0.04]"
+          : "border-slate-300 bg-slate-50/60 hover:border-slate-400 hover:bg-slate-50"
+      } disabled:cursor-not-allowed`}
+    >
+      {upload ? (
+        <>
+          <Loader2
+            className={`animate-spin text-[color:var(--brand)] ${compact ? "size-4" : "size-5"}`}
+            aria-hidden
+          />
+          <p className={`font-bold text-slate-600 ${compact ? "text-[10px]" : "text-[12px]"}`}>
+            Uploading {upload.done}/{upload.total}…
+          </p>
+        </>
+      ) : (
+        <>
+          <span
+            className={`flex items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200 transition group-hover:text-[color:var(--brand)] ${
+              compact ? "size-7" : "size-8"
+            }`}
+          >
+            <UploadCloud className={compact ? "size-3.5" : "size-4"} aria-hidden />
+          </span>
+          <p className={`font-bold text-slate-700 ${compact ? "text-[10px] leading-tight" : "text-[12px]"}`}>
+            {compact ? (
+              <>
+                Drop or <span className="text-[color:var(--brand)]">browse</span>
+              </>
+            ) : (
+              <>
+                Drag &amp; drop or{" "}
+                <span className="text-[color:var(--brand)]">browse</span> — multiple allowed
+              </>
+            )}
+          </p>
+        </>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPTED_IMAGE_MIME}
+        multiple
+        className="hidden"
+        onChange={(e) => void handleFiles(e.target.files)}
+      />
+    </button>
+  ) : null;
+
+  const urlRow = (
+    <div className={`flex shrink-0 items-center ${compact ? "gap-1.5" : "gap-2"}`}>
+      <input
+        className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 text-slate-900 outline-none transition focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 disabled:opacity-50 ${
+          compact ? "h-8 text-[12px]" : "h-10 rounded-xl px-3 text-[13px]"
+        }`}
+        value={urlDraft}
+        onChange={(e) => setUrlDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleAddUrl();
+          }
+        }}
+        placeholder="Paste URL"
+        autoComplete="off"
+        inputMode="url"
+        disabled={busy}
+      />
+      <button
+        type="button"
+        onClick={handleAddUrl}
+        disabled={busy || !urlDraft.trim()}
+        className={`inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 ${
+          compact ? "h-8 px-2 text-[11px]" : "h-10 rounded-xl px-3 text-[12.5px]"
+        }`}
+      >
+        <Plus className={compact ? "size-3" : "size-3.5"} aria-hidden />
+        Add
+      </button>
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-2" style={{ ["--brand" as string]: BRAND }}>
-      <span className="text-[13px] font-bold text-slate-700">
-        Images{" "}
-        <span className="font-medium text-slate-400">· optional</span>
-      </span>
+      {!compact ? (
+        <span className="text-[13px] font-bold text-slate-700">
+          Images{" "}
+          <span className="font-medium text-slate-400">· optional</span>
+        </span>
+      ) : null}
 
-      {images.length > 0 ? (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {images.map((url, i) => (
-            <LocalThumb
-              key={`${url}-${i}`}
-              url={url}
-              isPreview={i === previewIndex}
-              busy={busy}
-              onSetPreview={() => onChange(images, i)}
-              onRemove={() => removeAt(i)}
-            />
-          ))}
+      {compact ? (
+        <div className="flex min-h-[92px] items-stretch gap-2">
+          <div className="flex min-w-0 flex-[1.2] flex-wrap content-start gap-1.5 overflow-y-auto rounded-lg border border-slate-100 bg-white p-1.5">
+            {hasImages ? (
+              images.map((url, i) => (
+                <LocalThumb
+                  key={`${url}-${i}`}
+                  url={url}
+                  isPreview={i === previewIndex}
+                  busy={busy}
+                  onSetPreview={() => onChange(images, i)}
+                  onRemove={() => removeAt(i)}
+                  compact
+                />
+              ))
+            ) : (
+              <p className="flex min-h-[76px] w-full items-center justify-center text-[10px] font-medium text-slate-400">
+                No images yet
+              </p>
+            )}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            {dropZone}
+            {urlRow}
+          </div>
         </div>
-      ) : null}
-
-      {CLOUDINARY_CONFIGURED ? (
-        <button
-          type="button"
-          onClick={() => !busy && inputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            if (!busy) setDragActive(true);
-          }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragActive(false);
-            if (!busy) void handleFiles(e.dataTransfer.files);
-          }}
-          disabled={busy}
-          className={`group flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed px-4 py-4 text-center transition ${
-            dragActive
-              ? "border-[color:var(--brand)] bg-[color:var(--brand)]/[0.04]"
-              : "border-slate-300 bg-slate-50/60 hover:border-slate-400 hover:bg-slate-50"
-          } disabled:cursor-not-allowed`}
-        >
-          {upload ? (
-            <>
-              <Loader2
-                className="size-5 animate-spin text-[color:var(--brand)]"
-                aria-hidden
-              />
-              <p className="text-[12px] font-bold text-slate-600">
-                Uploading {upload.done}/{upload.total}…
-              </p>
-            </>
-          ) : (
-            <>
-              <span className="flex size-8 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200 transition group-hover:text-[color:var(--brand)]">
-                <UploadCloud className="size-4" aria-hidden />
-              </span>
-              <p className="text-[12px] font-bold text-slate-700">
-                Drag &amp; drop or{" "}
-                <span className="text-[color:var(--brand)]">browse</span> —
-                multiple allowed
-              </p>
-            </>
-          )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPTED_IMAGE_MIME}
-            multiple
-            className="hidden"
-            onChange={(e) => void handleFiles(e.target.files)}
-          />
-        </button>
-      ) : null}
-
-      <div className="flex items-center gap-2">
-        <input
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[13px] text-slate-900 outline-none transition focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 disabled:opacity-50"
-          value={urlDraft}
-          onChange={(e) => setUrlDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleAddUrl();
-            }
-          }}
-          placeholder="…or paste an image URL"
-          autoComplete="off"
-          inputMode="url"
-          disabled={busy}
-        />
-        <button
-          type="button"
-          onClick={handleAddUrl}
-          disabled={busy || !urlDraft.trim()}
-          className="inline-flex h-10 shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-[12.5px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-        >
-          <Plus className="size-3.5" aria-hidden />
-          Add
-        </button>
-      </div>
+      ) : (
+        <>
+          {hasImages ? (
+            <div className="grid shrink-0 grid-cols-3 gap-1.5 sm:grid-cols-4">
+              {images.map((url, i) => (
+                <LocalThumb
+                  key={`${url}-${i}`}
+                  url={url}
+                  isPreview={i === previewIndex}
+                  busy={busy}
+                  onSetPreview={() => onChange(images, i)}
+                  onRemove={() => removeAt(i)}
+                />
+              ))}
+            </div>
+          ) : null}
+          {dropZone}
+          {urlRow}
+        </>
+      )}
 
       {error ? (
         <p className="text-[11.5px] font-semibold text-rose-600">{error}</p>

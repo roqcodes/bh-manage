@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { upsertProductPricingRule } from "@/modules/pricing/services/pricing.service";
+import {
+  getVariantPricingSuggestions,
+  setProductSmartPricing,
+  upsertProductPricingRule,
+} from "@/modules/pricing/services/pricing.service";
+import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 
 const upsertSchema = z.object({
   productId: z.string().uuid(),
@@ -38,4 +44,59 @@ export async function upsertProductPricingRuleAction(
 
   revalidatePath(`/admin/products/${parsed.data.productId}`);
   return { ok: true };
+}
+
+export async function setProductSmartPricingAction(
+  productId: string,
+  enabled: boolean,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    await setProductSmartPricing(productId, enabled);
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Update failed.",
+    };
+  }
+  revalidatePath(`/admin/products/${productId}`);
+  return { ok: true };
+}
+
+export async function fetchVariantPricingSuggestionsAction(productId: string) {
+  await requireAdminOrManagerProfile();
+  return getVariantPricingSuggestions(productId);
+}
+
+export async function applySuggestedPricesAction(
+  productId: string,
+): Promise<{ ok: true; updated: number } | { ok: false; message: string }> {
+  try {
+    await requireAdminOrManagerProfile();
+    const suggestions = await getVariantPricingSuggestions(productId);
+    const toApply = suggestions.filter(
+      (s) => s.suggestedPrice != null && s.suggestedPrice > 0,
+    );
+    if (toApply.length === 0) {
+      return { ok: false, message: "No suggestions available. Add vendor offers and pricing rules first." };
+    }
+
+    const supabase = await createSupabaseServerClient();
+    let updated = 0;
+    for (const row of toApply) {
+      const { error } = await supabase
+        .from("product_variants")
+        .update({ price: row.suggestedPrice })
+        .eq("id", row.variantId);
+      if (error) throw new Error(error.message);
+      updated += 1;
+    }
+
+    revalidatePath(`/admin/products/${productId}`);
+    return { ok: true, updated };
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Apply failed.",
+    };
+  }
 }

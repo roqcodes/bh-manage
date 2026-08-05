@@ -6,14 +6,41 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface ModalProps {
   title: string;
+  subtitle?: string;
   onClose: () => void;
   children: ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl" | "landscape";
+  /** When true, body uses flex column with no default padding (for custom layouts). */
+  bareBody?: boolean;
 }
 
-export function Modal({ title, onClose, children, size = "md" }: ModalProps) {
+export function Modal({
+  title,
+  subtitle,
+  onClose,
+  children,
+  size = "md",
+  bareBody = false,
+}: ModalProps) {
   const widthCls =
-    size === "lg" ? "max-w-2xl" : size === "sm" ? "max-w-sm" : "max-w-md";
+    size === "landscape"
+      ? "max-w-[min(94vw,1280px)]"
+      : size === "xl"
+        ? "max-w-4xl"
+        : size === "lg"
+          ? "max-w-2xl"
+          : size === "sm"
+            ? "max-w-sm"
+            : "max-w-md";
+
+  const bodyCls = bareBody
+    ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+    : "max-h-[min(85vh,720px)] overflow-y-auto overscroll-contain p-6";
+
+  const shellCls =
+    size === "landscape"
+      ? "flex max-h-[min(90vh,840px)] min-h-[min(80vh,640px)] flex-col overflow-hidden"
+      : "";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto p-4">
@@ -35,21 +62,33 @@ export function Modal({ title, onClose, children, size = "md" }: ModalProps) {
           stiffness: 300,
           duration: 0.2,
         }}
-        className={`relative w-full ${widthCls} rounded-[28px] bg-white shadow-2xl`}
+        className={`relative w-full ${widthCls} ${shellCls} rounded-[28px] bg-white shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h3 className="text-base font-extrabold text-slate-900">{title}</h3>
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+          <div className="min-w-0">
+            <h3 id="modal-title" className="text-base font-extrabold text-slate-900">
+              {title}
+            </h3>
+            {subtitle ? (
+              <p className="mt-0.5 text-[12.5px] font-medium text-slate-500">
+                {subtitle}
+              </p>
+            ) : null}
+          </div>
           <button
+            type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Close dialog"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
           >
             <X size={16} />
           </button>
         </div>
-        <div className="max-h-[min(85vh,720px)] overflow-y-auto overscroll-contain p-6">
-          {children}
-        </div>
+        <div className={bodyCls}>{children}</div>
       </motion.div>
     </div>
   );
@@ -92,17 +131,20 @@ export function PrimaryBtn({
   disabled,
   type = "button",
   onClick,
+  form,
 }: {
   children: ReactNode;
   disabled?: boolean;
   type?: "button" | "submit";
   onClick?: () => void;
+  form?: string;
 }) {
   return (
     <button
       type={type}
       disabled={disabled}
       onClick={onClick}
+      form={form}
       className="flex h-11 items-center justify-center rounded-xl bg-[#2563EB] px-5 text-sm font-bold text-white transition hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {children}

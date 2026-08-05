@@ -71,6 +71,7 @@ export interface Product {
   category_id: string | null;
   image_url: string | null;
   is_active: boolean | null;
+  use_smart_pricing: boolean | null;
   created_at: string | null;
 }
 
@@ -81,9 +82,14 @@ export interface ProductWithCategory extends Product {
 /** Admin product detail “at a glance” (server-computed). */
 export interface ProductAtGlanceMetrics {
   centralStockTotal: number;
-  livePriceMin: number | null;
-  livePriceMax: number | null;
-  variantsWithLivePrice: number;
+  /** Customer-facing list prices for SKUs with central stock > 0. */
+  listPriceMin: number | null;
+  listPriceMax: number | null;
+  variantsInStock: number;
+  /** Admin-only suggestions when smart pricing is enabled. */
+  suggestedPriceMin: number | null;
+  suggestedPriceMax: number | null;
+  variantsWithSuggestion: number;
 }
 
 export interface VariantImage {

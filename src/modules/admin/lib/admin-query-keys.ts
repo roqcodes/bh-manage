@@ -13,6 +13,7 @@ export const adminQueryKeys = {
     ["admin", "users", tab, segment, page] as const,
   delivery: () => ["admin", "delivery"] as const,
   productDetail: (id: string) => ["admin", "product", id] as const,
+  productPricingSuggestions: (id: string) => ["admin", "product", id, "pricing-suggestions"] as const,
   orderDetail: (id: string) => ["admin", "order", id] as const,
   vendorDetail: (id: string) => ["admin", "vendor", id] as const,
   purchaseOrderDetail: (id: string) => ["admin", "purchase-order", id] as const,

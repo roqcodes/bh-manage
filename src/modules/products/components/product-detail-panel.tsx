@@ -93,13 +93,13 @@ function TintIconBadge({
   children: ReactNode;
 }) {
   return (
-    <span className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/55 bg-white/90 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/55 bg-white/90 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <span
         className="pointer-events-none absolute inset-0 opacity-[0.35]"
         style={{ background: tint }}
         aria-hidden
       />
-      <span className="relative text-slate-500 [&_svg]:size-4">{children}</span>
+      <span className="relative text-slate-500 [&_svg]:size-3.5">{children}</span>
     </span>
   );
 }
@@ -140,19 +140,19 @@ function KpiCard({
 }) {
   return (
     <div
-      className={`group ${CARD} p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]`}
+      className={`group ${CARD} p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]`}
     >
       <div
         className="pointer-events-none absolute -right-8 -top-8 size-28 rounded-full opacity-[0.07] blur-2xl transition-opacity group-hover:opacity-[0.11]"
         style={{ background: tint }}
         aria-hidden
       />
-      <div className="relative flex items-start justify-between">
-        <div>
-          <p className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-slate-400">
+      <div className="relative flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
             {label}
           </p>
-          <div className="mt-2 text-[28px] font-black leading-none tabular-nums tracking-tight text-slate-950 [&_*]:tabular-nums">
+          <div className="mt-1.5 text-[20px] font-bold leading-tight tabular-nums tracking-tight text-slate-950 [&_*]:tabular-nums">
             {value}
           </div>
         </div>
@@ -160,7 +160,7 @@ function KpiCard({
           <Icon aria-hidden />
         </TintIconBadge>
       </div>
-      {delta ? <div className="relative mt-3">{delta}</div> : null}
+      {delta ? <div className="relative mt-2.5">{delta}</div> : null}
     </div>
   );
 }
@@ -578,22 +578,24 @@ export function ProductDetailPanel({
   const isActive = product.is_active ?? false;
   const shortId = product.id.slice(0, 8).toUpperCase();
 
-  const livePriceValue =
-    glance.livePriceMin == null ? (
+  const listPriceValue =
+    glance.listPriceMin == null ? (
       "—"
-    ) : glance.livePriceMax != null &&
-      Math.abs(glance.livePriceMax - glance.livePriceMin) > 0.005 ? (
+    ) : glance.listPriceMax != null &&
+      Math.abs(glance.listPriceMax - glance.listPriceMin) > 0.005 ? (
       <span className="block leading-tight">
-        <span className="block text-[22px] sm:text-[26px]">
-          {formatInr(glance.livePriceMin)}
+        <span className="block text-[16px] sm:text-[18px]">
+          {formatInr(glance.listPriceMin)}
         </span>
-        <span className="mt-0.5 block text-[13px] font-bold text-slate-500">
-          to {formatInr(glance.livePriceMax)}
+        <span className="mt-0.5 block text-[11px] font-bold text-slate-500">
+          to {formatInr(glance.listPriceMax)}
         </span>
       </span>
     ) : (
-      formatInr(glance.livePriceMin)
+      formatInr(glance.listPriceMin)
     );
+
+  const smartPricingOn = product.use_smart_pricing === true;
 
   return (
     <>
@@ -726,13 +728,13 @@ export function ProductDetailPanel({
             icon={Sparkles}
             trailing={
               <span className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                Vendor + margin · central stock
+                List price · central stock
               </span>
             }
           >
             At a glance
           </SectionEyebrow>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
               label="Variants"
               value={variants.length.toLocaleString("en-IN")}
@@ -749,7 +751,7 @@ export function ProductDetailPanel({
             <KpiCard
               label="Category"
               value={
-                <span className="line-clamp-2 text-left text-[22px] leading-tight sm:text-[26px]">
+                <span className="line-clamp-2 text-left text-[16px] font-bold leading-snug sm:text-[18px]">
                   {product.categories?.name ?? "Uncategorized"}
                 </span>
               }
@@ -762,22 +764,30 @@ export function ProductDetailPanel({
               }
             />
             <KpiCard
-              label="Live selling price"
-              value={livePriceValue}
+              label="List price"
+              value={listPriceValue}
               icon={Sparkles}
               tint="linear-gradient(135deg, #fce8ec, #e9b8c4)"
               delta={
                 <div className="flex flex-wrap items-center gap-2">
-                  {glance.livePriceMin != null ? (
+                  {glance.listPriceMin != null ? (
                     <TrendChip tone="up">
-                      {glance.variantsWithLivePrice}/{variants.length || 1} SKUs with
-                      vendor stock · rule applied
+                      {glance.variantsInStock}/{variants.length || 1} SKUs in stock · customer price
                     </TrendChip>
                   ) : (
-                    <TrendChip tone="neutral">
-                      No in-stock vendor offers
+                    <TrendChip tone="down">
+                      No central stock — not sellable
                     </TrendChip>
                   )}
+                  {smartPricingOn && glance.suggestedPriceMin != null ? (
+                    <TrendChip tone="neutral">
+                      Suggested from {formatInr(glance.suggestedPriceMin)}
+                      {glance.suggestedPriceMax != null &&
+                      Math.abs(glance.suggestedPriceMax - glance.suggestedPriceMin) > 0.005
+                        ? ` – ${formatInr(glance.suggestedPriceMax)}`
+                        : ""}
+                    </TrendChip>
+                  ) : null}
                 </div>
               }
             />
@@ -863,7 +873,11 @@ export function ProductDetailPanel({
 
         {/* Pricing */}
         <section aria-label="Pricing">
-          <ProductPricingSection productId={product.id} initialRule={pricingRule} />
+          <ProductPricingSection
+            productId={product.id}
+            initialRule={pricingRule}
+            useSmartPricing={product.use_smart_pricing === true}
+          />
         </section>
 
         <footer className="pt-1 text-center text-[10.5px] font-bold uppercase tracking-[0.18em] text-slate-300">

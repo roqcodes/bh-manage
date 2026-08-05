@@ -7,16 +7,9 @@ export interface PricingRuleRow {
   is_active: boolean | null;
 }
 
-/** Pure pricing inputs (no DB). */
-
 export interface PricingRuleInput {
   margin_percent: number | null;
   fixed_markup: number | null;
-}
-
-export interface VendorPricingOverrideInput {
-  override_price: number | null;
-  override_margin: number | null;
 }
 
 export interface FinalPriceBreakdown {
