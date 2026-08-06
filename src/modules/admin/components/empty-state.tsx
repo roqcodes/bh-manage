@@ -8,7 +8,7 @@ export function EmptyState({
   message: string;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 py-20 text-center">
+    <div className="flex flex-col items-center gap-2.5 py-14 text-center">
       <div className="text-slate-200">{icon}</div>
       <p className="text-sm font-semibold text-slate-400">{message}</p>
     </div>

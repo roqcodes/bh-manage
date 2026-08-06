@@ -383,7 +383,7 @@ export function OrdersPanel({
     stats.totalOrders > 0 ? (openQueue / stats.totalOrders) * 100 : 0;
 
   return (
-    <div className="space-y-6 lg:space-y-7">
+    <div className="space-y-4 lg:space-y-5">
       <header>
         <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
           Order pipeline
@@ -405,7 +405,7 @@ export function OrdersPanel({
         >
           At a glance
         </SectionEyebrow>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
           <KpiCard
             label="All orders"
             value={stats.totalOrders.toLocaleString("en-IN")}
@@ -589,7 +589,7 @@ export function OrdersPanel({
             ) : null}
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-4">
             {filtered.map((order) => (
               <OrderRowCard key={order.id} order={order} />
             ))}

@@ -122,7 +122,7 @@ export function AdminConfigView() {
 
   if (!profile) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-10 sm:px-6">
+      <div className="mx-auto w-full max-w-[1200px] px-3 py-6 sm:px-4">
         <p className="text-sm font-medium text-slate-500">Loading profile…</p>
       </div>
     );
@@ -131,7 +131,7 @@ export function AdminConfigView() {
   const initial = profile.name?.[0]?.toUpperCase() ?? "A";
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 sm:py-8 lg:py-10">
+    <div className="mx-auto w-full max-w-[1200px] px-3 py-3 sm:px-4 sm:py-4">
       <header className="mb-8 lg:mb-10">
         <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
           Config
@@ -199,7 +199,7 @@ export function AdminConfigView() {
 
       <section aria-label="System settings" className="mb-8 lg:mb-10">
         <SectionEyebrow icon={Settings2}>System settings</SectionEyebrow>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3">
           <ShortcutCard
             href="/admin/config/tax"
             icon={Percent}

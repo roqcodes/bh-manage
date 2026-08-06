@@ -152,7 +152,7 @@ export default function AdminBillingPage() {
   };
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="flex h-full flex-col p-4">
       <PageHeader
         title="Manual Billing"
         subtitle="Create invoices for offline/external customers"

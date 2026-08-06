@@ -17,7 +17,7 @@ export function AdminDeliveryView() {
   if (isPending && !data) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="px-4 py-10 text-sm font-semibold text-red-600 sm:px-8">
+      <div className="px-3 py-6 text-sm font-semibold text-red-600 sm:px-4">
         {error instanceof Error ? error.message : "Failed to load delivery riders."}
       </div>
     );
@@ -27,7 +27,7 @@ export function AdminDeliveryView() {
   const { riders } = data;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
+    <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-5 sm:py-4">
       <header className="mb-8">
         <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
           Delivery Manager

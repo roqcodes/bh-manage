@@ -90,6 +90,10 @@ export interface ProductAtGlanceMetrics {
   suggestedPriceMin: number | null;
   suggestedPriceMax: number | null;
   variantsWithSuggestion: number;
+  /** Distinct vendors with stock > 0 on any SKU of this product. */
+  vendorCount: number;
+  /** Total units listed across all vendor supply lines for this product. */
+  vendorStockTotal: number;
 }
 
 export interface VariantImage {
@@ -110,6 +114,8 @@ export interface ProductVariant {
   created_at: string | null;
   /** Ordered images for this variant; preview first. Empty when none. */
   images: VariantImage[];
+  /** Central warehouse stock (from inventory). */
+  central_stock?: number;
 }
 
 export interface VariantWithProduct extends ProductVariant {
@@ -124,6 +130,7 @@ export interface InventoryWithVariant {
     id: string;
     name: string | null;
     products: { id: string; name: string | null } | null;
+    variant_images?: { url: string; is_preview: boolean | null }[];
   } | null;
 }
 

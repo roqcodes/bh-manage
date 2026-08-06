@@ -25,6 +25,7 @@ import {
   updateVariantAction,
   deleteVariantAction,
 } from "@/modules/products/actions/variants.actions";
+import { Button } from "@/components/ui/button";
 import {
   Modal,
   FormError,
@@ -1271,7 +1272,7 @@ export function ProductManageModal({
         onStepClick={goToStep}
       />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50/30">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/30">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStep}
@@ -1315,7 +1316,7 @@ export function ProductManageModal({
             {(currentStep === "details" && error) ||
             (currentStep === "variants" && isCreate && error) ||
             (currentStep === "review" && isCreate && error) ? (
-              <div className="shrink-0 border-t border-slate-100 bg-white px-8 py-3">
+              <div className="shrink-0 border-t border-border bg-background px-6 py-3">
                 <FormError message={error} />
               </div>
             ) : null}
@@ -1323,18 +1324,19 @@ export function ProductManageModal({
         </AnimatePresence>
       </div>
 
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200/80 bg-white px-8 py-4">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-background px-6 py-4">
         <div>
           {showBack ? (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={handleBack}
               disabled={isPending}
-              className="inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-[13px] font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
             >
-              <ArrowLeft className="size-4" aria-hidden />
+              <ArrowLeft data-icon="inline-start" />
               Back
-            </button>
+            </Button>
           ) : (
             <span />
           )}

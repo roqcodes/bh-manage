@@ -79,8 +79,8 @@ export function AdminSidebar({
     >
       <div
         className={[
-          "flex items-center py-8 transition-[padding] duration-200",
-          collapsed ? "justify-center px-2" : "gap-3 px-7",
+          "flex items-center py-5 transition-[padding] duration-200",
+          collapsed ? "justify-center px-2" : "gap-2.5 px-5",
         ].join(" ")}
       >
         <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#1e3a8a] shadow-lg shadow-[#2563EB]/20">
@@ -100,12 +100,12 @@ export function AdminSidebar({
 
       <nav
         className={[
-          "flex-1 space-y-1 overflow-y-auto pb-4 transition-[padding] duration-200",
+          "flex-1 space-y-0.5 overflow-y-auto pb-3 transition-[padding] duration-200",
           collapsed ? "px-2" : "px-4",
         ].join(" ")}
       >
         {!collapsed ? (
-          <div className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400/80">
+          <div className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400/80">
             Main Menu
           </div>
         ) : (
@@ -125,8 +125,8 @@ export function AdminSidebar({
               className={[
                 "group relative flex items-center rounded-xl text-[14px] font-bold transition-all duration-200",
                 collapsed
-                  ? "justify-center px-0 py-2.5"
-                  : "gap-3 px-4 py-2.5",
+                  ? "justify-center px-0 py-2"
+                  : "gap-2.5 px-3 py-2",
                 active
                   ? "bg-gradient-to-r from-[#2563EB]/10 to-transparent text-[#2563EB] shadow-[0_1px_0_0_rgba(255,255,255,0.6)_inset]"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
@@ -155,7 +155,7 @@ export function AdminSidebar({
       <div
         className={[
           "border-t border-slate-200/60 transition-[padding] duration-200",
-          collapsed ? "p-3" : "p-5",
+          collapsed ? "p-2.5" : "p-4",
         ].join(" ")}
       >
         <div

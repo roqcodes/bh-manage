@@ -1,352 +1,292 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import type { ComponentType, ReactNode } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence } from "framer-motion";
-import {
-  Pencil,
-  Warehouse,
-  Search,
-  Sparkles,
-  Package,
-  AlertTriangle,
-  ExternalLink,
-} from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
+import {
+  ExternalLink,
+  MoreHorizontal,
+  Package,
+  Search,
+  Warehouse,
+} from "lucide-react";
 
 import type { InventoryCatalogStats, InventoryWithVariant } from "@/common/admin/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { overrideStockAction } from "@/modules/inventory/actions/inventory.actions";
 import { Pagination } from "@/modules/admin/components/pagination";
 import {
-  Modal,
-  FieldLabel,
-  FormError,
-  PrimaryBtn,
-  SecondaryBtn,
-  inputCls,
-} from "@/modules/admin/components/modal";
+  adminPanelStackClass,
+  adminStatGridClass,
+} from "@/modules/admin/lib/admin-layout";
+import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 
-const BRAND = "#2563EB";
+type StockFilter = "all" | "healthy" | "low" | "critical";
 
-const CARD =
-  "relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]";
-
-const ROW_TINTS = [
-  "linear-gradient(135deg, #e0e7ff, #c7d2fe)",
-  "linear-gradient(135deg, #d1fae5, #a7f3d0)",
-  "linear-gradient(135deg, #fce8ec, #e9b8c4)",
-  "linear-gradient(135deg, #fef9c3, #fde68a)",
-  "linear-gradient(135deg, #cffafe, #a5f3fc)",
-];
-
-function tintFor(variantId: string): string {
-  let h = 0;
-  for (let i = 0; i < variantId.length; i++) h = (h * 31 + variantId.charCodeAt(i)) >>> 0;
-  return ROW_TINTS[h % ROW_TINTS.length];
+function formatSku(variantId: string) {
+  return variantId.slice(0, 8).toUpperCase();
 }
 
-function SectionEyebrow({
-  icon: Icon,
-  children,
-  trailing,
-}: {
-  icon?: ComponentType<{ className?: string }>;
-  children: ReactNode;
-  trailing?: ReactNode;
-}) {
-  return (
-    <div className="mb-4 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2.5">
-        {Icon ? (
-          <span className="flex size-6 items-center justify-center rounded-md border border-slate-200/70 bg-slate-50 text-slate-500 shadow-sm shadow-slate-900/[0.03] ring-1 ring-white/80">
-            <Icon className="size-3" aria-hidden />
-          </span>
-        ) : null}
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-          {children}
-        </h2>
-      </div>
-      {trailing ? <div className="shrink-0">{trailing}</div> : null}
-    </div>
-  );
+const TITLE_CASE_SMALL_WORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "for",
+  "in",
+  "on",
+  "at",
+  "to",
+  "of",
+  "with",
+]);
+
+function toTitleCase(value: string | null | undefined, fallback = "—"): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return fallback;
+
+  return trimmed
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word, index) => {
+      if (index > 0 && TITLE_CASE_SMALL_WORDS.has(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ");
 }
 
-function TintIconBadge({
-  tint,
-  children,
-}: {
-  tint: string;
-  children: ReactNode;
-}) {
-  return (
-    <span className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/55 bg-white/90 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <span
-        className="pointer-events-none absolute inset-0 opacity-[0.35]"
-        style={{ background: tint }}
-        aria-hidden
-      />
-      <span className="relative text-slate-500 [&_svg]:size-4">{children}</span>
-    </span>
-  );
+function stockUnits(stock: number | null | undefined) {
+  return Math.max(0, Math.floor(Number(stock ?? 0)));
 }
 
-function TrendChip({
-  tone,
-  children,
-}: {
-  tone: "up" | "down" | "neutral";
-  children: ReactNode;
-}) {
-  const tones = {
-    up: "bg-emerald-50/80 text-emerald-700/90 ring-emerald-500/[0.08]",
-    down: "bg-rose-50/80 text-rose-700/90 ring-rose-500/[0.08]",
-    neutral: "bg-slate-100/90 text-slate-600/90 ring-slate-900/[0.05]",
-  } as const;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums ring-1 ${tones[tone]}`}
-    >
-      {children}
-    </span>
-  );
+function stockFilterFor(stock: number | null | undefined): Exclude<StockFilter, "all"> {
+  const units = stockUnits(stock);
+  if (units < 1) return "critical";
+  if (units < 10) return "low";
+  return "healthy";
 }
 
-function InlineRail({
-  pct,
-  label,
+function previewUrlFromRow(row: InventoryWithVariant): string | null {
+  const images = row.product_variants?.variant_images ?? [];
+  const preview = images.find((img) => img.is_preview) ?? images[0];
+  return preview?.url?.trim() ?? null;
+}
+
+function InventoryMetricCard({
+  title,
   value,
-  gradient,
+  description,
 }: {
-  pct: number;
-  label: string;
-  value: string;
-  gradient: string;
-}) {
-  const clamped = Math.min(100, Math.max(0, pct));
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-[10px] font-semibold">
-        <span className="uppercase tracking-[0.12em] text-slate-400">{label}</span>
-        <span className="tabular-nums text-slate-600">{value}</span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full"
-          style={{ width: `${clamped}%`, background: gradient }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  delta,
-  icon: Icon,
-  tint,
-  children,
-}: {
-  label: string;
+  title: string;
   value: ReactNode;
-  delta?: ReactNode;
-  icon: ComponentType<{ className?: string }>;
-  tint: string;
-  children?: ReactNode;
+  description?: ReactNode;
 }) {
   return (
-    <div
-      className={`group ${CARD} p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]`}
-    >
-      <div
-        className="pointer-events-none absolute -right-8 -top-8 size-28 rounded-full opacity-[0.07] blur-2xl transition-opacity group-hover:opacity-[0.11]"
-        style={{ background: tint }}
-        aria-hidden
-      />
-      <div className="relative flex items-start justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            {label}
-          </p>
-          <div className="mt-2 text-2xl font-bold tabular-nums leading-none tracking-tight text-slate-900">
-            {value}
-          </div>
-        </div>
-        <TintIconBadge tint={tint}>
-          <Icon aria-hidden />
-        </TintIconBadge>
-      </div>
-      {delta ? <div className="relative mt-3">{delta}</div> : null}
-      {children ? <div className="relative mt-4">{children}</div> : null}
-    </div>
+    <Card size="sm" className="border border-border ring-0">
+      <CardHeader className="border-b border-border pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-1 pt-3">
+        <div className="text-2xl font-semibold tabular-nums">{value}</div>
+        {description ? (
+          <CardDescription className="text-xs">{description}</CardDescription>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
-const RAIL_OK = "linear-gradient(90deg, #86efac, #4ade80)";
-const RAIL_WARN = "linear-gradient(90deg, #fde68a, #fcd34d)";
-const RAIL_DANGER = "linear-gradient(90deg, #fecaca, #f87171)";
+function StockStatusBadge({ stock }: { stock: number | null | undefined }) {
+  const level = stockFilterFor(stock);
+  if (level === "critical") {
+    return (
+      <Badge variant="destructive" className="font-normal">
+        Out of stock
+      </Badge>
+    );
+  }
+  if (level === "low") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-amber-200 bg-amber-50 font-normal text-amber-800"
+      >
+        Low stock
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      variant="outline"
+      className="border-emerald-200 bg-emerald-50 font-normal text-emerald-700"
+    >
+      Healthy
+    </Badge>
+  );
+}
 
-function StockOverrideModal({
-  row,
-  onClose,
-}: {
-  row: InventoryWithVariant;
-  onClose: () => void;
-}) {
+function VariantThumb({ url }: { url: string | null }) {
+  const [broken, setBroken] = useState(false);
+  if (!url || broken) {
+    return (
+      <div className="flex size-9 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
+        <Package aria-hidden />
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      className="size-9 rounded-md border border-border object-cover"
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
+function InventoryTableRow({ row }: { row: InventoryWithVariant }) {
   const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [savePending, startSave] = useTransition();
+  const [stockStr, setStockStr] = useState(String(stockUnits(row.stock)));
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const stock = parseInt(fd.get("stock") as string, 10);
-    if (Number.isNaN(stock) || stock < 0) {
-      return setError("Enter a valid non-negative number.");
+  useEffect(() => {
+    setStockStr(String(stockUnits(row.stock)));
+  }, [row.variant_id, row.stock]);
+
+  const level = stockFilterFor(row.stock);
+  const variantLabel = toTitleCase(row.product_variants?.name, "Unnamed variant");
+  const productName = toTitleCase(row.product_variants?.products?.name);
+  const productId = row.product_variants?.products?.id;
+  const previewUrl = previewUrlFromRow(row);
+
+  function saveStock() {
+    const parsed = parseInt(stockStr, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setStockStr(String(stockUnits(row.stock)));
+      return;
     }
-    setError(null);
-    startTransition(async () => {
-      try {
-        await overrideStockAction(row.variant_id, stock);
-        void queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
-        onClose();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed.");
+    const next = Math.floor(parsed);
+    if (next === stockUnits(row.stock)) return;
+
+    startSave(async () => {
+      await overrideStockAction(row.variant_id, next);
+      void queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
+      if (productId) {
+        void queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.productDetail(productId),
+        });
       }
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm">
-        <p className="font-semibold text-slate-900">
-          {row.product_variants?.products?.name ?? "—"}
-        </p>
-        <p className="mt-0.5 font-medium text-slate-500">
-          {row.product_variants?.name ?? "—"}
-        </p>
-      </div>
-      <FieldLabel label="New Stock (units)">
-        <input
-          className={inputCls}
-          name="stock"
-          type="number"
-          min="0"
-          defaultValue={row.stock ?? 0}
-          required
-        />
-      </FieldLabel>
-      <FormError message={error} />
-      <div className="flex justify-end gap-2">
-        <SecondaryBtn onClick={onClose}>Cancel</SecondaryBtn>
-        <PrimaryBtn type="submit" disabled={isPending}>
-          {isPending ? "Saving…" : "Override Stock"}
-        </PrimaryBtn>
-      </div>
-    </form>
-  );
-}
-
-function InventoryRowCard({
-  row,
-  onEdit,
-}: {
-  row: InventoryWithVariant;
-  onEdit: () => void;
-}) {
-  const tint = tintFor(row.variant_id);
-  const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
-  const low = stock > 0 && stock < 10;
-  const critical = stock < 1;
-  const productId = row.product_variants?.products?.id;
-
-  return (
-    <div
-      className={`group ${CARD} flex flex-col overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]`}
-    >
-      <div className="relative h-40 w-full shrink-0 overflow-hidden bg-slate-50">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.2]"
-          style={{ background: tint }}
-          aria-hidden
-        />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Warehouse className="size-14 text-slate-300" strokeWidth={1.25} aria-hidden />
-        </div>
-        <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-          {critical ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50/90 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-rose-800 ring-1 ring-rose-200/50 backdrop-blur">
-              Out of stock
-            </span>
-          ) : low ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50/90 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-900 ring-1 ring-amber-200/50 backdrop-blur">
-              Low stock
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50/90 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200/50 backdrop-blur">
-              Healthy
-            </span>
+    <TableRow>
+      <TableCell>
+        <VariantThumb url={previewUrl} />
+      </TableCell>
+      <TableCell className="max-w-[10rem] font-medium">
+        <span className="line-clamp-2">{variantLabel}</span>
+      </TableCell>
+      <TableCell className="hidden max-w-[12rem] text-muted-foreground md:table-cell">
+        <span className="line-clamp-2">{productName}</span>
+      </TableCell>
+      <TableCell className="hidden lg:table-cell">
+        <code className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+          {formatSku(row.variant_id)}
+        </code>
+      </TableCell>
+      <TableCell>
+        <StockStatusBadge stock={row.stock} />
+      </TableCell>
+      <TableCell>
+        <Input
+          className={cn(
+            "h-7 w-20 tabular-nums",
+            level === "critical" && "text-destructive",
+            level === "low" && "text-amber-700",
           )}
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col p-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-          Variant
-        </p>
-        <h3 className="mt-0.5 line-clamp-2 text-[15px] font-semibold leading-snug text-slate-900">
-          {row.product_variants?.name ?? "—"}
-        </h3>
-        <p className="mt-1 line-clamp-2 text-[13px] font-medium text-slate-500">
-          {row.product_variants?.products?.name ?? "—"}
-        </p>
-
-        <div className="mt-4 border-t border-slate-100 pt-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-            Central stock
-          </p>
-          <p
-            className={`mt-0.5 text-2xl font-bold tabular-nums ${
-              critical ? "text-rose-600" : low ? "text-amber-700" : "text-slate-900"
-            }`}
-          >
-            {stock.toLocaleString("en-IN")}
-            <span className="ml-1 text-[12px] font-medium text-slate-500">units</span>
-          </p>
-        </div>
-
-        <p className="mt-2 text-[11px] font-medium text-slate-400">
-          {row.updated_at
-            ? `Updated ${format(new Date(row.updated_at), "MMM d, yyyy · h:mm a")}`
-            : "No update timestamp"}
-        </p>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="inline-flex flex-1 min-w-[8rem] items-center justify-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-[12px] font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-          >
-            <Pencil className="size-3.5" />
-            Adjust stock
-          </button>
-          {productId ? (
-            <Link
-              href={`/admin/products/${productId}`}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[12px] font-semibold text-[color:var(--brand)] ring-1 ring-[color:var(--brand)]/20 transition hover:bg-[color:var(--brand)]/5"
-              style={{ ["--brand" as string]: BRAND }}
+          type="number"
+          min={0}
+          step={1}
+          value={stockStr}
+          onChange={(e) => setStockStr(e.target.value)}
+          onBlur={saveStock}
+          disabled={savePending}
+          aria-label={`Stock for ${variantLabel}`}
+        />
+      </TableCell>
+      <TableCell className="hidden text-muted-foreground sm:table-cell">
+        {row.updated_at
+          ? format(new Date(row.updated_at), "MMM d, yyyy · h:mm a")
+          : "—"}
+      </TableCell>
+      <TableCell className="text-right">
+        {productId ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Actions for ${variantLabel}`}
+                />
+              }
             >
-              Product
-              <ExternalLink className="size-3.5" />
-            </Link>
-          ) : null}
-        </div>
-      </div>
-    </div>
+              <MoreHorizontal />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  nativeButton={false}
+                  render={<Link href={`/admin/products/${productId}`} />}
+                >
+                  <ExternalLink />
+                  View product
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </TableCell>
+    </TableRow>
   );
 }
+
+const FILTER_OPTIONS: { id: StockFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "healthy", label: "Healthy" },
+  { id: "low", label: "Low" },
+  { id: "critical", label: "Critical" },
+];
 
 export function InventoryPanel({
   inventory,
@@ -359,180 +299,178 @@ export function InventoryPanel({
   page: number;
   stats: InventoryCatalogStats;
 }) {
-  const [selected, setSelected] = useState<InventoryWithVariant | null>(null);
   const [search, setSearch] = useState("");
+  const [stockFilter, setStockFilter] = useState<StockFilter>("all");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return inventory;
     return inventory.filter((row) => {
-      const v = (row.product_variants?.name ?? "").toLowerCase();
-      const p = (row.product_variants?.products?.name ?? "").toLowerCase();
-      return v.includes(q) || p.includes(q);
+      if (stockFilter !== "all" && stockFilterFor(row.stock) !== stockFilter) {
+        return false;
+      }
+      if (!q) return true;
+      const variantName = (row.product_variants?.name ?? "").toLowerCase();
+      const productName = (row.product_variants?.products?.name ?? "").toLowerCase();
+      const sku = formatSku(row.variant_id).toLowerCase();
+      return (
+        variantName.includes(q) || productName.includes(q) || sku.includes(q)
+      );
     });
-  }, [inventory, search]);
+  }, [inventory, search, stockFilter]);
 
-  const isFiltering = search.trim().length > 0;
+  const isFiltering = search.trim().length > 0 || stockFilter !== "all";
   const healthyPct =
-    stats.totalSkus > 0 ? (stats.healthySkus / stats.totalSkus) * 100 : 0;
+    stats.totalSkus > 0 ? Math.round((stats.healthySkus / stats.totalSkus) * 100) : 0;
 
   return (
-    <>
-      <AnimatePresence>
-        {selected && (
-          <Modal title="Override Stock" onClose={() => setSelected(null)} size="sm">
-            <StockOverrideModal row={selected} onClose={() => setSelected(null)} />
-          </Modal>
-        )}
-      </AnimatePresence>
-
-      <div className="space-y-6 lg:space-y-7">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+    <div className={adminPanelStackClass}>
+        <header className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Central inventory
           </h1>
-          <p className="mt-1.5 max-w-2xl text-sm font-medium leading-relaxed text-slate-500 sm:text-[15px]">
-            Variant-level stock in the warehouse. Override counts when reconciling
-            receipts or corrections.
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Variant-level warehouse stock. Override counts when reconciling receipts
+            or corrections.
           </p>
         </header>
 
         <section aria-label="Inventory summary">
-          <SectionEyebrow
-            icon={Sparkles}
-            trailing={
-              <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                Warehouse · live
-              </span>
-            }
-          >
-            At a glance
-          </SectionEyebrow>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard
-              label="Tracked SKUs"
+          <div className={adminStatGridClass}>
+            <InventoryMetricCard
+              title="Tracked SKUs"
               value={stats.totalSkus.toLocaleString("en-IN")}
-              icon={Package}
-              tint="linear-gradient(135deg, #e0e7ff, #c7d2fe)"
-              delta={
-                <TrendChip tone="neutral">
-                  Rows in central inventory
-                </TrendChip>
-              }
+              description="Rows in central inventory"
             />
-            <KpiCard
-              label="Healthy (≥10)"
+            <InventoryMetricCard
+              title="Healthy (≥10)"
               value={stats.healthySkus.toLocaleString("en-IN")}
-              icon={Warehouse}
-              tint="linear-gradient(135deg, #d1fae5, #a7f3d0)"
-              delta={
-                <TrendChip tone={stats.healthySkus > 0 ? "up" : "neutral"}>
-                  {Math.round(healthyPct)}% of SKUs
-                </TrendChip>
-              }
-            >
-              <InlineRail
-                pct={healthyPct}
-                label="Healthy share"
-                value={`${stats.healthySkus} / ${stats.totalSkus}`}
-                gradient={
-                  healthyPct >= 60 ? RAIL_OK : healthyPct < 25 ? RAIL_DANGER : RAIL_WARN
-                }
-              />
-            </KpiCard>
-            <KpiCard
-              label="Low (1–9)"
+              description={`${healthyPct}% of tracked SKUs`}
+            />
+            <InventoryMetricCard
+              title="Low (1–9)"
               value={stats.lowStockSkus.toLocaleString("en-IN")}
-              icon={AlertTriangle}
-              tint="linear-gradient(135deg, #fef9c3, #fde68a)"
-              delta={
-                <TrendChip tone={stats.lowStockSkus > 0 ? "down" : "neutral"}>
-                  Needs attention soon
-                </TrendChip>
+              description={
+                stats.lowStockSkus > 0 ? "Needs attention soon" : "None flagged"
               }
             />
-            <KpiCard
-              label="Critical"
+            <InventoryMetricCard
+              title="Critical"
               value={stats.criticalSkus.toLocaleString("en-IN")}
-              icon={AlertTriangle}
-              tint="linear-gradient(135deg, #ffe4e6, #fecdd3)"
-              delta={
-                <TrendChip tone={stats.criticalSkus > 0 ? "down" : "neutral"}>
-                  Zero or unset stock
-                </TrendChip>
+              description={
+                stats.criticalSkus > 0 ? "Zero or unset stock" : "None flagged"
               }
             />
           </div>
         </section>
 
-        <section aria-label="Stock rows">
-          <SectionEyebrow
-            icon={Warehouse}
-            trailing={
-              <label className="relative flex items-center">
-                <Search
-                  className="pointer-events-none absolute left-3 size-3.5 text-slate-400"
-                  aria-hidden
-                />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search variants…"
-                  className="h-9 w-44 rounded-xl border border-slate-200/70 bg-white pl-8 pr-3 text-[12.5px] font-medium text-slate-700 shadow-sm outline-none transition placeholder:font-medium placeholder:text-slate-400 focus:border-[color:var(--brand)]/40 focus:ring-2 focus:ring-[color:var(--brand)]/20 sm:w-56"
-                  style={{ ["--brand" as string]: BRAND }}
-                />
-              </label>
-            }
-          >
-            {isFiltering
-              ? `${filtered.length} of ${inventory.length} on this page`
-              : `Ledger · page ${page + 1}`}
-          </SectionEyebrow>
+        <Card className="border border-border ring-0">
+          <CardHeader className="border-b border-border">
+            <CardTitle>Stock ledger</CardTitle>
+            <CardDescription>
+              {isFiltering
+                ? `${filtered.length} of ${inventory.length} rows on this page`
+                : `Page ${page + 1} · ${inventory.length} rows shown`}
+            </CardDescription>
+          </CardHeader>
+
+          <div className="flex flex-col gap-2 border-b border-border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-xs">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search variant, product, SKU…"
+                className="pl-9"
+                aria-label="Search inventory rows"
+              />
+            </div>
+
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label="Filter by stock level"
+            >
+              {FILTER_OPTIONS.map((option) => (
+                <Button
+                  key={option.id}
+                  type="button"
+                  size="sm"
+                  variant={stockFilter === option.id ? "secondary" : "outline"}
+                  aria-pressed={stockFilter === option.id}
+                  onClick={() => setStockFilter(option.id)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </div>
 
           {filtered.length === 0 ? (
-            <div
-              className={`flex flex-col items-center gap-3 px-6 py-16 text-center ${CARD}`}
-            >
-              <Warehouse className="size-12 text-slate-200" />
-              <p className="text-sm font-medium text-slate-500">
+            <CardContent className="flex flex-col items-center gap-3 py-14 text-center">
+              <Warehouse className="size-10 text-muted-foreground/40" aria-hidden />
+              <p className="text-sm text-muted-foreground">
                 {isFiltering
-                  ? "No rows match your search."
+                  ? "No rows match your filters."
                   : "No inventory records yet."}
               </p>
               {isFiltering ? (
-                <button
+                <Button
                   type="button"
-                  onClick={() => setSearch("")}
-                  className="mt-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:bg-slate-50"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearch("");
+                    setStockFilter("all");
+                  }}
                 >
-                  Clear search
-                </button>
+                  Clear filters
+                </Button>
               ) : null}
-            </div>
+            </CardContent>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filtered.map((row) => (
-                <InventoryRowCard
-                  key={row.variant_id}
-                  row={row}
-                  onEdit={() => setSelected(row)}
-                />
-              ))}
-            </div>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">
+                      <span className="sr-only">Thumbnail</span>
+                    </TableHead>
+                    <TableHead scope="col">Variant</TableHead>
+                    <TableHead scope="col" className="hidden md:table-cell">
+                      Product
+                    </TableHead>
+                    <TableHead scope="col" className="hidden lg:table-cell">
+                      SKU
+                    </TableHead>
+                    <TableHead scope="col">Status</TableHead>
+                    <TableHead scope="col">Stock</TableHead>
+                    <TableHead scope="col" className="hidden sm:table-cell">
+                      Updated
+                    </TableHead>
+                    <TableHead scope="col" className="text-right">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((row) => (
+                    <InventoryTableRow key={row.variant_id} row={row} />
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
           )}
 
           {!isFiltering && total > inventory.length ? (
-            <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
+            <CardFooter className="border-t border-border p-0">
               <Pagination total={total} page={page} basePath="/admin/inventory" />
-            </div>
+            </CardFooter>
           ) : null}
-        </section>
-
-        <footer className="pt-1 text-center text-[10px] font-medium uppercase tracking-[0.16em] text-slate-300">
-          BuyHub · Inventory & catalog
-        </footer>
-      </div>
-    </>
+        </Card>
+    </div>
   );
 }

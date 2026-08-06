@@ -120,7 +120,7 @@ export function CustomersStatCards({ stats }: { stats: CustomerStats }) {
   const retailPct = stats.total > 0 ? (stats.retail / stats.total) * 100 : 0;
   
   return (
-    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="mb-4 grid grid-cols-2 gap-2.5 md:grid-cols-4">
       <KpiCard
         label="Total Customers"
         value={stats.total.toLocaleString("en-IN")}

@@ -36,7 +36,7 @@ export function Pagination({
   const end = Math.min((page + 1) * PAGE_SIZE, total);
 
   return (
-    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
+    <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2">
       <p className="text-[13px] text-slate-500">
         <span className="font-bold text-slate-900">
           {start}–{end}
@@ -47,14 +47,14 @@ export function Pagination({
         <button
           disabled={page === 0}
           onClick={() => router.push(buildUrl(page - 1))}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
+          className="flex size-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
         >
           <ChevronLeft size={14} />
         </button>
         <button
           disabled={page >= totalPages - 1}
           onClick={() => router.push(buildUrl(page + 1))}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
+          className="flex size-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
         >
           <ChevronRight size={14} />
         </button>

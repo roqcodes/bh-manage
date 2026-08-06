@@ -93,7 +93,7 @@ export function ProcurementWorkspace() {
   const vendorsInPlan = [...new Set(lines.map((l) => l.vendor_id))];
 
   return (
-    <div className="space-y-6 lg:space-y-7">
+    <div className="space-y-4 lg:space-y-5">
       <section className={`${CARD} p-5 sm:p-6`} aria-label="How procurement works">
         <div className="mb-3 flex items-start gap-3">
           <Info className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden />
@@ -189,7 +189,7 @@ export function ProcurementWorkspace() {
         ) : null}
 
         {plan && plan.by_vendor.length > 0 ? (
-          <div className="mb-6 space-y-3">
+          <div className="mb-4 space-y-3">
             <div className="flex items-center gap-2">
               <Sparkles className="size-3.5 text-amber-500/80" aria-hidden />
               <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">

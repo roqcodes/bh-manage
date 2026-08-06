@@ -554,7 +554,7 @@ export function VendorDetailPanel({
         )}
       </AnimatePresence>
 
-      <div className="space-y-6 lg:space-y-7">
+      <div className="space-y-4 lg:space-y-5">
         <div className={`${CARD} overflow-hidden`}>
           <div className="grid gap-0 lg:grid-cols-[288px_1fr]">
             <div className="relative h-[200px] w-full shrink-0 overflow-hidden border-b border-slate-100 sm:h-[220px] lg:h-72 lg:w-72 lg:border-b-0 lg:border-e">
@@ -651,7 +651,7 @@ export function VendorDetailPanel({
           >
             At a glance
           </SectionEyebrow>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
             <KpiCard
               label="Supply lines"
               value={metrics.lines.toLocaleString("en-IN")}
@@ -742,7 +742,7 @@ export function VendorDetailPanel({
               ) : null}
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3">
               {vendorProducts.map((vp) => (
                 <SupplyLineCard
                   key={vp.id}

@@ -105,7 +105,7 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
             isMdViewport={isMd}
             onToggleSidebar={handleToggleSidebar}
           />
-          <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom,1rem)]">
+          <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom,0.5rem)]">
             {children}
           </div>
         </main>

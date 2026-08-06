@@ -64,7 +64,7 @@ export function AdminUsersView() {
   if (isPending && !data) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="px-4 py-10 text-sm font-semibold text-red-600 sm:px-8">
+      <div className="px-3 py-6 text-sm font-semibold text-red-600 sm:px-4">
         {error instanceof Error ? error.message : "Failed to load users."}
       </div>
     );
@@ -83,7 +83,7 @@ export function AdminUsersView() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
+    <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-5 sm:py-4">
       <PageHeader title="Users" subtitle={subtitle} />
 
       <div className="mb-4 flex gap-1 rounded-2xl bg-slate-100 p-1">

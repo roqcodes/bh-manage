@@ -9,10 +9,12 @@ import {
   Loader2,
   Plus,
   ImageOff,
-  Check,
 } from "lucide-react";
 
 import type { ProductVariant, VariantImage } from "@/common/admin/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   addVariantImagesAction,
   deleteVariantImageAction,
@@ -26,8 +28,6 @@ import {
 } from "@/modules/products/lib/cloudinary-upload";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { FormError, SecondaryBtn } from "@/modules/admin/components/modal";
-
-const BRAND = "#2563EB";
 
 function Thumb({
   image,
@@ -43,21 +43,19 @@ function Thumb({
   compact?: boolean;
 }) {
   const [broken, setBroken] = useState(false);
+
   return (
     <div
-      className={`group relative shrink-0 overflow-hidden border bg-slate-50 transition ${
-        compact ? "w-[68px] rounded-md" : "w-full rounded-xl"
-      } ${
-        image.is_preview
-          ? "border-[color:var(--brand)] ring-2 ring-[color:var(--brand)]/25"
-          : "border-slate-200"
-      }`}
-      style={{ ["--brand" as string]: BRAND }}
+      className={cn(
+        "flex w-full flex-col overflow-hidden rounded-lg border bg-background",
+        compact && "w-[68px]",
+        image.is_preview ? "border-primary/30" : "border-border",
+      )}
     >
-      <div className={`relative aspect-square w-full ${compact ? "h-[68px]" : ""}`}>
+      <div className="relative aspect-square w-full overflow-hidden bg-muted">
         {broken ? (
-          <div className="flex size-full items-center justify-center text-slate-300">
-            <ImageOff className={compact ? "size-4" : "size-7"} aria-hidden />
+          <div className="flex size-full items-center justify-center text-muted-foreground">
+            <ImageOff aria-hidden />
           </div>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
@@ -70,58 +68,39 @@ function Thumb({
         )}
 
         {image.is_preview ? (
-          <span
-            className={`absolute left-1 top-1 inline-flex items-center gap-0.5 rounded-full bg-[color:var(--brand)] font-bold uppercase tracking-wide text-white shadow-sm ${
-              compact ? "px-1 py-px text-[7px]" : "left-2 top-2 gap-1 px-2 py-0.5 text-[10px]"
-            }`}
+          <Badge
+            variant="secondary"
+            className="absolute left-1 top-1 h-5 px-1.5 text-[10px]"
           >
-            <Star className={`fill-current ${compact ? "size-2" : "size-3"}`} aria-hidden />
-            {!compact ? "Preview" : null}
-          </span>
+            Preview
+          </Badge>
         ) : null}
       </div>
 
-      <div
-        className={`flex items-center border-t border-slate-100 bg-white ${
-          compact ? "gap-0.5 p-0.5" : "gap-1.5 p-2"
-        }`}
-      >
-        {image.is_preview ? (
-          compact ? (
-            <span className="flex flex-1 justify-center text-[color:var(--brand)]">
-              <Check className="size-2.5" aria-hidden />
-            </span>
-          ) : (
-            <span className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-[color:var(--brand)]/8 px-2 py-1.5 text-[11px] font-bold text-[color:var(--brand)]">
-              <Check className="size-3.5" aria-hidden />
-              Preview
-            </span>
-          )
-        ) : (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onSetPreview}
-            title="Set preview"
-            className={`inline-flex flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50 ${
-              compact ? "p-0.5" : "gap-1 px-2 py-1.5 text-[11px]"
-            }`}
-          >
-            <Star className={compact ? "size-2.5" : "size-3.5"} aria-hidden />
-            {!compact ? "Set preview" : null}
-          </button>
-        )}
-        <button
+      <div className="flex items-center gap-1 border-t border-border p-1">
+        <Button
           type="button"
+          variant={image.is_preview ? "secondary" : "ghost"}
+          size="icon-sm"
+          className="min-w-0 flex-1"
+          disabled={busy || image.is_preview}
+          onClick={onSetPreview}
+          title={image.is_preview ? "Current preview" : "Set as preview"}
+          aria-pressed={image.is_preview}
+        >
+          <Star />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 text-destructive hover:text-destructive"
           disabled={busy}
           onClick={onDelete}
           title="Delete image"
-          className={`inline-flex shrink-0 items-center justify-center rounded-lg border border-rose-100 bg-rose-50/80 text-rose-500 transition hover:border-rose-200 hover:bg-rose-100 disabled:opacity-50 ${
-            compact ? "size-5" : "size-8"
-          }`}
         >
-          <Trash2 className={compact ? "size-2.5" : "size-3.5"} aria-hidden />
-        </button>
+          <Trash2 />
+        </Button>
       </div>
     </div>
   );
@@ -238,14 +217,14 @@ export function VariantImagesManager({
           : "w-full flex-col gap-1.5 rounded-xl px-4 py-5"
       } ${
         dragActive
-          ? "border-[color:var(--brand)] bg-[color:var(--brand)]/[0.04]"
-          : "border-slate-300 bg-slate-50/60 hover:border-slate-400 hover:bg-slate-50"
+          ? "border-primary bg-primary/5"
+          : "border-border bg-muted/40 hover:border-muted-foreground/30 hover:bg-muted/60"
       } disabled:cursor-not-allowed`}
     >
       {upload ? (
         <>
           <Loader2
-            className={`animate-spin text-[color:var(--brand)] ${compact ? "size-4" : "size-5"}`}
+            className={`animate-spin text-primary ${compact ? "size-4" : "size-5"}`}
             aria-hidden
           />
           <p className={`font-bold text-slate-600 ${compact ? "text-[10px]" : "text-[12px]"}`}>
@@ -255,21 +234,21 @@ export function VariantImagesManager({
       ) : (
         <>
           <span
-            className={`flex items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200 transition group-hover:text-[color:var(--brand)] ${
+            className={`flex items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border transition group-hover:text-primary ${
               compact ? "size-7" : "size-9"
             }`}
           >
             <UploadCloud className={compact ? "size-3.5" : "size-5"} aria-hidden />
           </span>
-          <p className={`font-bold text-slate-700 ${compact ? "text-[10px] leading-tight" : "text-[12.5px]"}`}>
+          <p className={`font-bold text-foreground ${compact ? "text-[10px] leading-tight" : "text-[12.5px]"}`}>
             {compact ? (
               <>
-                Drop or <span className="text-[color:var(--brand)]">browse</span>
+                Drop or <span className="text-primary">browse</span>
               </>
             ) : (
               <>
                 Drag &amp; drop or{" "}
-                <span className="text-[color:var(--brand)]">browse</span> — multiple allowed
+                <span className="text-primary">browse</span> — multiple allowed
               </>
             )}
           </p>
@@ -325,18 +304,15 @@ export function VariantImagesManager({
   );
 
   return (
-    <div
-      className={compact ? "flex flex-col gap-2" : "space-y-4"}
-      style={{ ["--brand" as string]: BRAND }}
-    >
-      {!compact ? (
-        <p className="text-[12.5px] font-medium leading-snug text-slate-500">
+    <div className={compact ? "flex flex-col gap-2" : "flex flex-col gap-2"}>
+      {!compact && !embedded ? (
+        <p className="text-[12.5px] font-medium leading-snug text-muted-foreground">
           Manage images for{" "}
-          <span className="font-bold text-slate-800">
+          <span className="font-semibold text-foreground">
             {variant.name ?? "this variant"}
           </span>
           . The image marked{" "}
-          <span className="font-bold text-[color:var(--brand)]">Preview</span> is
+          <span className="font-semibold text-foreground">Preview</span> is
           shown first.
         </p>
       ) : null}
@@ -375,7 +351,13 @@ export function VariantImagesManager({
       ) : (
         <>
           {hasImages ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div
+              className={
+                embedded
+                  ? "grid shrink-0 grid-cols-3 gap-1.5 sm:grid-cols-4"
+                  : "grid grid-cols-2 gap-2 sm:grid-cols-3"
+              }
+            >
               {images.map((img) => (
                 <Thumb
                   key={img.id}

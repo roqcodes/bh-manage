@@ -31,6 +31,8 @@ export async function getProductAtGlanceMetrics(
     suggestedPriceMin: null,
     suggestedPriceMax: null,
     variantsWithSuggestion: 0,
+    vendorCount: 0,
+    vendorStockTotal: 0,
   };
 
   if (variantIds.length === 0) return empty;
@@ -39,13 +41,10 @@ export async function getProductAtGlanceMetrics(
     useSmartPricing ? getActivePricingRuleForProduct(productId) : Promise.resolve(null),
     supabase.from("inventory").select("variant_id,stock").in("variant_id", variantIds),
     supabase.from("product_variants").select("id,price").in("id", variantIds),
-    useSmartPricing
-      ? supabase
-          .from("vendor_products")
-          .select("variant_id,base_price,stock")
-          .in("variant_id", variantIds)
-          .gt("stock", 0)
-      : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("vendor_products")
+      .select("vendor_id,variant_id,base_price,stock")
+      .in("variant_id", variantIds),
   ]);
 
   if (invRes.error) throw new Error(invRes.error.message);
@@ -72,10 +71,21 @@ export async function getProductAtGlanceMetrics(
       : null;
 
   const minBaseByVariant = new Map<string, number>();
+  const vendorsWithStock = new Set<string>();
+  let vendorStockTotal = 0;
+
   for (const row of offersRes.data ?? []) {
     const vid = row.variant_id as string;
+    const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
+    vendorStockTotal += stock;
+
+    const vendorId = row.vendor_id as string;
+    if (stock > 0 && vendorId) vendorsWithStock.add(vendorId);
+
+    if (!useSmartPricing) continue;
+
     const bp = Number(row.base_price ?? 0);
-    if (!Number.isFinite(bp)) continue;
+    if (!Number.isFinite(bp) || stock <= 0) continue;
     const cur = minBaseByVariant.get(vid);
     if (cur === undefined || bp < cur) minBaseByVariant.set(vid, bp);
   }
@@ -112,5 +122,7 @@ export async function getProductAtGlanceMetrics(
     suggestedPriceMax:
       suggestedPrices.length > 0 ? Math.max(...suggestedPrices) : null,
     variantsWithSuggestion: suggestedPrices.length,
+    vendorCount: vendorsWithStock.size,
+    vendorStockTotal,
   };
 }

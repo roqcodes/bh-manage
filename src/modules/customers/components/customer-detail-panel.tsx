@@ -45,7 +45,7 @@ export function CustomerDetailPanel({
   const { summary, wallet } = details;
 
   return (
-    <div className="space-y-6 lg:space-y-8">
+    <div className="space-y-4 lg:space-y-5">
       {/* HEADER CARD */}
       <section className={`${CARD} flex flex-col p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6`}>
         <div className="flex items-center gap-5">

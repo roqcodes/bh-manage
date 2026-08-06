@@ -87,7 +87,7 @@ export default function AdminFinancePage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-8 py-10">
+      <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
         <div className="flex h-64 items-center justify-center">
           <div className="text-center">
             <Package className="mx-auto h-12 w-12 animate-spin text-slate-400" />
@@ -100,7 +100,7 @@ export default function AdminFinancePage() {
 
   if (isError || !financeData) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-8 py-10">
+      <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
         <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white">
           <div className="text-center">
             <Package className="mx-auto h-12 w-12 text-slate-400" />
@@ -125,7 +125,7 @@ export default function AdminFinancePage() {
     }).format(n);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-8 py-10">
+    <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Finance Dashboard</h1>
@@ -172,7 +172,7 @@ export default function AdminFinancePage() {
       {activeTab === "overview" && (
         <div className="space-y-6">
           {/* Summary Cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <div className="flex items-center justify-between">
                 <div>

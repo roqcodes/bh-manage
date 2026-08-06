@@ -82,7 +82,7 @@ export default function VendorProductsPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-8 py-10">
+      <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
         <div className="flex h-64 items-center justify-center">
           <div className="text-center">
             <Package className="mx-auto h-12 w-12 animate-spin text-slate-400" />
@@ -95,7 +95,7 @@ export default function VendorProductsPage() {
 
   if (isError || !data) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-8 py-10">
+      <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
         <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white">
           <div className="text-center">
             <Package className="mx-auto h-12 w-12 text-slate-400" />
@@ -115,7 +115,7 @@ export default function VendorProductsPage() {
   const subtitle = `${data.total} catalog line${data.total !== 1 ? "s" : ""} ${data.tab === "my" ? "on your supply list" : "active variant" + (data.total !== 1 ? "s" : "")} you can add.`;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-8 py-10">
+    <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
       <PageHeader title="Supply" subtitle={subtitle} />
       <VendorSupplyTabNav active={data.tab} />
       {data.tab === "my" ? (

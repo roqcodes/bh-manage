@@ -23,7 +23,7 @@ export async function getInventory(
     supabase
       .from("inventory")
       .select(
-        "variant_id,stock,updated_at,product_variants(id,name,products(id,name))",
+        "variant_id,stock,updated_at,product_variants(id,name,products(id,name),variant_images(url,is_preview,sort_order))",
       )
       .order("updated_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1),

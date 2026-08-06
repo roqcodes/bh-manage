@@ -85,7 +85,7 @@ function SectionEyebrow({
   trailing?: ReactNode;
 }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-3">
+    <div className="mb-3 flex items-center justify-between gap-2.5">
       <div className="flex items-center gap-2.5">
         {Icon ? (
           <span className="flex size-6 items-center justify-center rounded-md border border-slate-200/70 bg-slate-50 text-slate-500 shadow-sm shadow-slate-900/[0.03] ring-1 ring-white/80">
@@ -186,7 +186,7 @@ function TintIconBadge({
 
 /** Outer shell + hover/shadow — matches `KpiCard` (Business pulse). */
 const pulseCardShellClass =
-  "group relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-5 shadow-[0_1px_0_0_rgba(255,255,255,0.6)_inset,0_2px_10px_-4px_rgba(15,23,42,0.06),0_20px_40px_-24px_rgba(15,23,42,0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]";
+  "group relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_1px_0_0_rgba(255,255,255,0.6)_inset,0_2px_10px_-4px_rgba(15,23,42,0.06),0_20px_40px_-24px_rgba(15,23,42,0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]";
 
 function AlertStrip({ alerts }: { alerts: DashboardAlert[] }) {
   if (!alerts?.length) {
@@ -219,7 +219,7 @@ function AlertStrip({ alerts }: { alerts: DashboardAlert[] }) {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
       {alerts.map((a) => {
         const c = alertColors(a.severity);
         return (
@@ -354,7 +354,7 @@ function OrderFlowFunnel({
   const max = Math.max(...stages.map((s) => s.count), 1);
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-br from-white via-white to-slate-50 p-6 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
+    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-br from-white via-white to-slate-50 p-5 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-32"
         aria-hidden
@@ -538,7 +538,7 @@ function CatalogInventoryPanel({ catalog }: { catalog: CatalogInventoryCoverage 
   const stroke = strong ? "#10b981" : weak ? "#e11d48" : "#f59e0b";
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-6 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
+    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-5 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
       <SectionEyebrow icon={Gauge}>Catalog inventory</SectionEyebrow>
 
       <p className="mt-1 text-[12.5px] font-semibold leading-snug text-slate-500">
@@ -624,7 +624,7 @@ function RevenueBreakdown({
   const costPct = 100 - marginPct;
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-6 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
+    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-5 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-32"
         aria-hidden
@@ -857,7 +857,7 @@ const QUICK_ACTIONS: {
 
 function QuickActionsDeck() {
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-6 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
+    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-5 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
       <SectionEyebrow
         icon={Plus}
         trailing={
@@ -1155,7 +1155,7 @@ export function AdminDashboardView() {
 
   if (isError) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 py-10">
+      <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
         <div className="flex items-start gap-3 rounded-2xl border border-rose-200/60 bg-rose-50/40 p-5">
           <AlertTriangle className="size-5 shrink-0 text-rose-600" />
           <div>
@@ -1229,8 +1229,8 @@ export function AdminDashboardView() {
     totalToday > 0 ? (pipeline.delivered / totalToday) * 100 : 0;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 sm:py-8 lg:py-10">
-      <div className="space-y-6 lg:space-y-7">
+    <div className="mx-auto w-full max-w-[1200px] px-3 py-3 sm:px-4 sm:py-4">
+      <div className="space-y-4 lg:space-y-5">
         <DashboardHero />
 
         <section aria-label="Alerts">
@@ -1250,7 +1250,7 @@ export function AdminDashboardView() {
           >
             Business pulse
           </SectionEyebrow>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
             <KpiCard
               label="Revenue"
               value={compactInr(business.revenueToday)}
@@ -1403,7 +1403,7 @@ export function AdminDashboardView() {
 
         {/* Pipeline + catalog inventory */}
         <section aria-label="Operations">
-          <div className="grid items-stretch gap-5 lg:grid-cols-3">
+          <div className="grid items-stretch gap-4 lg:grid-cols-3">
             <div className="h-full lg:col-span-2">
               <OrderFlowFunnel
                 stages={stages}
@@ -1422,7 +1422,7 @@ export function AdminDashboardView() {
 
         {/* Revenue breakdown + quick actions */}
         <section aria-label="Revenue and actions">
-          <div className="grid items-stretch gap-5">
+          <div className="grid items-stretch gap-4">
             <div className="h-full w-full lg:col-span-2">
               <RevenueBreakdown
                 revenue={business.revenueToday}

@@ -30,7 +30,7 @@ export function AdminOrderInvoicePage() {
 
   if (!id) {
     return (
-      <div className="px-4 py-10 sm:px-6">
+      <div className="px-3 py-6 sm:px-4">
         <p className="text-sm font-semibold text-slate-600">Missing order id.</p>
       </div>
     );
@@ -39,7 +39,7 @@ export function AdminOrderInvoicePage() {
   if (isPending && data === undefined) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="px-4 py-10 sm:px-6">
+      <div className="px-3 py-6 sm:px-4">
         <div className="flex items-start gap-3 rounded-2xl border border-rose-200/60 bg-rose-50/40 p-5 print:hidden">
           <AlertTriangle className="size-5 shrink-0 text-rose-600" />
           <div>
@@ -54,7 +54,7 @@ export function AdminOrderInvoicePage() {
   }
   if (data === null) {
     return (
-      <div className="px-4 py-10 sm:px-6">
+      <div className="px-3 py-6 sm:px-4">
         <p className="text-sm font-medium text-slate-600 print:hidden">
           This order could not be found.
         </p>

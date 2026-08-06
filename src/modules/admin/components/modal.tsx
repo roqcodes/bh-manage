@@ -1,8 +1,18 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field, FieldLabel as UiFieldLabel } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 
 interface ModalProps {
   title: string;
@@ -14,6 +24,24 @@ interface ModalProps {
   bareBody?: boolean;
 }
 
+const SIZE_CLASSES: Record<NonNullable<ModalProps["size"]>, string> = {
+  sm: "sm:max-w-sm",
+  md: "sm:max-w-md",
+  lg: "sm:max-w-2xl",
+  xl: "sm:max-w-4xl",
+  landscape:
+    "h-[min(90vh,840px)] min-h-[min(80vh,640px)] w-[min(94vw,1280px)] max-w-[min(94vw,1280px)]",
+};
+
+/** Shared input styling for legacy raw `<input>` / `<select>` / `<textarea>` in forms. */
+export const inputCls =
+  "h-7 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50";
+
+export const selectCls = `${inputCls} cursor-pointer`;
+
+export const textareaCls =
+  "min-h-20 w-full resize-none rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50";
+
 export function Modal({
   title,
   subtitle,
@@ -22,85 +50,38 @@ export function Modal({
   size = "md",
   bareBody = false,
 }: ModalProps) {
-  const widthCls =
-    size === "landscape"
-      ? "max-w-[min(94vw,1280px)]"
-      : size === "xl"
-        ? "max-w-4xl"
-        : size === "lg"
-          ? "max-w-2xl"
-          : size === "sm"
-            ? "max-w-sm"
-            : "max-w-md";
-
-  const bodyCls = bareBody
-    ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-    : "max-h-[min(85vh,720px)] overflow-y-auto overscroll-contain p-6";
-
-  const shellCls =
-    size === "landscape"
-      ? "flex max-h-[min(90vh,840px)] min-h-[min(80vh,640px)] flex-col overflow-hidden"
-      : "";
+  const isLandscape = size === "landscape";
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto p-4">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{
-          type: "spring",
-          damping: 25,
-          stiffness: 300,
-          duration: 0.2,
-        }}
-        className={`relative w-full ${widthCls} ${shellCls} rounded-[28px] bg-white shadow-2xl`}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="modal-title"
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        showCloseButton
+        className={cn(
+          "gap-0 p-0",
+          SIZE_CLASSES[size],
+          isLandscape ? "flex flex-col overflow-hidden" : "flex max-h-[min(90vh,840px)] flex-col overflow-hidden",
+        )}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
-          <div className="min-w-0">
-            <h3 id="modal-title" className="text-base font-extrabold text-slate-900">
-              {title}
-            </h3>
-            {subtitle ? (
-              <p className="mt-0.5 text-[12.5px] font-medium text-slate-500">
-                {subtitle}
-              </p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close dialog"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X size={16} />
-          </button>
+        <DialogHeader className="shrink-0 gap-1 border-b border-border px-5 py-3 text-left">
+          <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
+          {subtitle ? (
+            <DialogDescription className="text-sm">{subtitle}</DialogDescription>
+          ) : null}
+        </DialogHeader>
+
+        <div
+          className={cn(
+            bareBody
+              ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+              : "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3",
+          )}
+        >
+          {children}
         </div>
-        <div className={bodyCls}>{children}</div>
-      </motion.div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
-
-export const inputCls =
-  "h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 outline-none transition focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 disabled:opacity-50 bg-white";
-
-export const selectCls = `${inputCls} cursor-pointer`;
-
-export const textareaCls =
-  "w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 disabled:opacity-50 resize-none";
 
 export function FieldLabel({
   label,
@@ -110,19 +91,19 @@ export function FieldLabel({
   children: ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-bold text-slate-700">{label}</span>
+    <Field>
+      <UiFieldLabel className="text-sm font-medium">{label}</UiFieldLabel>
       {children}
-    </label>
+    </Field>
   );
 }
 
 export function FormError({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-      {message}
-    </p>
+    <Alert variant="destructive">
+      <AlertDescription className="text-sm">{message}</AlertDescription>
+    </Alert>
   );
 }
 
@@ -140,15 +121,9 @@ export function PrimaryBtn({
   form?: string;
 }) {
   return (
-    <button
-      type={type}
-      disabled={disabled}
-      onClick={onClick}
-      form={form}
-      className="flex h-11 items-center justify-center rounded-xl bg-[#2563EB] px-5 text-sm font-bold text-white transition hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-50"
-    >
+    <Button type={type} disabled={disabled} onClick={onClick} form={form}>
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -162,14 +137,9 @@ export function SecondaryBtn({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex h-11 items-center justify-center rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-    >
+    <Button type="button" variant="outline" disabled={disabled} onClick={onClick}>
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -183,13 +153,8 @@ export function DangerBtn({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex h-11 items-center justify-center rounded-xl bg-red-500 px-5 text-sm font-bold text-white transition hover:bg-red-600 disabled:opacity-50"
-    >
+    <Button type="button" variant="destructive" disabled={disabled} onClick={onClick}>
       {children}
-    </button>
+    </Button>
   );
 }

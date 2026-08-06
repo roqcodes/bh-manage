@@ -15,10 +15,10 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon, iconBg, trend }: StatCardProps) {
   return (
-    <div className="flex flex-1 flex-col gap-4 rounded-[28px] border border-slate-100 bg-white p-6 shadow-[0_4px_16px_rgba(26,26,46,0.04)]">
+    <div className="flex flex-1 flex-col gap-3 rounded-[28px] border border-slate-100 bg-white p-4 shadow-[0_4px_16px_rgba(26,26,46,0.04)]">
       <div className="flex items-start justify-between">
         <div
-          className="flex h-11 w-11 items-center justify-center rounded-2xl"
+          className="flex size-10 items-center justify-center rounded-2xl"
           style={{ background: iconBg }}
         >
           {icon}

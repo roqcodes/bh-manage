@@ -6,8 +6,8 @@ import { ProcurementWorkspace } from "@/modules/procurement/components/procureme
 
 export function AdminProcurementView() {
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 sm:py-8 lg:py-10">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="mx-auto w-full max-w-[1200px] px-3 py-3 sm:px-4 sm:py-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <header className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
             Procurement

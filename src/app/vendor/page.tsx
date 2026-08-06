@@ -52,7 +52,7 @@ export default function VendorHomePage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-8 py-10">
+      <div className="mx-auto w-full max-w-4xl px-5 py-6 sm:px-6">
         <div className="flex h-64 items-center justify-center">
           <div className="text-center">
             <Package className="mx-auto h-12 w-12 animate-spin text-slate-400" />
@@ -65,7 +65,7 @@ export default function VendorHomePage() {
 
   if (isError || !data) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-8 py-10">
+      <div className="mx-auto w-full max-w-4xl px-5 py-6 sm:px-6">
         <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white">
           <div className="text-center">
             <Package className="mx-auto h-12 w-12 text-slate-400" />
@@ -83,24 +83,24 @@ export default function VendorHomePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-8 py-10">
+    <div className="mx-auto w-full max-w-4xl px-5 py-6 sm:px-6">
       <PageHeader
         title="Vendor home"
         subtitle="Overview of purchase orders and your supply catalog."
       />
 
-      <div className="mb-8">
+      <div className="mb-5">
         <VendorStatsRow stats={data.stats} />
       </div>
 
-      <div className="mb-8">
+      <div className="mb-5">
         <VendorPoActivityFeed recent={data.recent} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-2">
         <Link
           href="/vendor/products"
-          className="group flex flex-col rounded-[24px] border border-slate-100 bg-white p-6 shadow-[0_4px_16px_rgba(26,26,46,0.04)] transition hover:border-[#2563EB]/20"
+          className="group flex flex-col rounded-[24px] border border-slate-100 bg-white p-4 shadow-[0_4px_16px_rgba(26,26,46,0.04)] transition hover:border-[#2563EB]/20"
         >
           <Package
             className="mb-3 text-slate-300 transition group-hover:text-[#2563EB]"
@@ -114,7 +114,7 @@ export default function VendorHomePage() {
 
         <Link
           href="/vendor/purchase-orders"
-          className="group flex flex-col rounded-[24px] border border-slate-100 bg-white p-6 shadow-[0_4px_16px_rgba(26,26,46,0.04)] transition hover:border-[#2563EB]/20"
+          className="group flex flex-col rounded-[24px] border border-slate-100 bg-white p-4 shadow-[0_4px_16px_rgba(26,26,46,0.04)] transition hover:border-[#2563EB]/20"
         >
           <ClipboardList
             className="mb-3 text-slate-300 transition group-hover:text-[#2563EB]"

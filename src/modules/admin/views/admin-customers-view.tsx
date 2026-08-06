@@ -31,7 +31,7 @@ export function AdminCustomersView() {
   if (isPending && !data) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="px-4 py-10 text-sm font-semibold text-red-600 sm:px-8">
+      <div className="px-3 py-6 text-sm font-semibold text-red-600 sm:px-4">
         {error instanceof Error ? error.message : "Failed to load customers."}
       </div>
     );
@@ -39,7 +39,7 @@ export function AdminCustomersView() {
   if (!data) return <AdminPageSkeleton />;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 sm:py-8 lg:py-10">
+    <div className="mx-auto w-full max-w-[1200px] px-3 py-3 sm:px-4 sm:py-4">
       <PageHeader title="Customers" subtitle="All registered users and customers." />
       
       {data.stats && <CustomersStatCards stats={data.stats} />}

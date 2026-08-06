@@ -141,18 +141,48 @@ export async function getProductVariants(
       .select("id,product_id,name,price,mrp,created_at")
       .eq("product_id", productId)
       .order("created_at", { ascending: true });
-    return ((plain ?? []) as Omit<ProductVariant, "images">[]).map((v) => ({
-      ...v,
-      images: [],
-    }));
+    const plainVariants = ((plain ?? []) as Omit<ProductVariant, "images">[]).map(
+      (v) => ({
+        ...v,
+        images: [],
+      }),
+    );
+    return attachCentralStock(supabase, plainVariants);
   }
 
-  return ((data ?? []) as unknown as (Omit<ProductVariant, "images"> & {
-    variant_images?: VariantImage[];
-  })[]).map((row) => {
+  const variants = (
+    (data ?? []) as unknown as (Omit<ProductVariant, "images"> & {
+      variant_images?: VariantImage[];
+    })[]
+  ).map((row) => {
     const { variant_images, ...variant } = row;
     return { ...variant, images: sortVariantImages(variant_images ?? []) };
   });
+
+  return attachCentralStock(supabase, variants);
+}
+
+async function attachCentralStock(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  variants: ProductVariant[],
+): Promise<ProductVariant[]> {
+  if (variants.length === 0) return variants;
+
+  const variantIds = variants.map((v) => v.id);
+  const { data: inventoryRows } = await supabase
+    .from("inventory")
+    .select("variant_id,stock")
+    .in("variant_id", variantIds);
+
+  const stockByVariant = new Map<string, number>();
+  for (const row of inventoryRows ?? []) {
+    stockByVariant.set(row.variant_id, Number(row.stock ?? 0));
+  }
+
+  return variants.map((v) => ({
+    ...v,
+    central_stock: stockByVariant.get(v.id) ?? 0,
+  }));
 }
 
 /** Preview first, then by sort_order, then by creation time for stable display. */

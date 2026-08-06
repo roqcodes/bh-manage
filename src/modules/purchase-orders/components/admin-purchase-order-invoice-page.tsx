@@ -30,7 +30,7 @@ export function AdminPurchaseOrderInvoicePage() {
 
   if (!id) {
     return (
-      <div className="px-4 py-10 sm:px-6">
+      <div className="px-3 py-6 sm:px-4">
         <p className="text-sm font-semibold text-slate-600">
           Missing purchase order id.
         </p>
@@ -41,7 +41,7 @@ export function AdminPurchaseOrderInvoicePage() {
   if (isPending && data === undefined) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="px-4 py-10 sm:px-6">
+      <div className="px-3 py-6 sm:px-4">
         <div className="flex items-start gap-3 rounded-2xl border border-rose-200/60 bg-rose-50/40 p-5 print:hidden">
           <AlertTriangle className="size-5 shrink-0 text-rose-600" />
           <div>
@@ -58,7 +58,7 @@ export function AdminPurchaseOrderInvoicePage() {
   }
   if (data === null) {
     return (
-      <div className="px-4 py-10 sm:px-6">
+      <div className="px-3 py-6 sm:px-4">
         <p className="text-sm font-medium text-slate-600 print:hidden">
           This purchase order could not be found.
         </p>

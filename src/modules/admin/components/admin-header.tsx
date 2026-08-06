@@ -61,7 +61,7 @@ export function AdminHeader({
 
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-slate-200/70 bg-[#F8FAFC]/85 backdrop-blur-md">
-      <div className="grid grid-cols-1 gap-2 px-4 py-2 sm:px-6 md:h-[56px] md:grid-cols-[minmax(0,1fr)_min(100%,28rem)_minmax(0,1fr)] md:items-center md:gap-4 md:py-0">
+      <div className="grid grid-cols-1 gap-2 px-3 py-1.5 sm:px-4 md:h-[50px] md:grid-cols-[minmax(0,1fr)_min(100%,28rem)_minmax(0,1fr)] md:items-center md:gap-3 md:py-0">
         <div className="flex min-w-0 items-center justify-between md:justify-start">
           <button
             type="button"
@@ -97,7 +97,7 @@ export function AdminHeader({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search…"
-              className="h-10 w-full rounded-xl border border-slate-200/80 bg-white/90 pl-10 pr-3 text-sm font-medium text-slate-900 shadow-sm shadow-slate-900/5 outline-none ring-slate-900/5 placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-[#2563EB]/15"
+              className="h-9 w-full rounded-xl border border-slate-200/80 bg-white/90 pl-10 pr-3 text-sm font-medium text-slate-900 shadow-sm shadow-slate-900/5 outline-none ring-slate-900/5 placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-[#2563EB]/15"
             />
           </label>
         </div>

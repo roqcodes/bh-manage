@@ -1,8 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import Link from "next/link";
-import { AlertTriangle, ArrowLeft, ChevronRight } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useParams } from "next/navigation";
 
 import type {
@@ -12,6 +11,8 @@ import type {
   ProductWithCategory,
 } from "@/common/admin/types";
 import type { PricingRuleRow } from "@/modules/pricing/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { ProductDetailPanel } from "@/modules/products/components/product-detail-panel";
 import { adminGetNullable } from "@/modules/admin/lib/admin-api-client";
@@ -27,31 +28,13 @@ type ProductDetailPayload = {
 
 function ProductDetailNav({ productName }: { productName?: string | null }) {
   return (
-    <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2">
-      <Link
-        href="/admin/products"
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-        aria-label="Back to marketplace"
-      >
-        <ArrowLeft className="size-4" aria-hidden />
-      </Link>
-      <ol className="flex min-w-0 items-center gap-1 text-[13px] font-medium text-slate-500">
-        <li className="shrink-0">
-          <Link
-            href="/admin/products"
-            className="font-semibold text-slate-600 transition hover:text-[#2563EB]"
-          >
-            Marketplace
-          </Link>
-        </li>
-        <li className="shrink-0" aria-hidden>
-          <ChevronRight className="size-3.5 text-slate-300" />
-        </li>
-        <li className="min-w-0 truncate font-bold text-slate-900">
-          {productName?.trim() || "Product"}
-        </li>
-      </ol>
-    </nav>
+    <AdminBreadcrumb
+      backHref="/admin/products"
+      items={[
+        { label: "Marketplace", href: "/admin/products" },
+        { label: productName?.trim() || "Product" },
+      ]}
+    />
   );
 }
 
@@ -70,8 +53,8 @@ export function AdminProductDetailView() {
 
   if (!id) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-10 sm:px-6">
-        <p className="text-sm font-semibold text-slate-600">Missing product id.</p>
+      <div className="mx-auto w-full max-w-[1200px] px-3 py-2.5 sm:px-4">
+        <p className="text-sm text-muted-foreground">Missing product id.</p>
       </div>
     );
   }
@@ -79,30 +62,22 @@ export function AdminProductDetailView() {
   if (isPending && data === undefined) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-10 sm:px-6">
-        <div className="flex items-start gap-3 rounded-2xl border border-rose-200/60 bg-rose-50/40 p-5">
-          <AlertTriangle className="size-5 shrink-0 text-rose-600" />
-          <div>
-            <p className="text-sm font-bold text-rose-900">
-              Failed to load product.
-            </p>
-            <p className="mt-1 text-[12.5px] font-medium text-rose-700">
-              {error instanceof Error ? error.message : "Unknown error."}
-            </p>
-          </div>
-        </div>
+      <div className="mx-auto w-full max-w-[1200px] px-3 py-2.5 sm:px-4">
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertTitle>Failed to load product</AlertTitle>
+          <AlertDescription>
+            {error instanceof Error ? error.message : "Unknown error."}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
   if (data === null) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:py-10">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-3 py-2.5 sm:px-4">
         <ProductDetailNav />
-        <div className="rounded-2xl border border-slate-200/70 bg-white p-10 text-center shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
-          <p className="text-sm font-semibold text-slate-500">
-            This product could not be found.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">This product could not be found.</p>
       </div>
     );
   }
@@ -110,7 +85,7 @@ export function AdminProductDetailView() {
   const { product, variants, categories, pricingRule, glance } = data;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:py-10">
+    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-3 py-2.5 font-sans sm:px-4">
       <ProductDetailNav productName={product.name} />
 
       <ProductDetailPanel

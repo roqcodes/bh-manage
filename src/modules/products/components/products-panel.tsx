@@ -497,7 +497,7 @@ export function ProductsPanel({
       )}
     </AnimatePresence>
 
-    <div className="space-y-6 lg:space-y-7">
+    <div className="space-y-4 lg:space-y-5">
         {/* Hero */}
         <header className="flex flex-col gap-4 pb-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -533,7 +533,7 @@ export function ProductsPanel({
           >
             Catalog pulse
           </SectionEyebrow>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3">
             <KpiCard
               label="Total products"
               value={stats.total.toLocaleString("en-IN")}
@@ -688,7 +688,7 @@ export function ProductsPanel({
               )}
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-4">
               {filteredProducts.map((product) => (
                 <ProductCard
                   key={product.id}

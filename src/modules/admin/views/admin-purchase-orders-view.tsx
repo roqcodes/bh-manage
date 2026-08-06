@@ -56,7 +56,7 @@ export function AdminPurchaseOrdersView() {
   if (isPending && !data) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-10 sm:px-6">
+      <div className="mx-auto w-full max-w-[1200px] px-3 py-6 sm:px-4">
         <div className="flex items-start gap-3 rounded-2xl border border-rose-200/60 bg-rose-50/40 p-5">
           <AlertTriangle className="size-5 shrink-0 text-rose-600" />
           <div>
@@ -74,7 +74,7 @@ export function AdminPurchaseOrdersView() {
   if (!data) return <AdminPageSkeleton />;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 sm:py-8 lg:py-10">
+    <div className="mx-auto w-full max-w-[1200px] px-3 py-3 sm:px-4 sm:py-4">
       <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
 
       </div>

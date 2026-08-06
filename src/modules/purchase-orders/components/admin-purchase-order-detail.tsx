@@ -78,7 +78,7 @@ export function AdminPurchaseOrderDetailView({
   const canCancel = status === "pending";
 
   return (
-    <div className="space-y-6 lg:space-y-7">
+    <div className="space-y-4 lg:space-y-5">
       <div className={`${CARD} overflow-hidden`}>
         <div
           className="relative border-b border-slate-100/80 px-5 py-8 sm:px-8 sm:py-10"

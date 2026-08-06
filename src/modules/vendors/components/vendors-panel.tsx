@@ -439,7 +439,7 @@ export function VendorsPanel({
         )}
       </AnimatePresence>
 
-      <div className="space-y-6 lg:space-y-7">
+      <div className="space-y-4 lg:space-y-5">
         <header className="flex flex-col gap-4 pb-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
@@ -473,7 +473,7 @@ export function VendorsPanel({
           >
             At a glance
           </SectionEyebrow>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
             <KpiCard
               label="Total vendors"
               value={stats.total.toLocaleString("en-IN")}
@@ -595,7 +595,7 @@ export function VendorsPanel({
               )}
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-4">
               {filtered.map((v) => (
                 <VendorCard
                   key={v.id}

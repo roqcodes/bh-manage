@@ -58,7 +58,7 @@ export default function VendorPurchaseOrderDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-8 py-10">
+      <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
         <div className="flex h-64 items-center justify-center">
           <div className="text-center">
             <Package className="mx-auto h-12 w-12 animate-spin text-slate-400" />
@@ -71,7 +71,7 @@ export default function VendorPurchaseOrderDetailPage() {
 
   if (isError || !po) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-8 py-10">
+      <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
         <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white">
           <div className="text-center">
             <Package className="mx-auto h-12 w-12 text-slate-400" />
@@ -89,7 +89,7 @@ export default function VendorPurchaseOrderDetailPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-8 py-10">
+    <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
       <VendorPurchaseOrderDetailView po={po as any} />
     </div>
   );

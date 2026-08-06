@@ -23,7 +23,7 @@ import { AdminCustomersView } from "@/modules/admin/views/admin-customers-view";
 
 function AdminNotFound() {
   return (
-    <div className="px-4 py-10 text-sm font-semibold text-slate-600 sm:px-8">
+    <div className="px-3 py-6 text-sm font-semibold text-slate-600 sm:px-4">
       This admin page does not exist.
     </div>
   );
