@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
+import { useMemo, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -8,9 +8,11 @@ import {
   ChevronDown,
   Columns3,
   Download,
+  Mail,
   MapPin,
   MoreHorizontal,
   Package,
+  Phone,
   Printer,
   Truck,
   X,
@@ -30,8 +32,6 @@ import {
 import {
   Popover,
   PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
@@ -53,8 +53,218 @@ import {
   PaymentPill,
   shortOrderRef,
   isPaid,
+  customerInitials,
 } from "@/modules/orders/components/orders-ui";
 
+function CompactPopoverShell({
+  label,
+  title,
+  subtitle,
+  children,
+  footer,
+  className,
+}: {
+  label: string;
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-col overflow-hidden", className)}>
+      <div className="border-b border-border/60 bg-muted/25 px-3 py-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          {label}
+        </p>
+        <p className="mt-0.5 text-[13px] font-semibold leading-snug text-foreground">{title}</p>
+        {subtitle ? (
+          <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">{subtitle}</p>
+        ) : null}
+      </div>
+      <div className="flex flex-col gap-1.5 px-3 py-2">{children}</div>
+      {footer ? (
+        <div className="border-t border-border/60 bg-muted/10 px-3 py-2">{footer}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function CompactMetaRow({
+  icon: Icon,
+  children,
+}: {
+  icon: typeof Mail;
+  children: ReactNode;
+}) {
+  return (
+    <p className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
+      <Icon className="mt-0.5 size-3 shrink-0 text-muted-foreground/70" aria-hidden />
+      <span className="min-w-0 break-all">{children}</span>
+    </p>
+  );
+}
+
+function CompactStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-border/50 bg-background/80 px-2 py-1.5">
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-0.5 truncate text-[11px] font-semibold tabular-nums text-foreground">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function CustomerPopover({ order }: { order: Order }) {
+  const name = order.users?.name ?? order.users?.email ?? "Guest";
+  const userId = order.users?.id;
+  const initials = customerInitials(name);
+  const orderTotal = formatInr(Number(order.total_amount ?? 0));
+  const orderDate = order.created_at
+    ? format(new Date(order.created_at), "MMM d, yyyy · h:mm a")
+    : "—";
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-1 text-[13px] font-medium leading-snug text-foreground hover:text-primary hover:underline",
+              ORDERS_ACCENT.focus,
+            )}
+          />
+        }
+      >
+        {name}
+        <ChevronDown className="size-3.5 opacity-50" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[17.5rem] gap-0 p-0">
+        <CompactPopoverShell
+          label="Customer"
+          title={name}
+          subtitle={`Order #${shortOrderRef(order.id)} · ${orderDate}`}
+          footer={
+            userId ? (
+              <Link
+                href={`/admin/customers/${userId}`}
+                className="inline-flex text-[11px] font-semibold text-primary hover:underline"
+              >
+                View customer profile →
+              </Link>
+            ) : (
+              <span className="text-[10px] text-muted-foreground">Guest checkout</span>
+            )
+          }
+        >
+          <div className="flex items-center gap-2">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+              {initials}
+            </span>
+            <div className="flex min-w-0 flex-wrap gap-1">
+              <PaymentPill paymentStatus={order.payment_status} />
+              <FulfillmentPill status={order.status} />
+            </div>
+          </div>
+          {order.users?.email ? (
+            <CompactMetaRow icon={Mail}>{order.users.email}</CompactMetaRow>
+          ) : null}
+          {order.users?.phone ? (
+            <CompactMetaRow icon={Phone}>{order.users.phone}</CompactMetaRow>
+          ) : null}
+          <CompactMetaRow icon={MapPin}>India</CompactMetaRow>
+          <div className="grid grid-cols-2 gap-1.5">
+            <CompactStat
+              label="Lifetime orders"
+              value={order.customer_order_count.toLocaleString("en-IN")}
+            />
+            <CompactStat label="This order" value={orderTotal} />
+          </div>
+          {order.merchant_note?.trim() ? (
+            <p className="rounded-md border border-border/50 bg-muted/30 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+              <span className="font-semibold text-foreground">Note · </span>
+              {order.merchant_note.trim()}
+            </p>
+          ) : null}
+        </CompactPopoverShell>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ItemsPopover({ order }: { order: Order }) {
+  const count = order.item_count;
+  const label = `${count} item${count === 1 ? "" : "s"}`;
+  const total = formatInr(Number(order.total_amount ?? 0));
+  const totalQty = order.order_items_preview.reduce(
+    (sum, item) => sum + (item.quantity ?? 0),
+    0,
+  );
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground",
+              ORDERS_ACCENT.focus,
+            )}
+          />
+        }
+      >
+        {label}
+        <ChevronDown className="size-3.5 opacity-50" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[17.5rem] gap-0 p-0">
+        <CompactPopoverShell
+          label="Line items"
+          title={label}
+          subtitle={`${totalQty || count} units · ${total}`}
+          footer={
+            <Link
+              href={`/admin/orders/${order.id}`}
+              className="inline-flex text-[11px] font-semibold text-primary hover:underline"
+            >
+              View full order →
+            </Link>
+          }
+        >
+          {order.order_items_preview.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">No items on this order.</p>
+          ) : (
+            <ul className="max-h-44 space-y-0 overflow-y-auto">
+              {order.order_items_preview.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-start gap-2 border-b border-border/40 py-1.5 last:border-0"
+                >
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-foreground">
+                    {item.quantity ?? 1}×
+                  </span>
+                  <span className="min-w-0 flex-1 text-[11px] font-medium leading-snug text-foreground">
+                    {item.product_name ?? "Item"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {order.merchant_note?.trim() ? (
+            <p className="rounded-md border border-border/50 bg-muted/30 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+              <span className="font-semibold text-foreground">Note · </span>
+              {order.merchant_note.trim()}
+            </p>
+          ) : null}
+        </CompactPopoverShell>
+      </PopoverContent>
+    </Popover>
+  );
+}
 function exportOrdersCsv(orders: Order[]) {
   const headers = [
     "Order ID",
@@ -99,98 +309,6 @@ function printShippingLabels(orderIds: string[]) {
   for (const id of orderIds) {
     window.open(`/admin/orders/${id}/invoice`, "_blank", "noopener,noreferrer");
   }
-}
-
-function CustomerPopover({ order }: { order: Order }) {
-  const name = order.users?.name ?? "Guest";
-  const userId = order.users?.id;
-
-  return (
-    <Popover>
-      <PopoverTrigger
-        render={
-          <button
-            type="button"
-            className={cn(
-              "inline-flex items-center gap-1 text-[13px] font-medium leading-snug text-foreground hover:text-primary hover:underline",
-              ORDERS_ACCENT.focus,
-            )}
-          />
-        }
-      >
-        {name}
-        <ChevronDown />
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-72">
-        <PopoverHeader>
-          <PopoverTitle>{name}</PopoverTitle>
-        </PopoverHeader>
-        <div className="flex flex-col gap-2 text-sm">
-          {order.users?.email ? (
-            <p className="text-muted-foreground">{order.users.email}</p>
-          ) : null}
-          {order.users?.phone ? (
-            <p className="text-muted-foreground">{order.users.phone}</p>
-          ) : null}
-          <p className="flex items-center gap-1.5 text-muted-foreground">
-            <MapPin />
-            India
-          </p>
-          <p className="text-muted-foreground">
-            {order.customer_order_count.toLocaleString("en-IN")} order
-            {order.customer_order_count === 1 ? "" : "s"} with BuyHub
-          </p>
-          {userId ? (
-            <Link
-              href={`/admin/customers/${userId}`}
-              className={buttonVariants({ size: "sm", variant: "outline" })}
-            >
-              View customer
-            </Link>
-          ) : null}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function ItemsPopover({ order }: { order: Order }) {
-  const count = order.item_count;
-  const label = `${count} item${count === 1 ? "" : "s"}`;
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <button
-            type="button"
-            className={cn(
-              "inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground",
-              ORDERS_ACCENT.focus,
-            )}
-          />
-        }
-      >
-        {label}
-        <ChevronDown />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuGroup>
-          {order.order_items_preview.length === 0 ? (
-            <DropdownMenuItem disabled>No items</DropdownMenuItem>
-          ) : (
-            order.order_items_preview.map((item) => (
-              <DropdownMenuItem key={item.id} disabled>
-                <span className="truncate">
-                  {item.quantity ?? 1}× {item.product_name ?? "Item"}
-                </span>
-              </DropdownMenuItem>
-            ))
-          )}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 }
 
 export function OrdersBulkActionBar({

@@ -29,6 +29,7 @@ import {
   SearchGroupHeader,
   SearchPageResultRow,
 } from "@/modules/admin/components/admin-search-results";
+import { AdminSearchHintRotator } from "@/modules/admin/components/admin-search-hints";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { filterSearchIndex } from "@/modules/admin/lib/admin-search-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
@@ -128,16 +129,21 @@ export function AdminSearchTrigger({ className }: { className?: string }) {
     <button
       type="button"
       onClick={() => setOpen(true)}
+      aria-label="Quick search"
       className={cn(
-        "relative flex h-9 w-full items-center gap-2 rounded-xl border border-slate-200/80 bg-white/90 px-3 text-left text-sm shadow-sm shadow-slate-900/5 outline-none transition-colors hover:border-slate-300 hover:bg-white focus-visible:border-slate-300 focus-visible:ring-2 focus-visible:ring-[#2563EB]/15",
+        "group/search relative flex h-10 w-full items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white/90 px-3.5 text-left text-sm shadow-sm shadow-slate-900/[0.04] outline-none",
+        "transition-all duration-300 ease-out",
+        "hover:-translate-y-px hover:border-[#2563EB]/30 hover:bg-white hover:shadow-md hover:shadow-[#2563EB]/[0.07]",
+        "focus-visible:border-[#2563EB]/40 focus-visible:ring-2 focus-visible:ring-[#2563EB]/15",
+        "active:translate-y-0 active:shadow-sm",
         className,
       )}
     >
-      <Search className="size-4 shrink-0 text-slate-400" aria-hidden />
-      <span className="flex-1 truncate font-medium text-slate-400">
-        Search orders, products, pages…
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-400 transition-all duration-300 group-hover/search:bg-[#2563EB]/10 group-hover/search:text-[#2563EB]">
+        <Search className="size-4" aria-hidden />
       </span>
-      <kbd className="hidden shrink-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:inline">
+      <AdminSearchHintRotator />
+      <kbd className="hidden shrink-0 rounded-md border border-slate-200/90 bg-slate-50/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 transition-colors duration-300 group-hover/search:border-slate-300 group-hover/search:text-slate-500 sm:inline">
         Space
       </kbd>
     </button>
