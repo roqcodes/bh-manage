@@ -9,11 +9,13 @@ import type {
   Order,
   VendorSnapshotEntry,
 } from "@/common/admin/types";
-import { computeShortages } from "@/modules/procurement/procurement.allocate";
 import {
   aggregatePendingOrderDemand,
-  getInventoryStockForVariants,
+  getInventoryReorderRows,
+  getOpenPurchaseOrderQuantitiesByVariant,
+  getProcurementDefaults,
 } from "@/modules/procurement/services/procurement.service";
+import { computeReorderNeeds } from "@/modules/procurement/procurement.allocate";
 
 function sortAlertsBySeverity(alerts: DashboardAlert[]): DashboardAlert[] {
   const rank: Record<string, number> = { critical: 0, warning: 1, attention: 2 };
@@ -67,8 +69,6 @@ export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload>
 
   const [
     revenueResult,
-    outOfStockResult,
-    lowStockResult,
     unfulfilledResult,
     delayedResult,
     pendingPipe,
@@ -90,15 +90,6 @@ export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload>
       .select("id,total_amount")
       .gte("created_at", startOfDay)
       .neq("status", "cancelled"),
-    supabase
-      .from("inventory")
-      .select("variant_id", { count: "exact", head: true })
-      .lte("stock", 0),
-    supabase
-      .from("inventory")
-      .select("variant_id", { count: "exact", head: true })
-      .lt("stock", 10)
-      .gt("stock", 0),
     supabase
       .from("orders")
       .select("id", { count: "exact", head: true })
@@ -129,7 +120,7 @@ export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload>
       .select("id", { count: "exact", head: true })
       .gte("created_at", startOfDay)
       .neq("status", "cancelled"),
-    supabase.from("inventory").select("variant_id,stock"),
+    supabase.from("inventory").select("variant_id,stock,reorder_point"),
     supabase
       .from("orders")
       .select("id,status")
@@ -152,12 +143,15 @@ export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload>
       try {
         const demandRows = await aggregatePendingOrderDemand();
         pipelineDemandUnits = demandRows.reduce((s, r) => s + r.demand_qty, 0);
-        const variantIds = demandRows.map((r) => r.variant_id);
-        const stockMap = await getInventoryStockForVariants(variantIds);
-        const demand = new Map(demandRows.map((d) => [d.variant_id, d.demand_qty]));
-        const shortages = computeShortages(demand, stockMap);
-        shortageUnits = shortages.reduce((s, r) => s + r.shortage_qty, 0);
-        pipelineShortageVariants = shortages.length;
+        const onOrderByVariant = await getOpenPurchaseOrderQuantitiesByVariant();
+        const inventoryRows = await getInventoryReorderRows(onOrderByVariant);
+        const defaults = await getProcurementDefaults();
+        const reorderNeeds = computeReorderNeeds(
+          inventoryRows,
+          defaults.default_reorder_quantity,
+        );
+        shortageUnits = reorderNeeds.reduce((s, r) => s + r.shortage_qty, 0);
+        pipelineShortageVariants = reorderNeeds.length;
       } catch {
         /* RBAC or empty */
       }
@@ -235,8 +229,14 @@ export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload>
     0,
   );
 
-  const outOfStockCount = outOfStockResult.count ?? 0;
-  const lowStockItems = lowStockResult.count ?? 0;
+  let outOfStockCount = 0;
+  let lowStockItems = 0;
+  for (const row of stockRows) {
+    const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
+    const reorderPoint = Math.max(0, Math.floor(Number(row.reorder_point ?? 10)));
+    if (stock < 1) outOfStockCount += 1;
+    else if (stock < reorderPoint) lowStockItems += 1;
+  }
   const productsNeedingRestock = outOfStockCount + lowStockItems;
 
   const { pipelineDemandUnits, shortageUnits, pipelineShortageVariants } =

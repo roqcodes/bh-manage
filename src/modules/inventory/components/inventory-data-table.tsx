@@ -33,10 +33,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { overrideStockAction } from "@/modules/inventory/actions/inventory.actions";
+import { overrideStockAction, updateReorderPointAction } from "@/modules/inventory/actions/inventory.actions";
 import {
   formatSku,
   INVENTORY_ACCENT,
+  reorderPointFor,
   stockLevelFor,
   stockUnits,
   StockStatusPill,
@@ -57,6 +58,7 @@ function exportInventoryCsv(rows: InventoryWithVariant[]) {
     "SKU",
     "Status",
     "Stock",
+    "Min threshold",
     "Updated",
   ];
 
@@ -64,8 +66,9 @@ function exportInventoryCsv(rows: InventoryWithVariant[]) {
     toTitleCase(row.product_variants?.name, "Unnamed variant"),
     toTitleCase(row.product_variants?.products?.name),
     formatSku(row.variant_id),
-    stockLevelFor(row.stock),
+    stockLevelFor(row.stock, row.reorder_point),
     String(stockUnits(row.stock)),
+    String(reorderPointFor(row.reorder_point)),
     row.updated_at
       ? format(new Date(row.updated_at), "yyyy-MM-dd HH:mm")
       : "",
@@ -118,12 +121,16 @@ function InventoryTableRow({
   const queryClient = useQueryClient();
   const [savePending, startSave] = useTransition();
   const [stockStr, setStockStr] = useState(String(stockUnits(row.stock)));
+  const [reorderPointStr, setReorderPointStr] = useState(
+    String(reorderPointFor(row.reorder_point)),
+  );
 
   useEffect(() => {
     setStockStr(String(stockUnits(row.stock)));
-  }, [row.variant_id, row.stock]);
+    setReorderPointStr(String(reorderPointFor(row.reorder_point)));
+  }, [row.variant_id, row.stock, row.reorder_point]);
 
-  const level = stockLevelFor(row.stock);
+  const level = stockLevelFor(row.stock, row.reorder_point);
   const variantLabel = toTitleCase(row.product_variants?.name, "Unnamed variant");
   const productName = toTitleCase(row.product_variants?.products?.name);
   const productId = row.product_variants?.products?.id;
@@ -146,6 +153,21 @@ function InventoryTableRow({
           queryKey: adminQueryKeys.productDetail(productId),
         });
       }
+    });
+  }
+
+  function saveReorderPoint() {
+    const parsed = parseInt(reorderPointStr, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setReorderPointStr(String(reorderPointFor(row.reorder_point)));
+      return;
+    }
+    const next = Math.floor(parsed);
+    if (next === reorderPointFor(row.reorder_point)) return;
+
+    startSave(async () => {
+      await updateReorderPointAction(row.variant_id, next);
+      void queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
     });
   }
 
@@ -179,7 +201,7 @@ function InventoryTableRow({
         </code>
       </TableCell>
       <TableCell>
-        <StockStatusPill stock={row.stock} />
+        <StockStatusPill stock={row.stock} reorderPoint={row.reorder_point} />
       </TableCell>
       <TableCell>
         <Input
@@ -198,7 +220,20 @@ function InventoryTableRow({
           aria-label={`Stock for ${variantLabel}`}
         />
       </TableCell>
-      <TableCell className="hidden text-[13px] text-muted-foreground sm:table-cell">
+      <TableCell>
+        <Input
+          className="h-7 w-16 tabular-nums"
+          type="number"
+          min={0}
+          step={1}
+          value={reorderPointStr}
+          onChange={(e) => setReorderPointStr(e.target.value)}
+          onBlur={saveReorderPoint}
+          disabled={savePending}
+          aria-label={`Min threshold for ${variantLabel}`}
+        />
+      </TableCell>
+      <TableCell className="hidden text-[13px] text-muted-foreground lg:table-cell">
         {row.updated_at
           ? format(new Date(row.updated_at), "MMM d, yyyy")
           : "—"}
@@ -332,6 +367,7 @@ export function InventoryDataTable({
   }
 
   return (
+    <div className="overflow-x-auto">
     <Table>
       <TableHeader>
         <TableRow className="border-b border-border/60 hover:bg-transparent">
@@ -350,7 +386,8 @@ export function InventoryDataTable({
           <TableHead className="hidden lg:table-cell">SKU</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Stock</TableHead>
-          <TableHead className="hidden sm:table-cell">Updated</TableHead>
+          <TableHead className="min-w-[5rem]">Min threshold</TableHead>
+          <TableHead className="hidden text-muted-foreground lg:table-cell">Updated</TableHead>
           <TableHead className="w-10" />
         </TableRow>
       </TableHeader>
@@ -365,5 +402,6 @@ export function InventoryDataTable({
         ))}
       </TableBody>
     </Table>
+    </div>
   );
 }

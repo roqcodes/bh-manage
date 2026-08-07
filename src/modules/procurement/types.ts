@@ -7,6 +7,29 @@ export interface ShortageRow {
   variant_id: string;
   shortage_qty: number;
   inventory_stock: number;
+  /** Set when shortage comes from reorder-point logic. */
+  reorder_point?: number;
+  suggested_order_qty?: number;
+  on_order_qty?: number;
+  effective_stock?: number;
+}
+
+export interface ProcurementSourcingNeed {
+  variant_id: string;
+  product_name?: string | null;
+  variant_name?: string | null;
+  inventory_stock: number;
+  on_order_qty: number;
+  effective_stock: number;
+  reorder_point: number;
+  suggested_order_qty: number;
+  uncovered_qty: number;
+  reason: "no_vendor" | "insufficient_vendor_stock";
+}
+
+export interface ProcurementDefaults {
+  default_reorder_point: number;
+  default_reorder_quantity: number;
 }
 
 export interface VendorProductOffer {
@@ -28,6 +51,11 @@ export interface AllocationLine {
   vendor_name?: string | null;
   product_name?: string | null;
   variant_name?: string | null;
+  inventory_stock?: number;
+  reorder_point?: number;
+  suggested_order_qty?: number;
+  on_order_qty?: number;
+  effective_stock?: number;
 }
 
 export interface ProcurementPlanVendorGroup {
@@ -43,4 +71,6 @@ export interface ProcurementPlan {
   allocations: AllocationLine[];
   by_vendor: ProcurementPlanVendorGroup[];
   system_total_cost: number;
+  needs_sourcing: ProcurementSourcingNeed[];
+  defaults: ProcurementDefaults;
 }

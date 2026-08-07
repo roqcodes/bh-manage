@@ -11,6 +11,7 @@ import type {
   Paginated,
 } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
+import { normalizeOrderAddress } from "@/modules/orders/lib/order-address";
 
 export interface OrderFilterUserRow {
   id: string;
@@ -194,7 +195,7 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
       .eq("id", row.address_id)
       .maybeSingle();
     if (addrError) throw new Error(addrError.message);
-    addresses = (addr as OrderWithItems["addresses"]) ?? null;
+    addresses = normalizeOrderAddress(addr as Record<string, unknown> | null);
   }
 
   const userId = row.users?.id;

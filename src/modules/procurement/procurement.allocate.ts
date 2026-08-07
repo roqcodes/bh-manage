@@ -55,3 +55,50 @@ export function computeShortages(
   }
   return rows;
 }
+
+export interface InventoryReorderRow {
+  variant_id: string;
+  stock: number;
+  reorder_point: number;
+  last_reorder_quantity: number | null;
+  on_order_qty?: number;
+}
+
+/**
+ * SKUs below reorder point are flagged for procurement.
+ * Uses effective stock (on-hand + open PO qty) like standard inventory systems.
+ * Order qty = last PO quantity for this variant, else global default from procurement settings.
+ */
+export function computeReorderNeeds(
+  rows: InventoryReorderRow[],
+  defaultOrderQuantity: number,
+): ShortageRow[] {
+  const out: ShortageRow[] = [];
+  const defaultQty = Math.max(1, Math.floor(defaultOrderQuantity));
+
+  for (const row of rows) {
+    const stock = Math.max(0, Math.floor(row.stock));
+    const onOrder = Math.max(0, Math.floor(row.on_order_qty ?? 0));
+    const effectiveStock = stock + onOrder;
+    const reorderPoint = Math.max(0, Math.floor(row.reorder_point));
+    if (effectiveStock >= reorderPoint) continue;
+
+    const lastQty =
+      row.last_reorder_quantity != null
+        ? Math.max(1, Math.floor(row.last_reorder_quantity))
+        : null;
+    const orderQty = lastQty ?? defaultQty;
+
+    out.push({
+      variant_id: row.variant_id,
+      shortage_qty: orderQty,
+      inventory_stock: stock,
+      reorder_point: reorderPoint,
+      suggested_order_qty: orderQty,
+      on_order_qty: onOrder,
+      effective_stock: effectiveStock,
+    });
+  }
+
+  return out;
+}

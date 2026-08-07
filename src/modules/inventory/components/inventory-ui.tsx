@@ -21,6 +21,9 @@ export const INVENTORY_VIEW_FILTERS: {
   { id: "critical", label: "Critical" },
 ];
 
+export const DEFAULT_REORDER_POINT = 10;
+export const DEFAULT_REORDER_QUANTITY = 10;
+
 export function formatSku(variantId: string) {
   return variantId.slice(0, 8).toUpperCase();
 }
@@ -29,21 +32,32 @@ export function stockUnits(stock: number | null | undefined) {
   return Math.max(0, Math.floor(Number(stock ?? 0)));
 }
 
+export function reorderPointFor(
+  reorderPoint: number | null | undefined,
+): number {
+  return Math.max(0, Math.floor(Number(reorderPoint ?? DEFAULT_REORDER_POINT)));
+}
+
 export function stockLevelFor(
   stock: number | null | undefined,
+  reorderPoint?: number | null,
 ): Exclude<InventoryViewFilter, "all"> {
   const units = stockUnits(stock);
+  const threshold = reorderPointFor(reorderPoint);
   if (units < 1) return "critical";
-  if (units < 10) return "low";
+  if (units < threshold) return "low";
   return "healthy";
 }
 
 export function matchesInventoryViewFilter(
-  row: { stock: number | null | undefined },
+  row: {
+    stock: number | null | undefined;
+    reorder_point?: number | null;
+  },
   filter: InventoryViewFilter,
 ): boolean {
   if (filter === "all") return true;
-  return stockLevelFor(row.stock) === filter;
+  return stockLevelFor(row.stock, row.reorder_point) === filter;
 }
 
 const TITLE_CASE_SMALL_WORDS = new Set([
@@ -80,10 +94,12 @@ export function toTitleCase(
 
 export function StockStatusPill({
   stock,
+  reorderPoint,
 }: {
   stock: number | null | undefined;
+  reorderPoint?: number | null;
 }) {
-  const level = stockLevelFor(stock);
+  const level = stockLevelFor(stock, reorderPoint);
 
   return (
     <span

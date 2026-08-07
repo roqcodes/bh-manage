@@ -22,4 +22,5 @@ export const adminQueryKeys = {
   customersList: (page: number) => ["admin", "customers", "list", page] as const,
   procurement: () => ["admin", "procurement"] as const,
   searchIndex: () => ["admin", "search-index"] as const,
+  taxRates: () => ["admin", "tax-rates"] as const,
 };

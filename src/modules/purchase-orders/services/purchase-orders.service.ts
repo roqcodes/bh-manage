@@ -23,6 +23,7 @@ export async function createPurchaseOrdersFromAllocations(
   }
 
   const poIds: string[] = [];
+  const lastQtyByVariant = new Map<string, number>();
 
   for (const [vendorId, group] of byVendor) {
     const total = group.reduce(
@@ -51,11 +52,27 @@ export async function createPurchaseOrdersFromAllocations(
       price: l.base_price,
     }));
 
+    for (const l of group) {
+      if (l.allocated_qty > 0) {
+        lastQtyByVariant.set(l.variant_id, l.allocated_qty);
+      }
+    }
+
     const { error: iErr } = await supabase
       .from("purchase_order_items")
       .insert(itemRows);
 
     if (iErr) throw new Error(iErr.message);
+  }
+
+  if (lastQtyByVariant.size > 0) {
+    for (const [variant_id, last_reorder_quantity] of lastQtyByVariant) {
+      const { error: memErr } = await supabase
+        .from("inventory")
+        .update({ last_reorder_quantity })
+        .eq("variant_id", variant_id);
+      if (memErr) throw new Error(memErr.message);
+    }
   }
 
   return { poIds };

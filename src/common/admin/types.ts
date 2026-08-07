@@ -170,6 +170,8 @@ export interface VariantWithProduct extends ProductVariant {
 export interface InventoryWithVariant {
   variant_id: string;
   stock: number | null;
+  reorder_point: number;
+  last_reorder_quantity: number | null;
   updated_at: string | null;
   product_variants: {
     id: string;
@@ -184,9 +186,9 @@ export interface InventoryCatalogStats {
   totalSkus: number;
   /** Stock is null or below 1. */
   criticalSkus: number;
-  /** 1–9 units. */
+  /** Below per-SKU reorder point but not out of stock. */
   lowStockSkus: number;
-  /** ≥ 10 units. */
+  /** At or above per-SKU reorder point. */
   healthySkus: number;
 }
 
@@ -270,6 +272,7 @@ export interface OrderAddress {
   city: string | null;
   state: string | null;
   pincode: string | null;
+  phone?: string | null;
   latitude?: number | null;
   longitude?: number | null;
 }
@@ -403,6 +406,8 @@ export interface ProcurementInsights {
   demandTodayUnits: number;
   /** Product / variant rows needing restock (out or low stock in central inventory). */
   productsNeedingRestock: number;
+  defaultReorderPoint?: number;
+  defaultReorderQuantity?: number;
 }
 
 export interface VendorSnapshotEntry {

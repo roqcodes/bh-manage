@@ -7,11 +7,7 @@ import type {
 } from "@/common/admin/types";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
-import {
-  aggregatePendingOrderDemand,
-  getInventoryStockForVariants,
-} from "@/modules/procurement/services/procurement.service";
-import { computeShortages } from "@/modules/procurement/procurement.allocate";
+import { countVariantsBelowReorderPoint } from "@/modules/procurement/services/procurement.service";
 import { getPendingPortalRequestCount } from "@/modules/users/services/users.service";
 
 function setBadge(
@@ -36,8 +32,7 @@ export async function getAdminNavBadges(): Promise<AdminNavBadgesPayload> {
   const [
     pendingOrdersRes,
     delayedOrdersRes,
-    criticalInventoryRes,
-    lowInventoryRes,
+    inventoryHealthRes,
     pendingPoRes,
     pendingUsersRes,
   ] = await Promise.all([
@@ -50,15 +45,7 @@ export async function getAdminNavBadges(): Promise<AdminNavBadgesPayload> {
       .select("id", { count: "exact", head: true })
       .in("status", ["pending", "processing", "shipped"])
       .lt("created_at", startOfDay),
-    supabase
-      .from("inventory")
-      .select("variant_id", { count: "exact", head: true })
-      .or("stock.is.null,stock.lt.1"),
-    supabase
-      .from("inventory")
-      .select("variant_id", { count: "exact", head: true })
-      .gte("stock", 1)
-      .lt("stock", 10),
+    supabase.from("inventory").select("stock,reorder_point"),
     supabase
       .from("purchase_orders")
       .select("id", { count: "exact", head: true })
@@ -75,8 +62,17 @@ export async function getAdminNavBadges(): Promise<AdminNavBadgesPayload> {
     delayedOrders > 0 ? "critical" : "warning";
   setBadge(badges, "/admin/orders", ordersCount, ordersTone);
 
-  const criticalSkus = criticalInventoryRes.count ?? 0;
-  const lowSkus = lowInventoryRes.count ?? 0;
+  const criticalSkus =
+    (inventoryHealthRes.data ?? []).filter((row) => {
+      const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
+      return stock < 1;
+    }).length;
+  const lowSkus =
+    (inventoryHealthRes.data ?? []).filter((row) => {
+      const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
+      const reorderPoint = Math.max(0, Math.floor(Number(row.reorder_point ?? 10)));
+      return stock >= 1 && stock < reorderPoint;
+    }).length;
   const inventoryCount = criticalSkus + lowSkus;
   const inventoryTone: AdminNavBadgeTone =
     criticalSkus > 0 ? "critical" : lowSkus > 0 ? "warning" : "info";
@@ -92,19 +88,15 @@ export async function getAdminNavBadges(): Promise<AdminNavBadgesPayload> {
   setBadge(badges, "/admin/users", pendingUsersRes, "warning");
 
   try {
-    const demandRows = await aggregatePendingOrderDemand();
-    const variantIds = demandRows.map((r) => r.variant_id);
-    const stockMap = await getInventoryStockForVariants(variantIds);
-    const demand = new Map(demandRows.map((d) => [d.variant_id, d.demand_qty]));
-    const shortages = computeShortages(demand, stockMap);
+    const reorderCount = await countVariantsBelowReorderPoint();
     setBadge(
       badges,
       "/admin/procurement",
-      shortages.length,
-      shortages.length > 0 ? "critical" : "info",
+      reorderCount,
+      reorderCount > 0 ? "critical" : "info",
     );
   } catch {
-    /* empty demand or RBAC */
+    /* RBAC */
   }
 
   const dashboardAlerts = Object.entries(badges).filter(

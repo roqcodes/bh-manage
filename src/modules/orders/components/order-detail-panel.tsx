@@ -791,6 +791,11 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                     <p className="text-sm leading-relaxed text-muted-foreground">
                       {addressText}
                     </p>
+                    {order.addresses?.phone ? (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Phone: {order.addresses.phone}
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="rounded-lg border border-dashed bg-muted/20 p-3.5 text-sm text-muted-foreground">

@@ -11,6 +11,7 @@ import type {
   Paginated,
 } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
+import { DEFAULT_REORDER_POINT, getProcurementDefaults } from "@/modules/procurement/services/procurement.service";
 
 export async function getInventory(
   page = 0,
@@ -23,7 +24,7 @@ export async function getInventory(
     supabase
       .from("inventory")
       .select(
-        "variant_id,stock,updated_at,product_variants(id,name,products(id,name),variant_images(url,is_preview,sort_order))",
+        "variant_id,stock,reorder_point,last_reorder_quantity,updated_at,product_variants(id,name,products(id,name),variant_images(url,is_preview,sort_order))",
       )
       .order("updated_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1),
@@ -42,28 +43,36 @@ export async function getInventoryCatalogStats(): Promise<InventoryCatalogStats>
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
 
-  const [totalRes, criticalRes, lowRes, healthyRes] = await Promise.all([
-    supabase.from("inventory").select("variant_id", { count: "exact", head: true }),
-    supabase
-      .from("inventory")
-      .select("variant_id", { count: "exact", head: true })
-      .or("stock.is.null,stock.lt.1"),
-    supabase
-      .from("inventory")
-      .select("variant_id", { count: "exact", head: true })
-      .gte("stock", 1)
-      .lt("stock", 10),
-    supabase
-      .from("inventory")
-      .select("variant_id", { count: "exact", head: true })
-      .gte("stock", 10),
-  ]);
+  const { data, error } = await supabase
+    .from("inventory")
+    .select("stock,reorder_point");
+
+  if (error) throw new Error(error.message);
+
+  let criticalSkus = 0;
+  let lowStockSkus = 0;
+  let healthySkus = 0;
+
+  for (const row of data ?? []) {
+    const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
+    const reorderPoint = Math.max(
+      0,
+      Math.floor(Number(row.reorder_point ?? DEFAULT_REORDER_POINT)),
+    );
+    if (stock < 1) {
+      criticalSkus += 1;
+    } else if (stock < reorderPoint) {
+      lowStockSkus += 1;
+    } else {
+      healthySkus += 1;
+    }
+  }
 
   return {
-    totalSkus: totalRes.count ?? 0,
-    criticalSkus: criticalRes.count ?? 0,
-    lowStockSkus: lowRes.count ?? 0,
-    healthySkus: healthyRes.count ?? 0,
+    totalSkus: (data ?? []).length,
+    criticalSkus,
+    lowStockSkus,
+    healthySkus,
   };
 }
 
@@ -73,9 +82,12 @@ export async function insertInventoryRow(
 ): Promise<void> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("inventory")
-    .insert({ variant_id: variantId, stock });
+  const defaults = await getProcurementDefaults();
+  const { error } = await supabase.from("inventory").insert({
+    variant_id: variantId,
+    stock,
+    reorder_point: defaults.default_reorder_point,
+  });
   if (error) throw new Error(error.message);
 }
 
@@ -100,6 +112,20 @@ export async function upsertInventoryStock(
   const { error } = await supabase
     .from("inventory")
     .upsert({ variant_id: variantId, stock });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateInventoryReorderSettings(
+  variantId: string,
+  reorder_point: number,
+): Promise<void> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+
+  const { error } = await supabase
+    .from("inventory")
+    .update({ reorder_point: Math.max(0, Math.floor(reorder_point)) })
+    .eq("variant_id", variantId);
   if (error) throw new Error(error.message);
 }
 

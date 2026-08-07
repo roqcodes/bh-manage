@@ -204,14 +204,43 @@ export interface Database {
         Row: {
           variant_id: string;
           stock: number | null;
+          reorder_point: number;
+          reorder_quantity: number;
+          last_reorder_quantity: number | null;
           updated_at: string | null;
         };
         Insert: {
           variant_id: string;
           stock?: number | null;
+          reorder_point?: number;
+          reorder_quantity?: number;
+          last_reorder_quantity?: number | null;
         };
         Update: {
           stock?: number | null;
+          reorder_point?: number;
+          reorder_quantity?: number;
+          last_reorder_quantity?: number | null;
+        };
+        Relationships: [];
+      };
+      procurement_settings: {
+        Row: {
+          id: number;
+          default_reorder_point: number;
+          default_reorder_quantity: number;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          default_reorder_point?: number;
+          default_reorder_quantity?: number;
+          updated_at?: string | null;
+        };
+        Update: {
+          default_reorder_point?: number;
+          default_reorder_quantity?: number;
+          updated_at?: string | null;
         };
         Relationships: [];
       };

@@ -256,19 +256,10 @@ export function FulfillmentPill({ status }: { status: string }) {
   );
 }
 
-export function formatAddressLine(address: {
-  line1?: string | null;
-  line2?: string | null;
-  address_line?: string | null;
-  city: string | null;
-  state: string | null;
-  pincode: string | null;
-}) {
-  const street = address.line1 ?? address.address_line;
-  return [street, address.line2, address.city, address.state, address.pincode]
-    .filter(Boolean)
-    .join(", ");
-}
+export {
+  formatAddressLine,
+  normalizeOrderAddress,
+} from "@/modules/orders/lib/order-address";
 
 export function customerInitials(name: string | null | undefined) {
   if (!name) return "?";

@@ -65,7 +65,7 @@ export function ProcurementMetricsBar({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Procurement</h1>
           <p className="text-sm text-muted-foreground">
-            Refill central warehouse when customer orders exceed on-hand stock.
+            Refill central warehouse when stock falls below per-SKU minimum thresholds.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -88,11 +88,11 @@ export function ProcurementMetricsBar({
       <Card className="overflow-hidden border border-border py-0 ring-0">
         <div className="flex flex-col divide-y divide-border lg:flex-row lg:divide-x lg:divide-y-0">
           <MetricSegment
-            label="Pipeline demand"
-            value={insights.pipelineDemandUnits.toLocaleString("en-IN")}
-            trend={`${insights.pipelineShortageVariants} SKUs short`}
-            trendTone={insights.shortageUnits > 0 ? "down" : "neutral"}
-            sparkSeed={insights.pipelineDemandUnits}
+            label="Below minimum"
+            value={insights.pipelineShortageVariants.toLocaleString("en-IN")}
+            trend={`${insights.shortageUnits} units suggested`}
+            trendTone={insights.pipelineShortageVariants > 0 ? "down" : "neutral"}
+            sparkSeed={insights.pipelineShortageVariants}
           />
           <MetricSegment
             label="Central inventory"
@@ -103,7 +103,7 @@ export function ProcurementMetricsBar({
             sparkTone="green"
           />
           <MetricSegment
-            label="Shortage"
+            label="Suggested order"
             value={insights.shortageUnits.toLocaleString("en-IN")}
             trend={`${insights.productsNeedingRestock} need restock`}
             trendTone={insights.shortageUnits > 0 ? "down" : "neutral"}
