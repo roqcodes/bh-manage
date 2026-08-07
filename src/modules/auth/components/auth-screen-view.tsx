@@ -5,22 +5,7 @@ import {
   type AuthScreenViewProps,
 } from "@/common/auth/types";
 
-function GridIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-7 w-7"
-      fill="none"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M4.75 4.75h5.5v5.5h-5.5zm9 0h5.5v5.5h-5.5zm-9 9h5.5v5.5h-5.5zm9 0h5.5v5.5h-5.5z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
+import { BuyHubLogo } from "@/modules/brand/components/buyhub-logo";
 
 function ArrowRightIcon() {
   return (
@@ -105,9 +90,7 @@ export function AuthScreenView({
       <div className="mx-auto flex w-full max-w-[1100px] flex-1 flex-col justify-center gap-8 px-5 py-4 lg:flex-row lg:items-center lg:gap-10 lg:px-10">
         <section className="rounded-[32px] border border-[#2563EB]/10 bg-[#2563EB]/5 p-6 lg:flex lg:flex-1 lg:flex-col lg:justify-center lg:border-0 lg:bg-transparent lg:p-0">
           <div className="mb-10 flex items-center gap-3.5">
-            <div className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-[#2563EB] text-white shadow-[0_8px_24px_rgba(37,99,235,0.3)]">
-              <GridIcon />
-            </div>
+            <BuyHubLogo size={56} priority />
             <p className="text-[28px] font-black tracking-[-0.06em] text-slate-900">
               Buy<span className="text-[#2563EB]">Hub</span>
             </p>

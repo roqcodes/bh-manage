@@ -2,7 +2,7 @@ import { format } from "date-fns";
 
 import type { OrderWithItems } from "@/common/admin/types";
 
-const BRAND = "#2563EB";
+import { BuyHubInvoiceLogo } from "@/modules/brand/components/buyhub-logo";
 
 function formatInr(n: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -28,13 +28,8 @@ export function OrderInvoiceDocument({ order }: { order: OrderWithItems }) {
       className="mx-auto max-w-3xl bg-white px-6 py-8 text-slate-900 print:max-w-none print:px-4 print:py-6 print:text-black"
     >
       <header className="border-b border-slate-200 pb-6 print:border-slate-300 print:pb-4">
-        <p
-          className="text-[11px] font-semibold uppercase tracking-[0.2em]"
-          style={{ color: BRAND }}
-        >
-          BuyHub
-        </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight print:text-xl">
+        <BuyHubInvoiceLogo />
+        <h1 className="mt-3 text-2xl font-bold tracking-tight print:text-xl">
           Order invoice
         </h1>
         <p className="mt-1 font-mono text-sm font-medium text-slate-600 print:text-xs">

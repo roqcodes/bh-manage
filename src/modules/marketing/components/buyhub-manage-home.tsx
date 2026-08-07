@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AUTH_ROUTES } from "@/modules/auth/services/auth-route.service";
+import { BuyHubLogo } from "@/modules/brand/components/buyhub-logo";
 
 const BRAND = "#2563EB";
 
@@ -8,13 +9,8 @@ export function BuyHubManageHome() {
   return (
     <div className="min-h-svh bg-gradient-to-b from-slate-50 via-white to-slate-50/80">
       <div className="mx-auto flex min-h-svh max-w-lg flex-col justify-center px-6 py-16 sm:px-8">
-        <p
-          className="text-[11px] font-semibold uppercase tracking-[0.22em]"
-          style={{ color: BRAND }}
-        >
-          BuyHub
-        </p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+        <BuyHubLogo size={56} priority />
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
           Manage
         </h1>
         <p className="mt-4 text-[15px] font-medium leading-relaxed text-slate-600">

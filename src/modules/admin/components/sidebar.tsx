@@ -31,6 +31,8 @@ import { prefetchAdminRoute } from "@/modules/admin/lib/admin-prefetch-nav";
 
 import { isAdminRouteHidden } from "@/modules/admin/lib/hidden-admin-routes";
 
+import { BuyHubLogo } from "@/modules/brand/components/buyhub-logo";
+
 const DASHBOARD_ITEM = ADMIN_DASHBOARD_ITEM;
 const NAV_SECTIONS = ADMIN_NAV_SECTIONS;
 
@@ -287,31 +289,12 @@ export function AdminSidebar({
 
       >
 
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#1e3a8a] shadow-lg shadow-[#2563EB]/20">
-
-          <span className="text-lg font-black text-white">B</span>
-
-        </div>
-
-        {!collapsed ? (
-
-          <div className="flex min-w-0 flex-1 flex-col">
-
-            <span className="text-[15px] font-black tracking-tight text-slate-900">
-
-              Buy<span className="text-[#2563EB]">Hub</span>
-
-            </span>
-
-            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
-
-              Management
-
-            </span>
-
-          </div>
-
-        ) : null}
+        <BuyHubLogo
+          size={36}
+          showWordmark={!collapsed}
+          wordmarkSuffix={collapsed ? undefined : "Management"}
+          className={collapsed ? "justify-center" : undefined}
+        />
 
       </div>
 

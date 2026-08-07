@@ -9,6 +9,7 @@ import type { OrderWithItems } from "@/common/admin/types";
 import { InvoicePrintToolbar } from "@/modules/admin/components/invoice-print-toolbar";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { OrderInvoiceDocument } from "@/modules/orders/components/order-invoice-document";
+import { buildOrderInvoiceFilename } from "@/modules/orders/lib/invoice-filename";
 import { adminGetNullable } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 
@@ -33,7 +34,7 @@ function AdminOrderInvoiceContent({ order }: { order: OrderWithItems }) {
       await html2pdf()
         .set({
           margin: 10,
-          filename: `BuyHub-Invoice-${shortOrderRef(order.id)}.pdf`,
+          filename: buildOrderInvoiceFilename(order),
           image: { type: "jpeg", quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
@@ -43,7 +44,7 @@ function AdminOrderInvoiceContent({ order }: { order: OrderWithItems }) {
     } finally {
       setDownloading(false);
     }
-  }, [order.id]);
+  }, [order]);
 
   useEffect(() => {
     if (
