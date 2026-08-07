@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import type { Database } from "@/lib/integrations/supabase/types";
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 
 export interface TaxRateRow {
@@ -115,7 +116,7 @@ export async function updateTaxRate(
 
   const supabase = await createSupabaseServerClient();
 
-  const updateData: Record<string, unknown> = {};
+  const updateData: Database["public"]["Tables"]["tax_rates"]["Update"] = {};
   if (updates.name !== undefined) updateData.name = updates.name;
   if (updates.ratePercent !== undefined)
     updateData.rate_percent = updates.ratePercent;
@@ -133,7 +134,7 @@ export async function updateTaxRate(
 
   const { error } = await supabase
     .from("tax_rates")
-    .update(updateData as any)
+    .update(updateData)
     .eq("id", id);
 
   if (error) throw new Error(error.message);

@@ -81,14 +81,6 @@ export function InventoryPanel({
         onExport={() => exportInventoryCsv(filtered)}
       />
 
-      <p className="text-sm text-muted-foreground">
-        Set per-SKU <span className="font-medium text-foreground">Min threshold</span> in the
-        table below. Default order qty is on{" "}
-        <Link href="/admin/procurement" className="font-medium text-primary hover:underline">
-          Procurement
-        </Link>
-        .
-      </p>
 
       <Card className="overflow-hidden border border-border py-0 ring-0">
         <CardContent className="flex flex-col gap-0 p-0">

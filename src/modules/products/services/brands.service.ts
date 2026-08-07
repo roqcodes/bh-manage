@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import type { Database } from "@/lib/integrations/supabase/types";
 import type { Brand } from "@/common/admin/types";
 
 const BRAND_COLUMNS =
@@ -91,7 +92,7 @@ export async function updateBrand(
   await requireAdminOrManagerProfile();
 
   const supabase = await createSupabaseServerClient();
-  const updateData: Record<string, unknown> = {};
+  const updateData: Database["public"]["Tables"]["brands"]["Update"] = {};
 
   if (input.name !== undefined) {
     const name = input.name.trim();

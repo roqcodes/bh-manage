@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import type { Database } from "@/lib/integrations/supabase/types";
 import type {
   Order,
   OrderCatalogStats,
@@ -273,7 +274,7 @@ export async function updateOrderDetailsById(
     throw new Error("Cannot modify a cancelled order.");
   }
 
-  const updateData: Record<string, unknown> = {};
+  const updateData: Database["public"]["Tables"]["orders"]["Update"] = {};
   if (input.status !== undefined) updateData.status = input.status;
   if (input.paymentStatus !== undefined) {
     updateData.payment_status = input.paymentStatus;

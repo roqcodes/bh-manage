@@ -26,7 +26,7 @@ function AdminOrderInvoiceContent({ order }: { order: OrderWithItems }) {
 
   const handleDownloadPdf = useCallback(async () => {
     const element = document.querySelector("[data-invoice-document]");
-    if (!element) return;
+    if (!(element instanceof HTMLElement)) return;
 
     setDownloading(true);
     try {
