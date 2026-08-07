@@ -18,6 +18,8 @@ import { AdminPurchaseOrdersView } from "@/modules/admin/views/admin-purchase-or
 import { AdminUsersView } from "@/modules/admin/views/admin-users-view";
 import { AdminVendorDetailView } from "@/modules/admin/views/admin-vendor-detail-view";
 import { AdminVendorsView } from "@/modules/admin/views/admin-vendors-view";
+import { AdminBrandsView } from "@/modules/admin/views/admin-brands-view";
+import { AdminCategoriesView } from "@/modules/admin/views/admin-categories-view";
 import { AdminCustomerDetailView } from "@/modules/admin/views/admin-customer-detail-view";
 import { AdminCustomersView } from "@/modules/admin/views/admin-customers-view";
 
@@ -49,6 +51,8 @@ export function AdminCatchAllView() {
     else if (seg === "procurement") inner = <AdminProcurementView />;
     else if (seg === "purchase-orders") inner = <AdminPurchaseOrdersView />;
     else if (seg === "customers") inner = <AdminCustomersView />;
+    else if (seg === "categories") inner = <AdminCategoriesView />;
+    else if (seg === "brands") inner = <AdminBrandsView />;
     else inner = <AdminNotFound />;
   } else if (slug.length === 2) {
     const [a, b] = slug;

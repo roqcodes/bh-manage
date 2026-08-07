@@ -2,29 +2,107 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Cpu, Info, Sparkles } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Package, Trash2 } from "lucide-react";
 
-import type { AllocationLine, ProcurementPlan } from "@/modules/procurement/types";
+import type { ProcurementInsights } from "@/common/admin/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import {
   runProcurementEngineAction,
   synchronizeProcurementPlanAction,
 } from "@/modules/procurement/actions/procurement.actions";
 import { approveProcurementPlanAction } from "@/modules/purchase-orders/actions/purchase-orders.actions";
-import { PrimaryBtn } from "@/modules/admin/components/modal";
+import { ProcurementMetricsBar } from "@/modules/procurement/components/procurement-metrics-bar";
+import { formatProcurementInr } from "@/modules/procurement/components/procurement-ui";
+import type { AllocationLine, ProcurementPlan } from "@/modules/procurement/types";
 
-const CARD =
-  "relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]";
-
-const INNER =
-  "rounded-xl border border-slate-100/90 bg-slate-50/50 px-4 py-3 text-sm text-slate-800";
+function VendorSummaryCard({
+  vendorName,
+  vendorId,
+  totalQty,
+  totalCost,
+}: {
+  vendorName: string | null;
+  vendorId: string;
+  totalQty: number;
+  totalCost: number;
+}) {
+  return (
+    <Card size="sm" className="border border-border ring-0">
+      <CardHeader className="border-b border-border pb-2">
+        <CardTitle className="text-sm font-medium">
+          {vendorName?.trim() || "Unnamed vendor"}
+        </CardTitle>
+        <CardDescription className="font-mono text-[10px]">
+          {vendorId.slice(0, 8).toUpperCase()}…
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-1 pt-3 text-sm">
+        <div className="flex justify-between gap-2">
+          <span className="text-muted-foreground">Total qty</span>
+          <span className="font-semibold tabular-nums">
+            {totalQty.toLocaleString("en-IN")}
+          </span>
+        </div>
+        <div className="flex justify-between gap-2">
+          <span className="text-muted-foreground">Total cost</span>
+          <span className="font-semibold tabular-nums">
+            {formatProcurementInr(totalCost)}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function ProcurementWorkspace() {
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [plan, setPlan] = useState<ProcurementPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [approveMsg, setApproveMsg] = useState<string | null>(null);
 
+  const { data: insightsData } = useQuery({
+    queryKey: adminQueryKeys.procurement(),
+    queryFn: () => adminGet<{ insights: ProcurementInsights }>("procurement"),
+  });
+
+  const insights = insightsData?.insights ?? {
+    pipelineDemandUnits: 0,
+    availableInventoryUnits: 0,
+    shortageUnits: 0,
+    pipelineShortageVariants: 0,
+    demandTodayUnits: 0,
+    productsNeedingRestock: 0,
+  };
+
   const lines = plan?.allocations ?? [];
+  const vendorsInPlan = [...new Set(lines.map((l) => l.vendor_id))];
+
+  function invalidateInsights() {
+    void queryClient.invalidateQueries({ queryKey: adminQueryKeys.procurement() });
+  }
 
   function runEngine() {
     setError(null);
@@ -33,6 +111,7 @@ export function ProcurementWorkspace() {
       try {
         const p = await runProcurementEngineAction();
         setPlan(p);
+        invalidateInsights();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to run engine.");
       }
@@ -84,227 +163,208 @@ export function ProcurementWorkspace() {
         const { poIds } = await approveProcurementPlanAction(normalized);
         setApproveMsg(`Created ${poIds.length} purchase order(s).`);
         setPlan(null);
+        invalidateInsights();
+        void queryClient.invalidateQueries({ queryKey: ["admin", "purchase-orders"] });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Approval failed.");
       }
     });
   }
 
-  const vendorsInPlan = [...new Set(lines.map((l) => l.vendor_id))];
-
   return (
-    <div className="space-y-4 lg:space-y-5">
-      <section className={`${CARD} p-5 sm:p-6`} aria-label="How procurement works">
-        <div className="mb-3 flex items-start gap-3">
-          <Info className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden />
-          <div>
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Mode C — Refill central warehouse
-            </h2>
-            <p className="mt-2 text-sm font-medium leading-relaxed text-slate-600">
-              Customers buy from <strong>central inventory</strong> at the SKU list price. When
-              orders create a shortage, this engine builds purchase orders from vendors at{" "}
-              <strong>vendor cost</strong> (not customer price).
-            </p>
-            <ol className="mt-3 list-inside list-decimal space-y-1 text-sm text-slate-600">
-              <li>Run engine — compares open order demand vs central stock.</li>
-              <li>Review allocations — lowest vendor cost first per SKU.</li>
-              <li>Approve — creates purchase orders; stock increases when POs are received.</li>
-              <li>
-                Optional — on each product page, enable{" "}
-                <strong>Smart pricing assist</strong> to suggest list prices from vendor cost +
-                margin rules.
-              </li>
-            </ol>
-            <p className="mt-3 text-sm text-slate-500">
-              Manage vendor offers under{" "}
-              <Link href="/admin/vendors" className="font-bold text-[#2563EB] hover:underline">
-                Vendors
-              </Link>
-              . Customer list prices under{" "}
-              <Link href="/admin/products" className="font-bold text-[#2563EB] hover:underline">
-                Products
-              </Link>
-              .
-            </p>
-          </div>
-        </div>
-      </section>
+    <div className="flex flex-col gap-4">
+      <ProcurementMetricsBar
+        insights={insights}
+        planLineCount={lines.length}
+        planVendorCount={vendorsInPlan.length}
+        planTotalCost={plan?.system_total_cost ?? 0}
+        onRunEngine={runEngine}
+        isRunning={isPending}
+      />
 
-      <section className={`${CARD} p-5 sm:p-6`} aria-label="Procurement plan">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-2.5">
-            <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-slate-50 text-slate-500 shadow-sm ring-1 ring-white/80">
-              <Cpu className="size-3" aria-hidden />
-            </span>
-            <div>
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Procurement plan
-              </h2>
-              <p className="mt-1 max-w-xl text-sm font-medium leading-relaxed text-slate-500">
-                Demand from pending + processing orders vs central inventory; lowest vendor cost
-                first.
-              </p>
-            </div>
-          </div>
-          <PrimaryBtn type="button" disabled={isPending} onClick={runEngine}>
-            {isPending ? "Running…" : "Run engine"}
-          </PrimaryBtn>
-        </div>
-
-        {vendorsInPlan.length > 0 ? (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-              Remove vendor
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {vendorsInPlan.map((vid) => {
-                const label =
-                  plan?.by_vendor.find((g) => g.vendor_id === vid)?.vendor_name?.trim() ||
-                  `${vid.slice(0, 8)}…`;
-                return (
-                  <button
-                    key={vid}
-                    type="button"
-                    className="rounded-lg border border-slate-200/80 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
-                    onClick={() => removeVendor(vid)}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-
-        {error ? (
-          <p className="mb-4 rounded-xl border border-rose-200/60 bg-rose-50/50 px-4 py-3 text-sm font-medium text-rose-800">
-            {error}
+      <Card className="border border-border ring-0">
+        <CardHeader className="border-b border-border">
+          <CardTitle>How procurement works</CardTitle>
+          <CardDescription>
+            Customers buy from central inventory at list price. When orders create a
+            shortage, this engine builds purchase orders from vendors at vendor cost.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-4 text-sm text-muted-foreground">
+          <ol className="list-inside list-decimal space-y-1.5">
+            <li>Run engine — compares open order demand vs central stock.</li>
+            <li>Review allocations — lowest vendor cost first per SKU.</li>
+            <li>Approve — creates purchase orders; stock increases when POs are received.</li>
+            <li>
+              Optional — on each product page, enable smart pricing assist to suggest
+              list prices from vendor cost and margin rules.
+            </li>
+          </ol>
+          <p>
+            Manage vendor offers under{" "}
+            <Link href="/admin/vendors" className="font-medium text-primary hover:underline">
+              Vendors
+            </Link>
+            . Customer list prices under{" "}
+            <Link href="/admin/products" className="font-medium text-primary hover:underline">
+              Products
+            </Link>
+            .
           </p>
-        ) : null}
-        {approveMsg ? (
-          <p className="mb-4 rounded-xl border border-emerald-200/60 bg-emerald-50/50 px-4 py-3 text-sm font-medium text-emerald-900">
-            {approveMsg}
-          </p>
-        ) : null}
+        </CardContent>
+      </Card>
 
-        {plan && plan.by_vendor.length > 0 ? (
-          <div className="mb-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="size-3.5 text-amber-500/80" aria-hidden />
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                By vendor
-              </h3>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+      <Card className="border border-border ring-0">
+        <CardHeader className="border-b border-border">
+          <CardTitle>Procurement plan</CardTitle>
+          <CardDescription>
+            Demand from pending and processing orders vs central inventory; lowest
+            vendor cost first.
+          </CardDescription>
+          {vendorsInPlan.length > 0 ? (
+            <CardAction>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">Remove vendor</span>
+                {vendorsInPlan.map((vid) => {
+                  const label =
+                    plan?.by_vendor.find((g) => g.vendor_id === vid)?.vendor_name?.trim() ||
+                    `${vid.slice(0, 8)}…`;
+                  return (
+                    <Button
+                      key={vid}
+                      size="sm"
+                      variant="outline"
+                      onClick={() => removeVendor(vid)}
+                    >
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </CardAction>
+          ) : null}
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 p-0 pt-0">
+          {error ? (
+            <Alert variant="destructive" className="mx-4 mt-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+          {approveMsg ? (
+            <Alert className="mx-4 mt-4">
+              <AlertDescription>{approveMsg}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {plan && plan.by_vendor.length > 0 ? (
+            <div className="grid gap-2.5 px-4 pt-4 sm:grid-cols-2 lg:grid-cols-3">
               {plan.by_vendor.map((g) => (
-                <div key={g.vendor_id} className={INNER}>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {g.vendor_name?.trim() || "—"}
-                  </p>
-                  <p className="mt-0.5 font-mono text-[10px] font-medium text-slate-400">
-                    {g.vendor_id}
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-slate-700">
-                    <span className="font-semibold text-slate-500">Total qty:</span>{" "}
-                    {g.total_allocated_quantity}
-                  </p>
-                  <p className="text-sm font-medium text-slate-700">
-                    <span className="font-semibold text-slate-500">Total cost:</span>{" "}
-                    ₹{g.total_cost.toFixed(2)}
-                  </p>
-                </div>
+                <VendorSummaryCard
+                  key={g.vendor_id}
+                  vendorName={g.vendor_name}
+                  vendorId={g.vendor_id}
+                  totalQty={g.total_allocated_quantity}
+                  totalCost={g.total_cost}
+                />
               ))}
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {lines.length === 0 ? (
-          <p className="text-sm font-medium text-slate-400">
-            No allocations yet. Run the engine when orders create a central stock shortage.
-          </p>
-        ) : (
-          <>
-            <div className="overflow-x-auto rounded-xl border border-slate-200/60">
-              <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b border-slate-100 bg-slate-50/90 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3">Vendor</th>
-                    <th className="min-w-[200px] px-4 py-3">Product · variant</th>
-                    <th className="px-4 py-3">Qty</th>
-                    <th className="px-4 py-3">Vendor cost ₹</th>
-                    <th className="px-4 py-3">Line ₹</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 text-slate-800">
+          {lines.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+              <Package className="size-10 text-muted-foreground/40" aria-hidden />
+              <p className="text-sm text-muted-foreground">
+                No allocations yet. Run the engine when orders create a central stock
+                shortage.
+              </p>
+              <Button onClick={runEngine} disabled={isPending}>
+                Run engine
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>Product · variant</TableHead>
+                    <TableHead className="w-24">Qty</TableHead>
+                    <TableHead>Vendor cost</TableHead>
+                    <TableHead>Line total</TableHead>
+                    <TableHead className="w-12" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {lines.map((line, index) => (
-                    <tr
-                      key={`${line.vendor_product_id}-${index}`}
-                      title={`Vendor ${line.vendor_id} · Variant ${line.variant_id}`}
-                    >
-                      <td className="px-4 py-3 align-top">
-                        <p className="text-sm font-semibold text-slate-900">
-                          {line.vendor_name?.trim() || "—"}
-                        </p>
-                        <p className="mt-0.5 font-mono text-[10px] font-medium text-slate-400">
-                          {line.vendor_id}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <p className="text-sm font-semibold text-slate-900">
-                          {line.product_name?.trim() || "—"}
-                        </p>
-                        <p className="text-xs font-medium text-slate-600">
-                          {line.variant_name?.trim() || "—"}
-                        </p>
-                        <p className="mt-0.5 font-mono text-[10px] font-medium text-slate-400">
-                          {line.variant_id}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
+                    <TableRow key={`${line.vendor_product_id}-${index}`}>
+                      <TableCell>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">
+                            {line.vendor_name?.trim() || "—"}
+                          </p>
+                          <p className="font-mono text-[10px] text-muted-foreground">
+                            {line.vendor_id.slice(0, 8).toUpperCase()}…
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">
+                            {line.product_name?.trim() || "—"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {line.variant_name?.trim() || "—"}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          className="h-8 w-20 tabular-nums"
                           type="number"
                           min={0}
-                          className="h-9 w-20 rounded-lg border border-slate-200/80 bg-white px-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15"
                           value={line.allocated_qty}
                           onChange={(e) =>
                             updateQty(index, parseInt(e.target.value, 10) || 0)
                           }
                         />
-                      </td>
-                      <td className="px-4 py-3 font-medium tabular-nums text-slate-700">
-                        {line.base_price.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 font-semibold tabular-nums text-slate-900">
-                        {line.total_cost.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          className="text-xs font-semibold text-rose-600 transition hover:underline"
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {formatProcurementInr(line.base_price)}
+                      </TableCell>
+                      <TableCell className="font-semibold tabular-nums">
+                        {formatProcurementInr(line.total_cost)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
                           onClick={() => removeLine(index)}
+                          aria-label="Remove line"
+                          className="text-destructive hover:text-destructive"
                         >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
+                          <Trash2 />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+              </Table>
 
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
-              <p className="text-base font-bold tabular-nums text-slate-900">
-                System total: ₹{(plan?.system_total_cost ?? 0).toFixed(2)}
-              </p>
-              <PrimaryBtn type="button" disabled={isPending} onClick={approve}>
-                Approve & create purchase orders
-              </PrimaryBtn>
-            </div>
-          </>
-        )}
-      </section>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">System total</span>
+                  <Badge variant="outline" className="text-sm font-semibold tabular-nums">
+                    {formatProcurementInr(plan?.system_total_cost ?? 0)}
+                  </Badge>
+                </div>
+                <Button onClick={approve} disabled={isPending}>
+                  Approve & create purchase orders
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

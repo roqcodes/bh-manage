@@ -3,6 +3,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 import { buildOrderItemSnapshot } from "@/modules/orders/services/order-item-pricing.service";
+import { commitOrderInventory } from "@/modules/orders/services/order-wallet-inventory.service";
 
 export interface CreateManualOrderInput {
   customerName?: string;
@@ -129,37 +130,15 @@ export async function createManualOrder(
     throw new Error(`Failed to insert order items: ${itemsError.message}`);
   }
 
-  // Step 4: Decrement inventory stock for each item
-  const inventoryUpdates = orderLineItems.map((item) => ({
-    variant_id: item.variantId,
-    quantity: item.quantity,
-  }));
-
-  for (const update of inventoryUpdates) {
-    // Get current stock
-    const { data: invData, error: invError } = await supabase
-      .from("inventory")
-      .select("stock")
-      .eq("variant_id", update.variant_id)
-      .maybeSingle();
-
-    if (invError) {
-      // Continue but log error, we don't want to fail the whole order if one inventory update fails
-      console.error(`Failed to read inventory for variant ${update.variant_id}`, invError);
-      continue;
-    }
-
-    const currentStock = invData?.stock ?? 0;
-    const newStock = Math.max(0, currentStock - update.quantity);
-
-    const { error: updateError } = await supabase
-      .from("inventory")
-      .update({ stock: newStock } as any)
-      .eq("variant_id", update.variant_id);
-
-    if (updateError) {
-      console.error(`Failed to update inventory for variant ${update.variant_id}`, updateError);
-    }
+  // Step 4: Decrement inventory for all line items
+  try {
+    await commitOrderInventory(orderId);
+  } catch (invErr) {
+    await supabase.from("order_items").delete().eq("order_id", orderId);
+    await supabase.from("orders").delete().eq("id", orderId);
+    throw invErr instanceof Error
+      ? invErr
+      : new Error("Failed to update inventory for manual order");
   }
 
   // Generate an invoice using the existing function

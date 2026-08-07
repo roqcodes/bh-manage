@@ -1,0 +1,291 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Search } from "lucide-react";
+
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
+  groupPagesBySection,
+  SearchEntityResultRow,
+  SearchGroupHeader,
+  SearchPageResultRow,
+} from "@/modules/admin/components/admin-search-results";
+import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { filterSearchIndex } from "@/modules/admin/lib/admin-search-client";
+import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import type { AdminSearchIndexResponse } from "@/modules/admin/types/admin-search";
+import { cn } from "@/lib/utils";
+
+type AdminGlobalSearchContextValue = {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+};
+
+const AdminGlobalSearchContext = createContext<AdminGlobalSearchContextValue | null>(
+  null,
+);
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    target.isContentEditable
+  );
+}
+
+function useSearchIndex() {
+  return useQuery({
+    queryKey: adminQueryKeys.searchIndex(),
+    queryFn: () => adminGet<AdminSearchIndexResponse>("search-index"),
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function AdminGlobalSearchProvider({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    void queryClient.prefetchQuery({
+      queryKey: adminQueryKeys.searchIndex(),
+      queryFn: () => adminGet<AdminSearchIndexResponse>("search-index"),
+      staleTime: 5 * 60_000,
+    });
+  }, [queryClient]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setOpen(true);
+        return;
+      }
+
+      if (event.key !== " " || event.repeat) return;
+      if (open || isTypingTarget(event.target)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      event.preventDefault();
+      setOpen(true);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  const value = useMemo(
+    () => ({
+      open,
+      setOpen,
+    }),
+    [open],
+  );
+
+  return (
+    <AdminGlobalSearchContext.Provider value={value}>
+      {children}
+      <AdminGlobalSearchDialog />
+    </AdminGlobalSearchContext.Provider>
+  );
+}
+
+export function useAdminGlobalSearch() {
+  const context = useContext(AdminGlobalSearchContext);
+  if (!context) {
+    throw new Error("useAdminGlobalSearch must be used within AdminGlobalSearchProvider");
+  }
+  return context;
+}
+
+export function AdminSearchTrigger({ className }: { className?: string }) {
+  const { setOpen } = useAdminGlobalSearch();
+
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className={cn(
+        "relative flex h-9 w-full items-center gap-2 rounded-xl border border-slate-200/80 bg-white/90 px-3 text-left text-sm shadow-sm shadow-slate-900/5 outline-none transition-colors hover:border-slate-300 hover:bg-white focus-visible:border-slate-300 focus-visible:ring-2 focus-visible:ring-[#2563EB]/15",
+        className,
+      )}
+    >
+      <Search className="size-4 shrink-0 text-slate-400" aria-hidden />
+      <span className="flex-1 truncate font-medium text-slate-400">
+        Search orders, products, pages…
+      </span>
+      <kbd className="hidden shrink-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:inline">
+        Space
+      </kbd>
+    </button>
+  );
+}
+
+function AdminGlobalSearchDialog() {
+  const router = useRouter();
+  const { open, setOpen } = useAdminGlobalSearch();
+  const [query, setQuery] = useState("");
+  const { data: index, isLoading, isError, isFetching } = useSearchIndex();
+
+  const groups = useMemo(
+    () => filterSearchIndex(index?.items ?? [], query),
+    [index?.items, query],
+  );
+
+  const totalIndexed = useMemo(() => {
+    if (!index) return 0;
+    return Object.values(index.counts).reduce((sum, count) => sum + count, 0);
+  }, [index]);
+
+  const trimmedQuery = query.trim();
+  const showPageGrid = trimmedQuery.length === 0;
+  const pageSections = useMemo(() => {
+    const pagesGroup = groups.find((group) => group.id === "pages");
+    if (!pagesGroup) return [];
+    return groupPagesBySection(pagesGroup.items);
+  }, [groups]);
+
+  const handleSelect = useCallback(
+    (href: string) => {
+      setOpen(false);
+      setQuery("");
+      router.push(href);
+    },
+    [router, setOpen],
+  );
+
+  const showInitialLoader = open && isLoading && !index;
+  const showRefreshing = open && isFetching && !!index;
+
+  return (
+    <CommandDialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setQuery("");
+      }}
+      title="Quick search"
+      description="Search pages, orders, products, purchase orders, and more"
+      className="top-[5%] w-[calc(100%-1.5rem)] max-w-4xl translate-y-0 sm:top-[6%] sm:max-w-4xl"
+    >
+      <Command shouldFilter={false}>
+        <div className="border-b border-border/60 p-2 pb-0">
+          <CommandInput
+            placeholder="Search anything — pages, orders, products, customers, vendors…"
+            value={query}
+            onValueChange={setQuery}
+            className="text-base"
+          />
+        </div>
+        <div className="flex items-center justify-between border-b border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground">
+          <span>
+            {index
+              ? `${totalIndexed.toLocaleString()} records indexed`
+              : "Indexing admin data…"}
+          </span>
+          {showRefreshing ? (
+            <span className="inline-flex items-center gap-1">
+              <Loader2 className="size-3 animate-spin" aria-hidden />
+              Refreshing
+            </span>
+          ) : index ? (
+            <span>Instant search</span>
+          ) : null}
+        </div>
+        <CommandList className="max-h-[min(72vh,42rem)] scroll-py-2">
+          {showInitialLoader ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-14 text-sm text-slate-500">
+              <Loader2 className="size-5 animate-spin" aria-hidden />
+              Building search index…
+            </div>
+          ) : isError ? (
+            <CommandEmpty>Could not load search index. Refresh and try again.</CommandEmpty>
+          ) : groups.length === 0 ? (
+            <CommandEmpty>
+              {trimmedQuery.length === 0
+                ? "No pages available."
+                : `No results for “${trimmedQuery}”.`}
+            </CommandEmpty>
+          ) : (
+            groups.map((group, groupIndex) => (
+              <div key={group.id}>
+                {groupIndex > 0 ? <CommandSeparator className="my-2" /> : null}
+
+                {group.id === "pages" && showPageGrid ? (
+                  <div className="px-1 py-1">
+                    <SearchGroupHeader group={group} showCount={false} />
+                    {pageSections.map((section) => (
+                      <div key={section.section} className="mb-3 last:mb-1">
+                        <p className="mb-1.5 px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                          {section.section}
+                        </p>
+                        <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
+                          {section.items.map((item, index) => (
+                            <CommandItem
+                              key={`${group.id}-${item.id}`}
+                              value={`${group.id}-${item.id}-${item.title}`}
+                              onSelect={() => handleSelect(item.href)}
+                              className="items-center rounded-xl px-2 py-2.5 [&>svg:last-child]:hidden"
+                            >
+                              <SearchPageResultRow item={item} iconIndex={index} />
+                            </CommandItem>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-1 py-1">
+                    <SearchGroupHeader group={group} showCount={group.id !== "pages"} />
+                    <CommandGroup className="p-0 **:[[cmdk-group-heading]]:hidden">
+                      {group.items.map((item, index) => (
+                      <CommandItem
+                        key={`${group.id}-${item.id}`}
+                        value={`${group.id}-${item.id}-${item.title}`}
+                        onSelect={() => handleSelect(item.href)}
+                        className={cn(
+                          "items-start rounded-xl px-2 py-2.5 [&>svg:last-child]:hidden",
+                          group.id === "pages" ? "items-center py-2.5" : "py-3",
+                        )}
+                      >
+                        {group.id === "pages" ? (
+                          <SearchPageResultRow item={item} iconIndex={index} />
+                        ) : (
+                          <SearchEntityResultRow item={item} groupId={group.id} />
+                        )}
+                      </CommandItem>
+                    ))}
+                    </CommandGroup>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </CommandList>
+      </Command>
+    </CommandDialog>
+  );
+}

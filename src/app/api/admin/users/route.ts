@@ -6,6 +6,7 @@ import {
   getPendingPortalRequestCount,
   getPortalStaffUsers,
   getStoreUsers,
+  getUsersCatalogStats,
 } from "@/modules/users/services/users.service";
 
 type PrimaryTab = "users" | "requests";
@@ -31,18 +32,23 @@ export async function GET(request: Request) {
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
 
   if (primary === "requests") {
-    const pending = await getPendingPortalRequests();
+    const [pending, stats] = await Promise.all([
+      getPendingPortalRequests(),
+      getUsersCatalogStats(),
+    ]);
     return NextResponse.json({
       pendingCount: pending.length,
       primary,
       segment,
       page,
+      stats,
       content: { kind: "requests" as const, pending },
     });
   }
 
-  const [pendingCount, content] = await Promise.all([
+  const [pendingCount, stats, content] = await Promise.all([
     getPendingPortalRequestCount(),
+    getUsersCatalogStats(),
     (async () => {
       if (segment === "stores") {
         return { kind: "stores" as const, ...(await getStoreUsers(page)) };
@@ -65,6 +71,7 @@ export async function GET(request: Request) {
     primary,
     segment,
     page,
+    stats,
     content,
   });
 }

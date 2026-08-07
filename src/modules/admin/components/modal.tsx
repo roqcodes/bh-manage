@@ -30,7 +30,7 @@ const SIZE_CLASSES: Record<NonNullable<ModalProps["size"]>, string> = {
   lg: "sm:max-w-2xl",
   xl: "sm:max-w-4xl",
   landscape:
-    "h-[min(90vh,840px)] min-h-[min(80vh,640px)] w-[min(94vw,1280px)] max-w-[min(94vw,1280px)]",
+    "h-[min(90vh,840px)] min-h-[min(80vh,640px)] w-[min(96vw,1536px)] sm:max-w-[min(96vw,1536px)]",
 };
 
 /** Shared input styling for legacy raw `<input>` / `<select>` / `<textarea>` in forms. */

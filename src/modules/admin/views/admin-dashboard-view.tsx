@@ -23,6 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+import { isAdminRouteHidden } from "@/modules/admin/lib/hidden-admin-routes";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import type {
@@ -869,7 +870,7 @@ function QuickActionsDeck() {
         Control deck
       </SectionEyebrow>
       <div className="grid flex-1 grid-cols-2 gap-3">
-        {QUICK_ACTIONS.map((a) => {
+        {QUICK_ACTIONS.filter((a) => !isAdminRouteHidden(a.href)).map((a) => {
           const Icon = a.icon;
           return (
             <Link

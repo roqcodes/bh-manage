@@ -2,15 +2,20 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 
 import type { AdminUser } from "@/common/admin/types";
-import { PageHeader } from "@/modules/admin/components/page-header";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { CustomersPanel } from "@/modules/customers/components/customers-panel";
-import { CustomersStatCards } from "@/modules/customers/components/customers-stat-cards";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import type { CustomerStats } from "@/modules/customers/services/customers.service";
+
+type CustomersPayload = {
+  data: AdminUser[];
+  total: number;
+  stats: CustomerStats;
+};
 
 export function AdminCustomersView() {
   const searchParams = useSearchParams();
@@ -18,36 +23,37 @@ export function AdminCustomersView() {
 
   const { data, isPending, isError, error } = useQuery({
     queryKey: adminQueryKeys.customersList(page),
-    queryFn: () => {
-      return adminGet<{
-        data: AdminUser[];
-        total: number;
-        stats: CustomerStats;
-      }>(`customers?page=${page}`);
-    },
+    queryFn: () => adminGet<CustomersPayload>(`customers?page=${page}`),
     placeholderData: keepPreviousData,
   });
 
   if (isPending && !data) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="px-3 py-6 text-sm font-semibold text-red-600 sm:px-4">
-        {error instanceof Error ? error.message : "Failed to load customers."}
+      <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4">
+        <div className="flex items-start gap-3 rounded-xl border border-rose-200/60 bg-rose-50/40 p-5">
+          <AlertTriangle className="size-5 shrink-0 text-rose-600" />
+          <div>
+            <p className="text-sm font-semibold text-rose-900">
+              Failed to load customers.
+            </p>
+            <p className="mt-1 text-sm text-rose-700">
+              {error instanceof Error ? error.message : "Unknown error."}
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
   if (!data) return <AdminPageSkeleton />;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-3 py-3 sm:px-4 sm:py-4">
-      <PageHeader title="Customers" subtitle="All registered users and customers." />
-      
-      {data.stats && <CustomersStatCards stats={data.stats} />}
-
+    <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
       <CustomersPanel
         users={data.data}
         total={data.total}
         page={page}
+        stats={data.stats}
       />
     </div>
   );

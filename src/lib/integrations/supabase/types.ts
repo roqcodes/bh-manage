@@ -126,24 +126,77 @@ export interface Database {
           },
         ];
       };
+      brands: {
+        Row: {
+          id: string;
+          name: string;
+          logo_url: string | null;
+          image_url: string | null;
+          sort_order: number;
+          is_active: boolean;
+          slug: string | null;
+          description: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          logo_url?: string | null;
+          image_url?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+          slug?: string | null;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          logo_url?: string | null;
+          image_url?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+          slug?: string | null;
+          description?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       categories: {
         Row: {
           id: string;
           name: string | null;
           parent_id: string | null;
+          thumbnail_url: string | null;
           image_url: string | null;
+          sort_order: number | null;
+          is_active: boolean | null;
+          slug: string | null;
+          description: string | null;
           created_at: string | null;
+          updated_at: string | null;
         };
         Insert: {
           id?: string;
           name?: string | null;
           parent_id?: string | null;
+          thumbnail_url?: string | null;
           image_url?: string | null;
+          sort_order?: number | null;
+          is_active?: boolean | null;
+          slug?: string | null;
+          description?: string | null;
         };
         Update: {
           name?: string | null;
           parent_id?: string | null;
+          thumbnail_url?: string | null;
           image_url?: string | null;
+          sort_order?: number | null;
+          is_active?: boolean | null;
+          slug?: string | null;
+          description?: string | null;
         };
         Relationships: [];
       };
@@ -216,6 +269,7 @@ export interface Database {
           tax: number | null;
           discount: number | null;
           created_by_admin_id: string | null;
+          merchant_note: string | null;
         };
         Insert: {
           id?: string;
@@ -235,6 +289,7 @@ export interface Database {
           tax?: number | null;
           discount?: number | null;
           created_by_admin_id?: string | null;
+          merchant_note?: string | null;
         };
         Update: {
           status?: string;
@@ -248,6 +303,7 @@ export interface Database {
           subtotal?: number | null;
           tax?: number | null;
           discount?: number | null;
+          merchant_note?: string | null;
         };
         Relationships: [];
       };
@@ -312,9 +368,11 @@ export interface Database {
           name: string | null;
           description: string | null;
           category_id: string | null;
+          brand_id: string | null;
           image_url: string | null;
           is_active: boolean | null;
           use_smart_pricing: boolean;
+          specs: Json;
           created_at: string | null;
         };
         Insert: {
@@ -322,19 +380,36 @@ export interface Database {
           name?: string | null;
           description?: string | null;
           category_id?: string | null;
+          brand_id?: string | null;
           image_url?: string | null;
           is_active?: boolean | null;
           use_smart_pricing?: boolean;
+          specs?: Json;
         };
         Update: {
           name?: string | null;
           description?: string | null;
           category_id?: string | null;
+          brand_id?: string | null;
           image_url?: string | null;
           is_active?: boolean | null;
           use_smart_pricing?: boolean;
+          specs?: Json;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "products_brand_id_fkey";
+            columns: ["brand_id"];
+            referencedRelation: "brands";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "products_category_id_fkey";
+            columns: ["category_id"];
+            referencedRelation: "categories";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       users: {
         Row: {
@@ -995,6 +1070,21 @@ export interface Database {
           p_reference: string;
         };
         Returns: number;
+      };
+      wallet_credit_user: {
+        Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_reference: string;
+        };
+        Returns: number;
+      };
+      inventory_apply_order_stock: {
+        Args: {
+          p_order_id: string;
+          p_multiplier?: number;
+        };
+        Returns: undefined;
       };
       generate_invoice_number: {
         Args: Record<string, never>;

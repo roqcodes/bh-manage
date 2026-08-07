@@ -23,7 +23,10 @@ export function OrderInvoiceDocument({ order }: { order: OrderWithItems }) {
   const total = Number(order.total_amount ?? 0);
 
   return (
-    <article className="mx-auto max-w-3xl bg-white px-6 py-8 text-slate-900 print:max-w-none print:px-4 print:py-6 print:text-black">
+    <article
+      data-invoice-document
+      className="mx-auto max-w-3xl bg-white px-6 py-8 text-slate-900 print:max-w-none print:px-4 print:py-6 print:text-black"
+    >
       <header className="border-b border-slate-200 pb-6 print:border-slate-300 print:pb-4">
         <p
           className="text-[11px] font-semibold uppercase tracking-[0.2em]"
@@ -78,6 +81,17 @@ export function OrderInvoiceDocument({ order }: { order: OrderWithItems }) {
           </p>
         ) : null}
       </section>
+
+      {order.merchant_note?.trim() ? (
+        <section className="mt-6 print:mt-4">
+          <h2 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 print:text-[9px]">
+            Note for merchant
+          </h2>
+          <p className="mt-2 whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm leading-relaxed text-slate-700 print:border-slate-300 print:bg-transparent print:text-xs">
+            {order.merchant_note.trim()}
+          </p>
+        </section>
+      ) : null}
 
       <section className="mt-8 print:mt-6">
         <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 print:text-[9px]">

@@ -48,6 +48,7 @@ export interface MarketplaceCategory {
   id: string;
   name: string | null;
   parent_id: string | null;
+  thumbnail_url: string | null;
   image_url: string | null;
   product_count: number;
 }
@@ -208,10 +209,13 @@ export const getMarketplaceCategories = cache(async (): Promise<MarketplaceCateg
       id,
       name,
       parent_id,
+      thumbnail_url,
       image_url,
       products!inner(id)
     `,
     )
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
   if (error) {
@@ -222,6 +226,7 @@ export const getMarketplaceCategories = cache(async (): Promise<MarketplaceCateg
     id: c.id,
     name: c.name,
     parent_id: c.parent_id,
+    thumbnail_url: c.thumbnail_url,
     image_url: c.image_url,
     product_count: c.products?.length || 0,
   })) as MarketplaceCategory[];

@@ -1,256 +1,839 @@
 "use client";
 
-import { useTransition } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { CreditCard, Package, User, Hash, Printer } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { format, formatDistanceToNow } from "date-fns";
+import {
+  ChevronDown,
+  Download,
+  ExternalLink,
+  Mail,
+  MapPin,
+  MessageSquare,
+  Package,
+  Pencil,
+  Phone,
+  Printer,
+  RotateCcw,
+  Truck,
+  User,
+} from "lucide-react";
 
-import type { OrderWithItems } from "@/common/admin/types";
-import { updateOrderStatusAction } from "@/modules/orders/actions/orders.actions";
-import { selectCls } from "@/modules/admin/components/modal";
+import type { OrderStatus, OrderWithItems } from "@/common/admin/types";
+import {
+  cancelOrderAndRefundAction,
+  updateOrderDetailsAction,
+  updateOrderStatusAction,
+} from "@/modules/orders/actions/orders.actions";
+import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
+import {
+  FormError,
+  Modal,
+  PrimaryBtn,
+  SecondaryBtn,
+  selectCls,
+  textareaCls,
+} from "@/modules/admin/components/modal";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import {
+  customerInitials,
+  formatAddressLine,
+  formatInr,
+  fulfillmentActionLabel,
+  FulfillmentPill,
+  getNextFulfillmentStatus,
+  isCancelled,
+  isPaid,
+  isRefunded,
+  ORDER_FULFILLMENT_FLOW,
+  PaymentPill,
+  shortOrderRef,
+} from "@/modules/orders/components/orders-ui";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
-const CARD =
-  "relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]";
-
-const HERO_TINT =
-  "linear-gradient(135deg, rgba(225, 29, 72, 0.12), rgba(99, 102, 241, 0.1))";
-
-function formatInr(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(n);
+function TimelineAvatar({ label }: { label: string }) {
+  return (
+    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+      {label}
+    </span>
+  );
 }
 
-function shortOrderRef(id: string) {
-  return id.split("-")[0]?.toUpperCase() ?? id.slice(0, 8);
+function buildTimeline(order: OrderWithItems, total: number) {
+  const events: {
+    id: string;
+    title: string;
+    detail: string;
+    at: string | null;
+    icon: string;
+  }[] = [
+    {
+      id: "created",
+      title: "Order placed",
+      detail: `Order #${shortOrderRef(order.id)} was created.`,
+      at: order.created_at,
+      icon: "BH",
+    },
+  ];
+
+  if (order.merchant_note?.trim()) {
+    events.splice(1, 0, {
+      id: "merchant-note",
+      title: "Note for merchant",
+      detail: order.merchant_note.trim(),
+      at: order.created_at,
+      icon: "✎",
+    });
+  }
+
+  if (isRefunded(order.payment_status)) {
+    events.push({
+      id: "refunded",
+      title: "Cancelled & refunded",
+      detail: `${formatInr(total)} returned to customer wallet.`,
+      at: order.created_at,
+      icon: "↩",
+    });
+  } else if (isPaid(order.payment_status)) {
+    events.push({
+      id: "payment",
+      title: "Payment captured",
+      detail: `${formatInr(total)} paid via BuyHub wallet.`,
+      at: order.created_at,
+      icon: "₹",
+    });
+  } else if (!isCancelled(order.status)) {
+    events.push({
+      id: "payment-pending",
+      title: "Payment pending",
+      detail: "Awaiting wallet payment from customer.",
+      at: order.created_at,
+      icon: "…",
+    });
+  }
+
+  const statusIndex = ORDER_FULFILLMENT_FLOW.indexOf(
+    order.status as OrderStatus,
+  );
+
+  if (statusIndex >= 1) {
+    events.push({
+      id: "processing",
+      title: "Order confirmed",
+      detail: "Items are being packed for shipment.",
+      at: order.created_at,
+      icon: "✓",
+    });
+  }
+  if (statusIndex >= 2) {
+    events.push({
+      id: "shipped",
+      title: "Order shipped",
+      detail: "Package handed off for delivery.",
+      at: order.created_at,
+      icon: "🚚",
+    });
+  }
+  if (statusIndex >= 3) {
+    events.push({
+      id: "delivered",
+      title: "Order delivered",
+      detail: "Fulfillment completed.",
+      at: order.created_at,
+      icon: "★",
+    });
+  }
+
+  if (isCancelled(order.status) && !isRefunded(order.payment_status)) {
+    events.push({
+      id: "cancelled",
+      title: "Order cancelled",
+      detail: "This order was cancelled.",
+      at: order.created_at,
+      icon: "×",
+    });
+  }
+
+  return events;
+}
+
+function OrderEditDialog({
+  order,
+  onClose,
+  onSaved,
+}: {
+  order: OrderWithItems;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState(order.status);
+  const [paymentStatus, setPaymentStatus] = useState(
+    order.payment_status ?? "pending",
+  );
+  const [merchantNote, setMerchantNote] = useState(
+    order.merchant_note ?? "",
+  );
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    startTransition(async () => {
+      try {
+        await updateOrderDetailsAction(order.id, {
+          status,
+          paymentStatus,
+          merchantNote: merchantNote.trim() || null,
+        });
+        onSaved();
+        onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save.");
+      }
+    });
+  }
+
+  return (
+    <Modal title="Edit order" subtitle={`#${shortOrderRef(order.id)}`} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="order-status">Fulfillment status</Label>
+          <select
+            id="order-status"
+            className={selectCls}
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            disabled={isCancelled(order.status)}
+          >
+            {ORDER_FULFILLMENT_FLOW.map((s) => (
+              <option key={s} value={s}>
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </option>
+            ))}
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="payment-status">Payment status</Label>
+          <select
+            id="payment-status"
+            className={selectCls}
+            value={paymentStatus}
+            onChange={(e) => setPaymentStatus(e.target.value)}
+            disabled={isCancelled(order.status)}
+          >
+            <option value="pending">Pending</option>
+            <option value="paid">Paid</option>
+            <option value="refunded">Refunded</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="merchant-note">Note for merchant</Label>
+          <textarea
+            id="merchant-note"
+            className={textareaCls}
+            rows={3}
+            value={merchantNote}
+            onChange={(e) => setMerchantNote(e.target.value)}
+            placeholder="Delivery instructions, preferences, etc."
+            maxLength={500}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            {merchantNote.length}/500 · Left by customer at checkout or added by admin
+          </p>
+        </div>
+
+        <FormError message={error} />
+        <div className="flex justify-end gap-2">
+          <SecondaryBtn onClick={onClose}>Cancel</SecondaryBtn>
+          <PrimaryBtn type="submit" disabled={isPending}>
+            {isPending ? "Saving…" : "Save changes"}
+          </PrimaryBtn>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function MerchantNoteSection({
+  orderId,
+  note,
+  onSaved,
+}: {
+  orderId: string;
+  note: string | null;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(note ?? "");
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const trimmed = note?.trim() ?? "";
+
+  function startEdit() {
+    setDraft(note ?? "");
+    setError(null);
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setDraft(note ?? "");
+    setError(null);
+    setEditing(false);
+  }
+
+  function handleSave() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await updateOrderDetailsAction(orderId, {
+          merchantNote: draft.trim() || null,
+        });
+        onSaved();
+        setEditing(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save note.");
+      }
+    });
+  }
+
+  return (
+    <Card className="border border-border ring-0">
+      <CardHeader className="flex flex-row items-start justify-between gap-2 border-b">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="size-4" />
+            Note for merchant
+          </CardTitle>
+        </div>
+        {!editing ? (
+          <Button type="button" variant="outline" size="sm" onClick={startEdit}>
+            <Pencil data-icon="inline-start" />
+            {trimmed ? "Edit" : "Add note"}
+          </Button>
+        ) : null}
+      </CardHeader>
+      <CardContent className="pt-4">
+        {editing ? (
+          <div className="flex flex-col gap-3">
+            <textarea
+              className={textareaCls}
+              rows={4}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Delivery instructions, preferences, etc."
+              maxLength={500}
+              disabled={isPending}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              {draft.length}/500 characters
+            </p>
+            {error ? (
+              <p className="text-sm text-rose-600">{error}</p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={cancelEdit}  
+                disabled={isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSave}
+                disabled={isPending}
+              >
+                {isPending ? "Saving…" : "Save note"}
+              </Button>
+            </div>
+          </div>
+        ) : trimmed ? (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            {trimmed}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No note from the customer. Add delivery instructions or internal
+            notes for your team.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
+  const [showEdit, setShowEdit] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const cancelled = isCancelled(order.status);
+  const paid = isPaid(order.payment_status);
+  const refunded = isRefunded(order.payment_status);
+  const nextStatus = getNextFulfillmentStatus(order.status);
+  const nextActionLabel = fulfillmentActionLabel(order.status);
+
+  const subtotal = useMemo(
+    () =>
+      order.order_items.reduce((sum, item) => {
+        const unit =
+          item.final_price != null
+            ? Number(item.final_price)
+            : Number(item.price ?? 0);
+        return sum + unit * Number(item.quantity ?? 1);
+      }, 0),
+    [order.order_items],
+  );
+  const total = Number(order.total_amount ?? 0);
+
+  const addressText = order.addresses
+    ? formatAddressLine(order.addresses)
+    : null;
+
+  const mapHref =
+    order.addresses?.latitude != null && order.addresses?.longitude != null
+      ? `https://www.google.com/maps?q=${order.addresses.latitude},${order.addresses.longitude}`
+      : addressText
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`
+        : null;
+
+  const timeline = useMemo(
+    () => buildTimeline(order, total),
+    [order, total],
+  );
+
+  async function invalidate() {
+    await queryClient.invalidateQueries({
+      queryKey: adminQueryKeys.orderDetail(order.id),
+    });
+    await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+  }
 
   function handleStatusChange(status: string) {
+    setActionError(null);
     startTransition(async () => {
-      await updateOrderStatusAction(order.id, status);
-      await queryClient.invalidateQueries({
-        queryKey: adminQueryKeys.orderDetail(order.id),
-      });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      try {
+        await updateOrderStatusAction(order.id, status);
+        await invalidate();
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : "Update failed.");
+      }
     });
   }
 
-  const paid = order.payment_status === "paid";
+  function handleCancelAndRefund() {
+    if (
+      !confirm(
+        `Cancel order #${shortOrderRef(order.id)} and refund ${formatInr(total)} to the customer wallet? Stock will be restored.`,
+      )
+    ) {
+      return;
+    }
+    setActionError(null);
+    startTransition(async () => {
+      try {
+        await cancelOrderAndRefundAction(order.id);
+        await invalidate();
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : "Cancel failed.");
+      }
+    });
+  }
 
   return (
-    <div className="space-y-4 lg:space-y-5">
-      <div className={`${CARD} overflow-hidden`}>
-        <div
-          className="relative border-b border-slate-100/80 px-5 py-8 sm:px-8 sm:py-10"
-          style={{ background: HERO_TINT }}
-        >
-          <div className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-white/40 blur-3xl" />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Order
-              </p>
-              <h2 className="mt-1 font-mono text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                #{shortOrderRef(order.id)}
-              </h2>
-              <p className="mt-2 max-w-xl font-mono text-[11px] font-medium text-slate-400 sm:text-xs">
-                {order.id}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-              <select
-                disabled={isPending}
-                value={order.status}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                aria-label="Order status"
-                className={`${selectCls} !h-10 min-h-[2.5rem] min-w-[10.5rem] py-0 text-[13px] font-semibold leading-none`}
-              >
-                {(
-                  [
-                    "pending",
-                    "processing",
-                    "shipped",
-                    "delivered",
-                    "cancelled",
-                  ] as const
-                ).map((s) => (
-                  <option key={s} value={s}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </option>
-                ))}
-              </select>
-              <Link
-                href={`/admin/orders/${order.id}/invoice`}
-                scroll={false}
-                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-200/80 bg-white px-3.5 text-[13px] font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:px-4"
-              >
-                <Printer className="size-4 shrink-0" aria-hidden />
-                Print invoice
-              </Link>
-            </div>
+    <div className="flex flex-col gap-4">
+      {showEdit ? (
+        <OrderEditDialog
+          order={order}
+          onClose={() => setShowEdit(false)}
+          onSaved={() => void invalidate()}
+        />
+      ) : null}
+
+      <AdminBreadcrumb
+        items={[
+          { label: "Orders", href: "/admin/orders" },
+          { label: `#${shortOrderRef(order.id)}` },
+        ]}
+        backHref="/admin/orders"
+      />
+
+      {actionError ? (
+        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {actionError}
+        </p>
+      ) : null}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-2">
+          <h1 className="font-mono text-2xl font-semibold tracking-tight">
+            #{shortOrderRef(order.id)}
+          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <PaymentPill paymentStatus={order.payment_status} />
+            <FulfillmentPill status={order.status} />
+            <span className="text-sm text-muted-foreground">
+              {order.created_at
+                ? format(new Date(order.created_at), "MMM d, yyyy · h:mm a")
+                : ""}
+            </span>
           </div>
         </div>
-
-        <div className="grid gap-px bg-slate-100/90 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="bg-white p-5">
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-              <Hash className="size-3.5 text-slate-400" aria-hidden />
-              Placed
-            </div>
-            <p className="mt-2 text-sm font-semibold text-slate-900">
-              {order.created_at
-                ? format(new Date(order.created_at), "MMM d, yyyy")
-                : "—"}
-            </p>
-            <p className="mt-0.5 text-[12px] font-medium text-slate-500">
-              {order.created_at
-                ? format(new Date(order.created_at), "h:mm a")
-                : ""}
-            </p>
-          </div>
-          <div className="bg-white p-5">
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-              <User className="size-3.5 text-slate-400" aria-hidden />
-              Customer
-            </div>
-            <p className="mt-2 text-sm font-semibold text-slate-900">
-              {order.users?.name ?? "—"}
-            </p>
-            {order.users?.email ? (
-              <p className="mt-1 truncate text-[12px] font-medium text-slate-500">
-                {order.users.email}
-              </p>
-            ) : null}
-            {order.users?.phone ? (
-              <p className="mt-0.5 text-[12px] font-medium text-slate-500">
-                {order.users.phone}
-              </p>
-            ) : null}
-          </div>
-          <div className="bg-white p-5">
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-              <CreditCard className="size-3.5 text-slate-400" aria-hidden />
-              Payment
-            </div>
-            <p className="mt-2">
-              <span
-                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ring-1 ${
-                  paid
-                    ? "bg-emerald-50/90 text-emerald-800 ring-emerald-200/60"
-                    : "bg-amber-50/90 text-amber-900 ring-amber-200/60"
-                }`}
-              >
-                {order.payment_status ?? "pending"}
-              </span>
-            </p>
-          </div>
-          <div className="bg-white p-5 sm:col-span-2 lg:col-span-1">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-              Order total
-            </div>
-            <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">
-              {formatInr(Number(order.total_amount ?? 0))}
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {!cancelled ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isPending}
+              onClick={handleCancelAndRefund}
+            >
+              <RotateCcw data-icon="inline-start" />
+              Cancel & refund
+            </Button>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isPending || cancelled}
+            onClick={() => setShowEdit(true)}
+          >
+            <Pencil data-icon="inline-start" />
+            Edit
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" size="sm" disabled={isPending} />
+              }
+            >
+              More actions
+              <ChevronDown data-icon="inline-end" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  nativeButton={false}
+                  render={
+                    <Link
+                      href={`/admin/orders/${order.id}/invoice`}
+                      target="_blank"
+                    />
+                  }
+                >
+                  <Printer />
+                  Print invoice
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  nativeButton={false}
+                  render={
+                    <Link
+                      href={`/admin/orders/${order.id}/invoice?download=1`}
+                      target="_blank"
+                    />
+                  }
+                >
+                  <Download />
+                  Download invoice (PDF)
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {nextStatus && nextActionLabel ? (
+            <Button
+              size="sm"
+              disabled={isPending}
+              onClick={() => handleStatusChange(nextStatus)}
+            >
+              {nextActionLabel}
+            </Button>
+          ) : null}
         </div>
       </div>
 
-      <section aria-label="Line items">
-        <div className="mb-4 flex items-center gap-2.5">
-          <span className="flex size-6 items-center justify-center rounded-md border border-slate-200/70 bg-slate-50 text-slate-500 shadow-sm ring-1 ring-white/80">
-            <Package className="size-3" aria-hidden />
-          </span>
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Line items ({order.order_items.length})
-          </h3>
-        </div>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          <Card className="border border-border ring-0">
+            <CardHeader className="border-b">
+              <CardTitle>Fulfillment</CardTitle>
+              <CardDescription>
+                {cancelled
+                  ? "This order was cancelled."
+                  : `Status: ${order.status}`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 pt-4">
+              {order.order_items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No line items.</p>
+              ) : (
+                order.order_items.map((item) => {
+                  const unit =
+                    item.final_price != null
+                      ? Number(item.final_price)
+                      : Number(item.price ?? 0);
+                  const lineTotal = unit * Number(item.quantity ?? 1);
 
-        {order.order_items.length === 0 ? (
-          <div className={`px-6 py-14 text-center text-sm font-medium text-slate-500 ${CARD}`}>
-            No items recorded for this order.
-          </div>
-        ) : (
-          <ul className="space-y-3">
-            {order.order_items.map((item) => {
-              const unitFinal =
-                item.final_price != null
-                  ? Number(item.final_price)
-                  : Number(item.price ?? 0);
-              const lineTotal = unitFinal * Number(item.quantity ?? 1);
-              return (
-                <li key={item.id}>
-                  <div
-                    className={`${CARD} flex flex-col gap-4 p-4 transition hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.08)] sm:flex-row sm:items-center sm:justify-between sm:gap-6`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[15px] font-semibold leading-snug text-slate-900">
-                        {item.product_name ?? "—"}
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-start gap-3 border-b border-border/60 pb-4 last:border-0 last:pb-0"
+                    >
+                      <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border bg-muted/40">
+                        <Package />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-medium">
+                          {item.product_name ?? "Item"}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Qty {item.quantity ?? 1} · {formatInr(unit)} each
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold tabular-nums">
+                        {formatInr(lineTotal)}
                       </p>
-                      {item.vendor_id ? (
-                        <p className="mt-1 text-[11px] font-medium text-slate-400">
-                          Vendor{" "}
-                          <span className="font-mono text-slate-500">
-                            {item.vendor_id.slice(0, 8)}…
-                          </span>
+                    </div>
+                  );
+                })
+              )}
+              {!cancelled && nextStatus ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                  <p className="text-sm text-muted-foreground">
+                    <Truck className="mr-1 inline" />
+                    Next step: {nextActionLabel?.toLowerCase()}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isPending}
+                    onClick={() => handleStatusChange(nextStatus)}
+                  >
+                    {nextActionLabel}
+                  </Button>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border ring-0">
+            <CardHeader className="border-b">
+              <CardTitle>Payment summary</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 pt-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="tabular-nums">{formatInr(subtotal)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between font-semibold">
+                <span>Order total</span>
+                <span className="tabular-nums">{formatInr(total)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Payment status</span>
+                <span className="capitalize">
+                  {order.payment_status ?? "pending"}
+                </span>
+              </div>
+              {refunded ? (
+                <div className="flex justify-between font-medium text-rose-700">
+                  <span>Refunded to wallet</span>
+                  <span className="tabular-nums">−{formatInr(total)}</span>
+                </div>
+              ) : paid ? (
+                <div className="flex justify-between font-medium text-emerald-700">
+                  <span>Paid via wallet</span>
+                  <span className="tabular-nums">{formatInr(total)}</span>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border ring-0">
+            <CardHeader className="border-b">
+              <CardTitle>Timeline</CardTitle>
+              <CardDescription>Order milestones</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <ol className="flex flex-col gap-4">
+                {timeline.map((event) => (
+                  <li key={event.id} className="flex gap-3">
+                    <TimelineAvatar label={event.icon} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{event.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {event.detail}
+                      </p>
+                      {event.at ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {format(new Date(event.at), "MMM d, yyyy · h:mm a")}
+                          {" · "}
+                          {formatDistanceToNow(new Date(event.at), {
+                            addSuffix: true,
+                          })}
                         </p>
                       ) : null}
                     </div>
-                    <dl className="grid shrink-0 grid-cols-2 gap-x-6 gap-y-2 text-[12px] sm:grid-cols-4 sm:text-right">
-                      <div>
-                        <dt className="font-semibold uppercase tracking-wide text-slate-400">
-                          Qty
-                        </dt>
-                        <dd className="mt-0.5 font-semibold tabular-nums text-slate-900">
-                          {item.quantity ?? "—"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="font-semibold uppercase tracking-wide text-slate-400">
-                          Base
-                        </dt>
-                        <dd className="mt-0.5 font-medium tabular-nums text-slate-700">
-                          {item.base_price != null
-                            ? formatInr(Number(item.base_price))
-                            : "—"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="font-semibold uppercase tracking-wide text-slate-400">
-                          Margin
-                        </dt>
-                        <dd className="mt-0.5 font-medium tabular-nums text-slate-700">
-                          {item.margin_amount != null
-                            ? formatInr(Number(item.margin_amount))
-                            : "—"}
-                        </dd>
-                      </div>
-                      <div className="col-span-2 border-t border-slate-100 pt-2 sm:col-span-1 sm:border-t-0 sm:pt-0">
-                        <dt className="font-semibold uppercase tracking-wide text-slate-400">
-                          Line
-                        </dt>
-                        <dd className="mt-0.5 font-bold tabular-nums text-slate-900">
-                          {formatInr(lineTotal)}
-                        </dd>
-                        <dd className="mt-0.5 text-[11px] font-medium text-slate-500">
-                          {formatInr(unitFinal)} / unit
-                        </dd>
-                      </div>
-                    </dl>
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <MerchantNoteSection
+            orderId={order.id}
+            note={order.merchant_note}
+            onSaved={() => void invalidate()}
+          />
+
+          <Card className="border border-border ring-0">
+            <CardHeader className="border-b pb-4">
+              <CardTitle>Customer</CardTitle>
+              <CardDescription>
+                Contact details and delivery information
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5 pt-5">
+              <div className="flex items-start gap-3">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                  {customerInitials(order.users?.name)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-semibold leading-tight">
+                    {order.users?.name ?? "Guest"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {order.customer_order_count} order
+                    {order.customer_order_count === 1 ? "" : "s"} with BuyHub
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/30 p-3.5 text-sm">
+                {order.users?.email ? (
+                  <div className="flex items-start gap-2.5">
+                    <Mail className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Email
+                      </p>
+                      <a
+                        href={`mailto:${order.users.email}`}
+                        className="break-all font-medium hover:underline"
+                      >
+                        {order.users.email}
+                      </a>
+                    </div>
                   </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+                ) : null}
+                {order.users?.phone ? (
+                  <div className="flex items-start gap-2.5">
+                    <Phone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Phone
+                      </p>
+                      <a
+                        href={`tel:${order.users.phone}`}
+                        className="font-medium hover:underline"
+                      >
+                        {order.users.phone}
+                      </a>
+                    </div>
+                  </div>
+                ) : null}
+                {!order.users?.email && !order.users?.phone ? (
+                  <p className="text-muted-foreground">
+                    No contact details on file.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <MapPin className="size-4 text-muted-foreground" />
+                  <p className="text-sm font-medium">Delivery address</p>
+                </div>
+                {addressText ? (
+                  <div className="rounded-lg border bg-background p-3.5">
+                    {order.addresses?.label ? (
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {order.addresses.label}
+                      </p>
+                    ) : null}
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {addressText}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-dashed bg-muted/20 p-3.5 text-sm text-muted-foreground">
+                    No delivery address saved for this order.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2 border-t pt-4">
+                {order.users?.id ? (
+                  <Link
+                    href={`/admin/customers/${order.users.id}`}
+                    className={buttonVariants({
+                      size: "sm",
+                      variant: "default",
+                      className: "gap-1.5",
+                    })}
+                  >
+                    <User data-icon="inline-start" />
+                    View customer
+                  </Link>
+                ) : null}
+                {mapHref ? (
+                  <a
+                    href={mapHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonVariants({
+                      size: "sm",
+                      variant: "outline",
+                      className: "gap-1.5",
+                    })}
+                  >
+                    <MapPin data-icon="inline-start" />
+                    Open in maps
+                    <ExternalLink className="size-3.5 opacity-70" />
+                  </a>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

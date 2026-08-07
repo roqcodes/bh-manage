@@ -8,6 +8,7 @@ import { isAdminInvoicePrintPath } from "@/modules/admin/lib/admin-invoice-route
 
 import type { UserProfile } from "@/common/auth/types";
 import { AdminHeader } from "@/modules/admin/components/admin-header";
+import { AdminGlobalSearchProvider } from "@/modules/admin/components/admin-global-search";
 import { AdminSidebar } from "@/modules/admin/components/sidebar";
 import { useIsMdUp } from "@/modules/admin/hooks/use-is-md-up";
 import { AdminSessionProvider } from "@/modules/admin/providers/admin-session-provider";
@@ -73,7 +74,8 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AdminSessionProvider profile={data.profile}>
-      <div className="relative flex h-full overflow-hidden bg-[#F8FAFC]">
+      <AdminGlobalSearchProvider>
+        <div className="relative flex h-full overflow-hidden bg-[#F8FAFC]">
         <button
           type="button"
           className={[
@@ -109,7 +111,8 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </main>
-      </div>
+        </div>
+      </AdminGlobalSearchProvider>
     </AdminSessionProvider>
   );
 }

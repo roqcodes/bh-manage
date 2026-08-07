@@ -4,6 +4,7 @@ import { getCurrentSessionProfile } from "@/modules/auth/services/auth.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { getCart } from "@/modules/cart/services/cart.service";
 import { buildOrderItemSnapshot } from "@/modules/orders/services/order-item-pricing.service";
+import { commitOrderInventory } from "@/modules/orders/services/order-wallet-inventory.service";
 import { clearCart } from "@/modules/cart/services/cart.service";
 
 export interface CreateOrderInput {
@@ -159,35 +160,13 @@ export async function createOrderFromCart(
     throw new Error(itemsError.message);
   }
 
-  // Step 7: Decrement inventory stock for each item
-  const inventoryUpdates = orderLineItems.map((item) => ({
-    variant_id: item.variantId,
-    quantity: item.quantity,
-  }));
-
-  for (const update of inventoryUpdates) {
-    // Get current stock
-    const { data: invData, error: invError } = await supabase
-      .from("inventory")
-      .select("stock")
-      .eq("variant_id", update.variant_id)
-      .maybeSingle();
-
-    if (invError) {
-      throw new Error(`Failed to read inventory for variant ${update.variant_id}`);
-    }
-
-    const currentStock = invData?.stock ?? 0;
-    const newStock = Math.max(0, currentStock - update.quantity);
-
-    const { error: updateError } = await supabase
-      .from("inventory")
-      .update({ stock: newStock } as any)
-      .eq("variant_id", update.variant_id);
-
-    if (updateError) {
-      throw new Error(`Failed to update inventory for variant ${update.variant_id}`);
-    }
+  // Step 7: Decrement inventory stock for each line (aggregated per variant)
+  try {
+    await commitOrderInventory(orderId);
+  } catch (invErr) {
+    await supabase.from("order_items").delete().eq("order_id", orderId);
+    await supabase.from("orders").delete().eq("id", orderId);
+    throw invErr instanceof Error ? invErr : new Error("Failed to update inventory");
   }
 
   // Step 8: Clear cart

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 import { getCategories } from "@/modules/products/services/categories.service";
+import { getBrands } from "@/modules/products/services/brands.service";
 import {
   getProductCatalogStats,
   getProducts,
@@ -15,11 +16,12 @@ export async function GET(request: Request) {
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
   const categoryId = searchParams.get("category_id") || null;
 
-  const [{ data, total }, categories, stats] = await Promise.all([
+  const [{ data, total }, categories, brands, stats] = await Promise.all([
     getProducts(page, categoryId),
     getCategories(),
+    getBrands(),
     getProductCatalogStats(),
   ]);
 
-  return NextResponse.json({ data, total, categories, page, stats });
+  return NextResponse.json({ data, total, categories, brands, page, stats });
 }

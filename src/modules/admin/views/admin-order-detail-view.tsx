@@ -1,21 +1,18 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import Link from "next/link";
-import { AlertTriangle, ChevronLeft } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 
 import type { OrderWithItems } from "@/common/admin/types";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { OrderDetailPanel } from "@/modules/orders/components/order-detail-panel";
+import { ORDERS_ACCENT } from "@/modules/orders/components/orders-ui";
 import { adminGetNullable } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 
 type OrderDetailPayload = { order: OrderWithItems };
-
-function shortOrderRef(id: string) {
-  return id.split("-")[0]?.toUpperCase() ?? id.slice(0, 8);
-}
 
 export function AdminOrderDetailView() {
   const params = useParams();
@@ -32,8 +29,10 @@ export function AdminOrderDetailView() {
 
   if (!id) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] px-3 py-6 sm:px-4">
-        <p className="text-sm font-semibold text-slate-600">Missing order id.</p>
+      <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4">
+        <p className="text-sm font-medium text-muted-foreground">
+          Missing order id.
+        </p>
       </div>
     );
   }
@@ -41,59 +40,46 @@ export function AdminOrderDetailView() {
   if (isPending && data === undefined) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] px-3 py-6 sm:px-4">
-        <div className="flex items-start gap-3 rounded-2xl border border-rose-200/60 bg-rose-50/40 p-5">
+      <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4">
+        <div className="flex items-start gap-3 rounded-xl border border-rose-200/60 bg-rose-50/40 p-5">
           <AlertTriangle className="size-5 shrink-0 text-rose-600" />
           <div>
             <p className="text-sm font-semibold text-rose-900">
               Failed to load order.
             </p>
-            <p className="mt-1 text-[13px] font-medium text-rose-700">
+            <p className="mt-1 text-sm text-rose-700">
               {error instanceof Error ? error.message : "Unknown error."}
             </p>
           </div>
         </div>
         <Link
           href="/admin/orders"
-          className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-800"
+          className={`mt-6 inline-flex text-sm font-medium hover:underline ${ORDERS_ACCENT.link}`}
         >
-          <ChevronLeft className="size-4" aria-hidden />
-          All orders
+          Back to orders
         </Link>
       </div>
     );
   }
   if (data === null) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] px-3 py-6 sm:px-4">
-        <Link
-          href="/admin/orders"
-          className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-800"
-        >
-          <ChevronLeft className="size-4" aria-hidden />
-          All orders
-        </Link>
-        <p className="text-[15px] font-medium text-slate-600">
+      <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4">
+        <p className="text-sm font-medium text-muted-foreground">
           This order could not be found.
         </p>
+        <Link
+          href="/admin/orders"
+          className={`mt-4 inline-flex text-sm font-medium hover:underline ${ORDERS_ACCENT.link}`}
+        >
+          Back to orders
+        </Link>
       </div>
     );
   }
 
-  const { order } = data;
-
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-3 py-3 sm:px-4 sm:py-4">
-      <Link
-        href="/admin/orders"
-        className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-800"
-      >
-        <ChevronLeft className="size-4" aria-hidden />
-        All orders
-      </Link>
-
-
-      <OrderDetailPanel order={order} />
+    <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
+      <OrderDetailPanel order={data.order} />
     </div>
   );
 }

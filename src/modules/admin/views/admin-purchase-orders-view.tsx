@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, LayoutDashboard } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 import {
   PURCHASE_ORDER_STATUS_FILTERS,
@@ -74,10 +73,7 @@ export function AdminPurchaseOrdersView() {
   if (!data) return <AdminPageSkeleton />;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-3 py-3 sm:px-4 sm:py-4">
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
-
-      </div>
+    <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
       <AdminPurchaseOrdersPanel
         orders={data.data}
         total={data.total}

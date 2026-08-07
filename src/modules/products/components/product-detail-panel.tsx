@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Package, Pencil, Plus, Trash2 } from "lucide-react";
 
 import type {
+  Brand,
   Category,
   ProductAtGlanceMetrics,
   ProductVariant,
@@ -31,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProductPricingSection } from "@/modules/products/components/product-pricing-section";
+import { ProductSpecsSection } from "@/modules/products/components/product-specs-section";
 import {
   updateProductAction,
   toggleProductAction,
@@ -51,6 +53,7 @@ import {
   textareaCls,
 } from "@/modules/admin/components/modal";
 import { ProductImageField } from "@/modules/products/components/product-image-field";
+import { formatCategoryOptionLabel } from "@/modules/products/lib/categories.utils";
 import { VariantImagesField } from "@/modules/products/components/variant-images-field";
 import { VariantImagesManager } from "@/modules/products/components/variant-images-manager";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
@@ -416,10 +419,12 @@ function VariantForm({
 function ProductEditForm({
   product,
   categories,
+  brands,
   onClose,
 }: {
   product: ProductWithCategory;
   categories: Category[];
+  brands: Brand[];
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -438,6 +443,7 @@ function ProductEditForm({
     const name = (fd.get("name") as string).trim();
     const description = (fd.get("description") as string).trim();
     const categoryId = (fd.get("categoryId") as string) || null;
+    const brandId = (fd.get("brandId") as string) || null;
     const imageUrlValue = imageUrl.trim() || null;
     if (!name) return setError("Name is required.");
     setError(null);
@@ -447,6 +453,7 @@ function ProductEditForm({
           name,
           description,
           categoryId,
+          brandId,
           imageUrl: imageUrlValue,
         });
         await queryClient.invalidateQueries({
@@ -483,7 +490,17 @@ function ProductEditForm({
           <option value="">No category</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {formatCategoryOptionLabel(c, categories)}
+            </option>
+          ))}
+        </select>
+      </LegacyFieldLabel>
+      <LegacyFieldLabel label="Brand">
+        <select name="brandId" className={selectCls} defaultValue={product.brand_id ?? ""}>
+          <option value="">No brand</option>
+          {brands.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name ?? "Unnamed"}
             </option>
           ))}
         </select>
@@ -509,12 +526,14 @@ export function ProductDetailPanel({
   product,
   variants,
   categories,
+  brands,
   pricingRule,
   glance,
 }: {
   product: ProductWithCategory;
   variants: ProductVariant[];
   categories: Category[];
+  brands: Brand[];
   pricingRule: PricingRuleRow | null;
   glance: ProductAtGlanceMetrics;
 }) {
@@ -584,6 +603,7 @@ export function ProductDetailPanel({
           <ProductEditForm
             product={product}
             categories={categories}
+            brands={brands}
             onClose={() => setModal(null)}
           />
         </Modal>
@@ -627,6 +647,9 @@ export function ProductDetailPanel({
                 )}
                 {product.categories?.name ? (
                   <Badge variant="outline">{product.categories.name}</Badge>
+                ) : null}
+                {product.brands?.name ? (
+                  <Badge variant="outline">{product.brands.name}</Badge>
                 ) : null}
               </div>
               <h1 className="mt-2 text-2xl font-semibold">
@@ -700,6 +723,8 @@ export function ProductDetailPanel({
             />
           </div>
         </section>
+
+        <ProductSpecsSection productId={product.id} initialSpecs={product.specs} />
 
         <Card className="border border-border ring-0">
           <CardHeader className="border-b border-border">

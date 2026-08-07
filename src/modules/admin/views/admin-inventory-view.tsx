@@ -10,7 +10,6 @@ import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleto
 import { InventoryPanel } from "@/modules/inventory/components/inventory-panel";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
-import { adminPageClass } from "@/modules/admin/lib/admin-layout";
 
 type InventoryPayload = {
   data: InventoryWithVariant[];
@@ -32,7 +31,7 @@ export function AdminInventoryView() {
   if (isPending && !data) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className={adminPageClass}>
+      <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4">
         <Alert variant="destructive">
           <AlertTriangle />
           <AlertTitle>Failed to load inventory</AlertTitle>
@@ -46,7 +45,7 @@ export function AdminInventoryView() {
   if (!data) return <AdminPageSkeleton />;
 
   return (
-    <div className={adminPageClass}>
+    <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
       <InventoryPanel
         inventory={data.data}
         total={data.total}

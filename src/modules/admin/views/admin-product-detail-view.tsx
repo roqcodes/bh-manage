@@ -5,6 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { useParams } from "next/navigation";
 
 import type {
+  Brand,
   Category,
   ProductAtGlanceMetrics,
   ProductVariant,
@@ -22,6 +23,7 @@ type ProductDetailPayload = {
   product: ProductWithCategory;
   variants: ProductVariant[];
   categories: Category[];
+  brands: Brand[];
   pricingRule: PricingRuleRow | null;
   glance: ProductAtGlanceMetrics;
 };
@@ -31,7 +33,7 @@ function ProductDetailNav({ productName }: { productName?: string | null }) {
     <AdminBreadcrumb
       backHref="/admin/products"
       items={[
-        { label: "Marketplace", href: "/admin/products" },
+        { label: "Products", href: "/admin/products" },
         { label: productName?.trim() || "Product" },
       ]}
     />
@@ -82,7 +84,7 @@ export function AdminProductDetailView() {
     );
   }
 
-  const { product, variants, categories, pricingRule, glance } = data;
+  const { product, variants, categories, brands, pricingRule, glance } = data;
 
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-3 py-2.5 font-sans sm:px-4">
@@ -92,6 +94,7 @@ export function AdminProductDetailView() {
         product={product}
         variants={variants}
         categories={categories}
+        brands={brands ?? []}
         pricingRule={pricingRule}
         glance={glance}
       />

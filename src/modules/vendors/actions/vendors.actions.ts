@@ -6,6 +6,7 @@ import {
   deleteVendorIfNoProducts,
   insertVendor,
   setVendorActive,
+  setVendorsActiveByIds,
   updateVendorById,
 } from "@/modules/vendors/services/vendors.service";
 
@@ -36,5 +37,24 @@ export async function toggleVendorAction(
 
 export async function deleteVendorAction(id: string): Promise<void> {
   await deleteVendorIfNoProducts(id);
+  revalidatePath("/admin/vendors");
+}
+
+export async function bulkSetVendorsActiveAction(
+  ids: string[],
+  isActive: boolean,
+): Promise<void> {
+  if (ids.length === 0) return;
+  await setVendorsActiveByIds(ids, isActive);
+  revalidatePath("/admin/vendors");
+  for (const id of ids) {
+    revalidatePath(`/admin/vendors/${id}`);
+  }
+}
+
+export async function bulkDeleteVendorsAction(ids: string[]): Promise<void> {
+  for (const id of ids) {
+    await deleteVendorIfNoProducts(id);
+  }
   revalidatePath("/admin/vendors");
 }

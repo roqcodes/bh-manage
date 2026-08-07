@@ -7,8 +7,10 @@ import {
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type {
   Paginated,
-  ProductWithCategory,
+  ProductCatalogStats,
   ProductVariant,
+  ProductWithCategory,
+  ProductWithCategoryListItem,
   VariantImage,
 } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
@@ -16,7 +18,7 @@ import { PAGE_SIZE } from "@/common/admin/types";
 export async function getProducts(
   page = 0,
   categoryId: string | null = null,
-): Promise<Paginated<ProductWithCategory>> {
+): Promise<Paginated<ProductWithCategoryListItem>> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * PAGE_SIZE;
@@ -24,7 +26,7 @@ export async function getProducts(
   let query = supabase
     .from("products")
     .select(
-      "id,name,description,category_id,image_url,is_active,use_smart_pricing,created_at,categories(id,name,parent_id,image_url,created_at)",
+      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
     );
 
   let countQuery = supabase
@@ -44,20 +46,105 @@ export async function getProducts(
   query = query.order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1);
 
   const [dataResult, countResult] = await Promise.all([query, countQuery]);
+  const rows = (dataResult.data ?? []) as unknown as ProductWithCategory[];
+  const enriched = await enrichProductsList(supabase, rows);
 
   return {
-    data: (dataResult.data ?? []) as unknown as ProductWithCategory[],
+    data: enriched,
     total: countResult.count ?? 0,
   };
 }
 
-export interface ProductCatalogStats {
-  total: number;
-  active: number;
-  inactive: number;
-  categoriesCount: number;
-  uncategorized: number;
-  categoryCounts: Record<string, number>;
+async function enrichProductsList(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  products: ProductWithCategory[],
+): Promise<ProductWithCategoryListItem[]> {
+  if (products.length === 0) return [];
+
+  const productIds = products.map((p) => p.id);
+  const { data: variantRows } = await supabase
+    .from("product_variants")
+    .select("id,product_id,name,price,mrp")
+    .in("product_id", productIds);
+
+  const variants = variantRows ?? [];
+  const variantIds = variants.map((v) => v.id);
+
+  const stockByVariant = new Map<string, number>();
+  if (variantIds.length > 0) {
+    const { data: inventoryRows } = await supabase
+      .from("inventory")
+      .select("variant_id,stock")
+      .in("variant_id", variantIds);
+
+    for (const row of inventoryRows ?? []) {
+      stockByVariant.set(row.variant_id, Number(row.stock ?? 0));
+    }
+  }
+
+  const summaryByProduct = new Map<
+    string,
+    {
+      stock: number;
+      priceMin: number | null;
+      mrpMin: number | null;
+      count: number;
+      firstSku: string | null;
+    }
+  >();
+
+  for (const v of variants) {
+    const pid = v.product_id as string | null;
+    if (!pid) continue;
+
+    const stock = stockByVariant.get(v.id) ?? 0;
+    const price = v.price != null ? Number(v.price) : null;
+    const mrp = v.mrp != null ? Number(v.mrp) : null;
+    const existing = summaryByProduct.get(pid) ?? {
+      stock: 0,
+      priceMin: null,
+      mrpMin: null,
+      count: 0,
+      firstSku: null,
+    };
+
+    existing.stock += stock;
+    existing.count += 1;
+    if (existing.firstSku == null) {
+      existing.firstSku =
+        v.name?.trim() ||
+        `PRD-${v.id.split("-")[0]?.slice(0, 4).toUpperCase() ?? v.id.slice(0, 8)}`;
+    }
+    if (price != null && Number.isFinite(price)) {
+      existing.priceMin =
+        existing.priceMin == null ? price : Math.min(existing.priceMin, price);
+    }
+    if (mrp != null && Number.isFinite(mrp) && mrp > 0) {
+      existing.mrpMin =
+        existing.mrpMin == null ? mrp : Math.min(existing.mrpMin, mrp);
+    }
+
+    summaryByProduct.set(pid, existing);
+  }
+
+  return products.map((product) => {
+    const summary = summaryByProduct.get(product.id) ?? {
+      stock: 0,
+      priceMin: null,
+      mrpMin: null,
+      count: 0,
+      firstSku: null,
+    };
+
+    return {
+      ...product,
+      stock_total: summary.stock,
+      price_min: summary.priceMin,
+      mrp_min: summary.mrpMin,
+      variant_count: summary.count,
+      sku_label: summary.firstSku,
+    };
+  });
 }
 
 export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
@@ -69,6 +156,8 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
     activeResult,
     categoriesCountResult,
     categoryRowsResult,
+    variantRowsResult,
+    inventoryRowsResult,
   ] = await Promise.all([
     supabase.from("products").select("id", { count: "exact", head: true }),
     supabase
@@ -77,6 +166,8 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
       .eq("is_active", true),
     supabase.from("categories").select("id", { count: "exact", head: true }),
     supabase.from("products").select("category_id"),
+    supabase.from("product_variants").select("id,product_id,price"),
+    supabase.from("inventory").select("variant_id,stock"),
   ]);
 
   const total = totalResult.count ?? 0;
@@ -95,6 +186,33 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
     }
   }
 
+  const stockByVariant = new Map<string, number>();
+  for (const row of inventoryRowsResult.data ?? []) {
+    stockByVariant.set(row.variant_id, Number(row.stock ?? 0));
+  }
+
+  const stockByProduct = new Map<string, number>();
+  let inventoryValue = 0;
+
+  for (const variant of variantRowsResult.data ?? []) {
+    const productId = variant.product_id as string | null;
+    if (!productId) continue;
+
+    const stock = stockByVariant.get(variant.id) ?? 0;
+    const price = Number(variant.price ?? 0);
+    stockByProduct.set(productId, (stockByProduct.get(productId) ?? 0) + stock);
+    if (Number.isFinite(price) && stock > 0) {
+      inventoryValue += price * stock;
+    }
+  }
+
+  let outOfStock = 0;
+  const { data: allProductIds } = await supabase.from("products").select("id");
+  for (const row of allProductIds ?? []) {
+    const stock = stockByProduct.get(row.id) ?? 0;
+    if (stock <= 0) outOfStock += 1;
+  }
+
   return {
     total,
     active,
@@ -102,6 +220,8 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
     categoriesCount: categoriesCountResult.count ?? 0,
     uncategorized,
     categoryCounts,
+    outOfStock,
+    inventoryValue,
   };
 }
 
@@ -113,7 +233,7 @@ export async function getProductById(
   const { data } = await supabase
     .from("products")
     .select(
-      "id,name,description,category_id,image_url,is_active,use_smart_pricing,created_at,categories(id,name,parent_id,image_url,created_at)",
+      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -208,6 +328,7 @@ export async function insertProduct(input: {
   name: string;
   description: string | null;
   categoryId: string | null;
+  brandId: string | null;
   imageUrl: string | null;
 }): Promise<string> {
   await requireAdminOrManagerProfile();
@@ -218,6 +339,7 @@ export async function insertProduct(input: {
       name: input.name,
       description: input.description,
       category_id: input.categoryId,
+      brand_id: input.brandId,
       image_url: input.imageUrl,
       is_active: true,
     })
@@ -233,6 +355,7 @@ export async function updateProductById(
     name: string;
     description: string | null;
     categoryId: string | null;
+    brandId: string | null;
     imageUrl: string | null;
   },
 ): Promise<void> {
@@ -244,6 +367,7 @@ export async function updateProductById(
       name: input.name,
       description: input.description,
       category_id: input.categoryId,
+      brand_id: input.brandId,
       image_url: input.imageUrl,
     })
     .eq("id", id);
@@ -257,6 +381,31 @@ export async function setProductActive(id: string, isActive: boolean): Promise<v
     .from("products")
     .update({ is_active: isActive })
     .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function setProductsActiveByIds(
+  ids: string[],
+  isActive: boolean,
+): Promise<void> {
+  if (ids.length === 0) return;
+
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("products")
+    .update({ is_active: isActive })
+    .in("id", ids);
+  if (error) throw new Error(error.message);
+}
+
+export async function updateProductSpecs(
+  id: string,
+  specs: Record<string, string>,
+): Promise<void> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("products").update({ specs }).eq("id", id);
   if (error) throw new Error(error.message);
 }
 

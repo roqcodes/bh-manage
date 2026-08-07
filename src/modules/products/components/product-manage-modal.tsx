@@ -15,7 +15,8 @@ import {
   Trash2,
 } from "lucide-react";
 
-import type { Category, ProductVariant, ProductWithCategory } from "@/common/admin/types";
+import type { Brand, Category, ProductVariant, ProductWithCategory } from "@/common/admin/types";
+import { formatCategoryOptionLabel } from "@/modules/products/lib/categories.utils";
 import {
   createProductAction,
   updateProductAction,
@@ -50,6 +51,7 @@ type ProductDraft = {
   name: string;
   description: string;
   categoryId: string | null;
+  brandId: string | null;
 };
 
 type VariantDraft = {
@@ -96,6 +98,7 @@ function emptyProductDraft(product?: ProductWithCategory): ProductDraft {
     name: product?.name ?? "",
     description: product?.description ?? "",
     categoryId: product?.category_id ?? null,
+    brandId: product?.brand_id ?? null,
   };
 }
 
@@ -104,6 +107,7 @@ function productDraftFromProduct(product: ProductWithCategory): ProductDraft {
     name: product.name ?? "",
     description: product.description ?? "",
     categoryId: product.category_id ?? null,
+    brandId: product.brand_id ?? null,
   };
 }
 
@@ -184,6 +188,7 @@ async function syncProductCatalogImage(
     name: detail.product.name ?? "",
     description: detail.product.description ?? "",
     categoryId: detail.product.category_id,
+    brandId: detail.product.brand_id,
     imageUrl: catalogImageFromVariantRows(detail.variants ?? []),
   });
   await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
@@ -634,14 +639,18 @@ function ReviewStep({
   productDraft,
   variantDrafts,
   categories,
+  brands,
 }: {
   productDraft: ProductDraft;
   variantDrafts: VariantDraft[];
   categories: Category[];
+  brands: Brand[];
 }) {
   const categoryName =
     categories.find((c) => c.id === productDraft.categoryId)?.name ??
     "Uncategorized";
+  const brandName =
+    brands.find((b) => b.id === productDraft.brandId)?.name ?? null;
 
   const previewUrl = catalogImageFromVariants(variantDrafts);
   const skuCount = variantDrafts.length;
@@ -657,7 +666,10 @@ function ReviewStep({
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-slate-900">{productDraft.name}</p>
-              <p className="mt-0.5 text-xs text-slate-500">{categoryName}</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {brandName ? `${brandName} · ` : ""}
+                {categoryName}
+              </p>
               <p className="mt-1 text-xs font-semibold tabular-nums text-slate-700">{priceLabel}</p>
               <p className="mt-0.5 text-[10px] font-medium text-slate-400">
                 {skuCount} SKU{skuCount !== 1 ? "s" : ""}
@@ -1032,17 +1044,19 @@ function EditVariantsStep({
 function DetailsStepForm({
   draft,
   categories,
+  brands,
   onDraftChange,
   error,
 }: {
   draft: ProductDraft;
   categories: Category[];
+  brands: Brand[];
   onDraftChange: (next: ProductDraft) => void;
   error: string | null;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
-      <div className="mx-auto w-full max-w-2xl space-y-3">
+      <div className="w-full space-y-3">
         <CompactField label="Product name">
           <input
             className={compactInputCls}
@@ -1064,7 +1078,24 @@ function DetailsStepForm({
             <option value="">None</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {formatCategoryOptionLabel(c, categories)}
+              </option>
+            ))}
+          </select>
+        </CompactField>
+
+        <CompactField label="Brand">
+          <select
+            className={compactSelectCls}
+            value={draft.brandId ?? ""}
+            onChange={(e) =>
+              onDraftChange({ ...draft, brandId: e.target.value || null })
+            }
+          >
+            <option value="">None</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name ?? "Unnamed"}
               </option>
             ))}
           </select>
@@ -1094,11 +1125,13 @@ export function ProductManageModal({
   mode,
   product,
   categories,
+  brands,
   onClose,
 }: {
   mode: "create" | "edit";
   product?: ProductWithCategory;
   categories: Category[];
+  brands: Brand[];
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -1139,6 +1172,7 @@ export function ProductManageModal({
     product?.name,
     product?.description,
     product?.category_id,
+    product?.brand_id,
   ]);
 
   const detailsValid = productDraft.name.trim().length > 0;
@@ -1183,6 +1217,7 @@ export function ProductManageModal({
             name: productDraft.name.trim(),
             description: productDraft.description.trim(),
             categoryId: productDraft.categoryId,
+            brandId: productDraft.brandId,
             imageUrl: catalogImageFromVariantRows(variants),
           });
           await queryClient.invalidateQueries({
@@ -1226,6 +1261,7 @@ export function ProductManageModal({
           name: productDraft.name.trim(),
           description: productDraft.description.trim(),
           categoryId: productDraft.categoryId,
+          brandId: productDraft.brandId,
           imageUrl: catalogImage,
         });
 
@@ -1286,6 +1322,7 @@ export function ProductManageModal({
               <DetailsStepForm
                 draft={productDraft}
                 categories={categories}
+                brands={brands}
                 onDraftChange={setProductDraft}
                 error={error}
               />
@@ -1310,6 +1347,7 @@ export function ProductManageModal({
                 productDraft={productDraft}
                 variantDrafts={variantDrafts}
                 categories={categories}
+                brands={brands}
               />
             ) : null}
 

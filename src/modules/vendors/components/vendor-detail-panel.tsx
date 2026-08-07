@@ -1,23 +1,35 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import type { ComponentType, ReactNode } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence } from "framer-motion";
 import {
-  Plus,
-  Pencil,
-  Trash2,
-  Package,
-  Building2,
-  Sparkles,
-  Warehouse,
   AlertTriangle,
-  ToggleLeft,
-  ToggleRight,
+  Building2,
+  Package,
+  Pencil,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
 import type { Vendor, VendorProductWithVariant, VariantWithProduct } from "@/common/admin/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   assignVariantToVendorAction,
   updateVendorProductAction,
@@ -38,127 +50,31 @@ import {
 } from "@/modules/admin/components/modal";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 
-const BRAND = "#2563EB";
-
-const CARD =
-  "relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]";
-
-const VENDOR_TINTS = [
-  "linear-gradient(135deg, #e0e7ff, #c7d2fe)",
-  "linear-gradient(135deg, #fce8ec, #e9b8c4)",
-  "linear-gradient(135deg, #d1fae5, #a7f3d0)",
-  "linear-gradient(135deg, #fef9c3, #fde68a)",
-];
-
-function tintFor(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return VENDOR_TINTS[h % VENDOR_TINTS.length];
+function formatInr(n: number) {
+  return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
-function SectionEyebrow({
-  icon: Icon,
-  children,
-  trailing,
-}: {
-  icon?: ComponentType<{ className?: string }>;
-  children: ReactNode;
-  trailing?: ReactNode;
-}) {
-  return (
-    <div className="mb-4 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2.5">
-        {Icon ? (
-          <span className="flex size-6 items-center justify-center rounded-md border border-slate-200/70 bg-slate-50 text-slate-500 shadow-sm shadow-slate-900/[0.03] ring-1 ring-white/80">
-            <Icon className="size-3" aria-hidden />
-          </span>
-        ) : null}
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-          {children}
-        </h2>
-      </div>
-      {trailing ? <div className="shrink-0">{trailing}</div> : null}
-    </div>
-  );
-}
-
-function TintIconBadge({
-  tint,
-  children,
-}: {
-  tint: string;
-  children: ReactNode;
-}) {
-  return (
-    <span className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/55 bg-white/90 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <span
-        className="pointer-events-none absolute inset-0 opacity-[0.35]"
-        style={{ background: tint }}
-        aria-hidden
-      />
-      <span className="relative text-slate-500 [&_svg]:size-4">{children}</span>
-    </span>
-  );
-}
-
-function TrendChip({
-  tone,
-  children,
-}: {
-  tone: "up" | "down" | "neutral";
-  children: ReactNode;
-}) {
-  const tones = {
-    up: "bg-emerald-50/80 text-emerald-700/90 ring-emerald-500/[0.08]",
-    down: "bg-rose-50/80 text-rose-700/90 ring-rose-500/[0.08]",
-    neutral: "bg-slate-100/90 text-slate-600/90 ring-slate-900/[0.05]",
-  } as const;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums ring-1 ${tones[tone]}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-function KpiCard({
-  label,
+function GlanceMetricCard({
+  title,
   value,
-  delta,
-  icon: Icon,
-  tint,
+  description,
 }: {
-  label: string;
+  title: string;
   value: ReactNode;
-  delta?: ReactNode;
-  icon: ComponentType<{ className?: string }>;
-  tint: string;
+  description?: ReactNode;
 }) {
   return (
-    <div
-      className={`group ${CARD} p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]`}
-    >
-      <div
-        className="pointer-events-none absolute -right-8 -top-8 size-28 rounded-full opacity-[0.07] blur-2xl transition-opacity group-hover:opacity-[0.11]"
-        style={{ background: tint }}
-        aria-hidden
-      />
-      <div className="relative flex items-start justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            {label}
-          </p>
-          <div className="mt-2 text-2xl font-bold tabular-nums leading-none tracking-tight text-slate-900">
-            {value}
-          </div>
-        </div>
-        <TintIconBadge tint={tint}>
-          <Icon aria-hidden />
-        </TintIconBadge>
-      </div>
-      {delta ? <div className="relative mt-3">{delta}</div> : null}
-    </div>
+    <Card size="sm" className="border border-border ring-0">
+      <CardHeader className="border-b border-border pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-1 pt-3">
+        <div className="text-2xl font-semibold tabular-nums">{value}</div>
+        {description ? (
+          <CardDescription className="text-xs">{description}</CardDescription>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -345,7 +261,7 @@ function EditVPForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+      <p className="rounded-lg bg-muted px-3 py-2 text-sm font-medium">
         {vp.product_variants?.products?.name ?? "—"} · {vp.product_variants?.name ?? "—"}
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -382,91 +298,74 @@ function EditVPForm({
   );
 }
 
-function SupplyLineCard({
+function SupplyLineTableRow({
   vp,
-  isPending,
+  disabled,
   onEdit,
   onRemove,
 }: {
   vp: VendorProductWithVariant;
-  isPending: boolean;
+  disabled: boolean;
   onEdit: () => void;
   onRemove: () => void;
 }) {
-  const tint = "linear-gradient(135deg, #e0e7ff, #c7d2fe)";
   const stock = Math.max(0, Math.floor(Number(vp.stock ?? 0)));
   const low = stock < 10;
+  const productName = vp.product_variants?.products?.name ?? "—";
+  const variantName = vp.product_variants?.name ?? "—";
 
   return (
-    <div
-      className={`group ${CARD} flex flex-col p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_14px_-4px_rgba(15,23,42,0.1),0_28px_50px_-24px_rgba(15,23,42,0.16)]`}
-    >
-      <div
-        className="pointer-events-none absolute -right-6 -top-6 size-24 rounded-full opacity-[0.08] blur-2xl transition-opacity group-hover:opacity-[0.14]"
-        style={{ background: tint }}
-        aria-hidden
-      />
-      <p className="relative text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-        Variant
-      </p>
-      <p className="relative mt-1 text-[15px] font-semibold leading-snug text-slate-900">
-        {vp.product_variants?.name ?? "—"}
-      </p>
-      <p className="relative mt-0.5 text-[13px] font-medium text-slate-500">
-        {vp.product_variants?.products?.name ?? "—"}
-      </p>
-
-      <div className="relative mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-            Base price
-          </p>
-          <p className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">
-            ₹{vp.base_price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
+    <TableRow>
+      <TableCell className="font-medium">{productName}</TableCell>
+      <TableCell>{variantName}</TableCell>
+      <TableCell className="tabular-nums">{formatInr(vp.base_price)}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <span className={`tabular-nums ${low ? "font-medium text-amber-700" : ""}`}>
+            {stock.toLocaleString("en-IN")}
+          </span>
+          {low ? (
+            <Badge
+              variant="outline"
+              className="border-amber-200 bg-amber-50 text-amber-800"
+            >
+              <AlertTriangle data-icon="inline-start" />
+              Low
+            </Badge>
+          ) : null}
         </div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-            Stock
-          </p>
-          <p
-            className={`mt-0.5 text-lg font-bold tabular-nums ${low ? "text-amber-700" : "text-slate-900"}`}
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={onEdit}
+            aria-label={`Edit ${variantName}`}
           >
-            {stock.toLocaleString("en-IN")}{" "}
-            <span className="text-[12px] font-medium text-slate-500">units</span>
-          </p>
+            <Pencil />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            disabled={disabled}
+            onClick={onRemove}
+            aria-label={`Remove ${variantName}`}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 />
+          </Button>
         </div>
-      </div>
-
-      {low ? (
-        <div className="relative mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50/80 px-2.5 py-1.5 text-[11px] font-medium text-amber-900 ring-1 ring-amber-200/50">
-          <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
-          Low stock (under 10 units)
-        </div>
-      ) : null}
-
-      <div className="relative mt-4 flex gap-2">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200/80 bg-white py-2.5 text-[12px] font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-        >
-          <Pencil className="size-3.5" />
-          Edit
-        </button>
-        <button
-          type="button"
-          disabled={isPending}
-          onClick={onRemove}
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-rose-100 bg-rose-50/80 text-rose-500 transition hover:border-rose-200 hover:bg-rose-100 disabled:opacity-50"
-          title="Remove supply line"
-        >
-          <Trash2 className="size-3.5" />
-        </button>
-      </div>
-    </div>
+      </TableCell>
+    </TableRow>
   );
 }
+
+type DetailModal =
+  | { kind: "assign" }
+  | { kind: "editVendor" }
+  | { kind: "editSupplyLine"; vp: VendorProductWithVariant }
+  | null;
 
 export function VendorDetailPanel({
   vendor,
@@ -479,13 +378,7 @@ export function VendorDetailPanel({
 }) {
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
-  const [modal, setModal] = useState<
-    "assign" | "editVendor" | VendorProductWithVariant | null
-  >(null);
-
-  function isVpModal(m: typeof modal): m is VendorProductWithVariant {
-    return m !== null && typeof m === "object";
-  }
+  const [modal, setModal] = useState<DetailModal>(null);
 
   const metrics = useMemo(() => {
     let totalStock = 0;
@@ -525,240 +418,184 @@ export function VendorDetailPanel({
     });
   }
 
-  const active = vendor.is_active ?? false;
-  const tint = tintFor(vendor.id);
-  const initial = (vendor.name?.trim()?.charAt(0) ?? "?").toUpperCase();
+  const isActive = vendor.is_active ?? false;
   const shortId = vendor.id.slice(0, 8).toUpperCase();
 
   return (
     <>
-      <AnimatePresence>
-        {modal === "assign" && (
-          <Modal title="Assign Variant" onClose={() => setModal(null)}>
-            <AssignForm
-              vendorId={vendor.id}
-              availableVariants={availableVariants}
-              onClose={() => setModal(null)}
-            />
-          </Modal>
-        )}
-        {modal === "editVendor" && (
-          <Modal title="Edit Vendor" onClose={() => setModal(null)} size="sm">
-            <VendorEditForm vendor={vendor} onClose={() => setModal(null)} />
-          </Modal>
-        )}
-        {isVpModal(modal) && (
-          <Modal title="Edit Supply Entry" onClose={() => setModal(null)} size="sm">
-            <EditVPForm vp={modal} vendorId={vendor.id} onClose={() => setModal(null)} />
-          </Modal>
-        )}
-      </AnimatePresence>
+      {modal?.kind === "assign" && (
+        <Modal title="Assign Variant" onClose={() => setModal(null)}>
+          <AssignForm
+            vendorId={vendor.id}
+            availableVariants={availableVariants}
+            onClose={() => setModal(null)}
+          />
+        </Modal>
+      )}
+      {modal?.kind === "editVendor" && (
+        <Modal title="Edit Vendor" onClose={() => setModal(null)} size="sm">
+          <VendorEditForm vendor={vendor} onClose={() => setModal(null)} />
+        </Modal>
+      )}
+      {modal?.kind === "editSupplyLine" && (
+        <Modal title="Edit Supply Entry" onClose={() => setModal(null)} size="sm">
+          <EditVPForm
+            vp={modal.vp}
+            vendorId={vendor.id}
+            onClose={() => setModal(null)}
+          />
+        </Modal>
+      )}
 
-      <div className="space-y-4 lg:space-y-5">
-        <div className={`${CARD} overflow-hidden`}>
-          <div className="grid gap-0 lg:grid-cols-[288px_1fr]">
-            <div className="relative h-[200px] w-full shrink-0 overflow-hidden border-b border-slate-100 sm:h-[220px] lg:h-72 lg:w-72 lg:border-b-0 lg:border-e">
-              <div
-                className="absolute inset-0 opacity-[0.22]"
-                style={{ background: tint }}
-                aria-hidden
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="flex size-24 items-center justify-center rounded-2xl border border-white/60 bg-white/95 text-4xl font-bold text-slate-600 shadow-md">
-                  {initial}
-                </span>
-              </div>
+      <div className="flex flex-col gap-3">
+        <Card className="border border-border ring-0">
+          <CardContent className="flex flex-col gap-3 py-3 lg:flex-row lg:items-start">
+            <div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+              <Building2 aria-hidden />
             </div>
-            <div className="flex flex-col justify-between p-6 sm:p-8">
-              <div>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ${
-                      active
-                        ? "bg-emerald-50/90 text-emerald-800 ring-emerald-500/15"
-                        : "bg-slate-100/90 text-slate-600 ring-slate-200/60"
-                    }`}
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {isActive ? (
+                  <Badge
+                    variant="outline"
+                    className="border-emerald-200 bg-emerald-50 text-emerald-700"
                   >
-                    <span
-                      className={`size-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-slate-400"}`}
-                    />
-                    {active ? "Active" : "Paused"}
-                  </span>
-                </div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-                  {vendor.name ?? "Unnamed vendor"}
-                </h1>
-                {vendor.contact?.trim() ? (
-                  <p className="mt-2 text-sm font-medium text-slate-600">{vendor.contact}</p>
+                    Active
+                  </Badge>
                 ) : (
-                  <p className="mt-2 text-sm font-medium italic text-slate-400">
-                    No contact on file.
-                  </p>
+                  <Badge variant="secondary">Inactive</Badge>
                 )}
-                <p className="mt-3 font-mono text-[11px] font-medium text-slate-400">
-                  ID · {shortId}…
-                </p>
               </div>
-
-              <div className="mt-6 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={isPending}
-                  onClick={handleToggle}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-[12.5px] font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {active ? (
-                    <ToggleRight className="size-4 text-emerald-600" />
-                  ) : (
-                    <ToggleLeft className="size-4 text-slate-400" />
-                  )}
-                  {active ? "Deactivate" : "Activate"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModal("editVendor")}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-[12.5px] font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <Pencil className="size-3.5" />
-                  Edit details
-                </button>
-                {availableVariants.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setModal("assign")}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] font-semibold text-white shadow-[0_10px_22px_-8px_rgba(37,99,235,0.5)] transition hover:shadow-[0_14px_28px_-8px_rgba(37,99,235,0.55)]"
-                    style={{
-                      background: `linear-gradient(135deg, ${BRAND}, #b5102f)`,
-                    }}
-                  >
-                    <Plus className="size-4" />
-                    Assign variant
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <section aria-label="Vendor summary">
-          <SectionEyebrow
-            icon={Sparkles}
-            trailing={
-              <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                Supply · snapshot
-              </span>
-            }
-          >
-            At a glance
-          </SectionEyebrow>
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-            <KpiCard
-              label="Supply lines"
-              value={metrics.lines.toLocaleString("en-IN")}
-              icon={Package}
-              tint="linear-gradient(135deg, #e0e7ff, #c7d2fe)"
-              delta={
-                <TrendChip tone={metrics.lines > 0 ? "up" : "neutral"}>
-                  Variants linked to this vendor
-                </TrendChip>
-              }
-            />
-            <KpiCard
-              label="Listed stock"
-              value={metrics.totalStock.toLocaleString("en-IN")}
-              icon={Warehouse}
-              tint="linear-gradient(135deg, #d1fae5, #a7f3d0)"
-              delta={
-                <TrendChip tone={metrics.totalStock > 0 ? "up" : "neutral"}>
-                  Units across supply lines
-                </TrendChip>
-              }
-            />
-            <KpiCard
-              label="Low stock lines"
-              value={metrics.lowStockLines.toLocaleString("en-IN")}
-              icon={AlertTriangle}
-              tint="linear-gradient(135deg, #fef9c3, #fde68a)"
-              delta={
-                <TrendChip tone={metrics.lowStockLines > 0 ? "down" : "neutral"}>
-                  Under 10 units on a line
-                </TrendChip>
-              }
-            />
-            <KpiCard
-              label="Assignable variants"
-              value={metrics.assignable.toLocaleString("en-IN")}
-              icon={Building2}
-              tint="linear-gradient(135deg, #fce8ec, #e9b8c4)"
-              delta={
-                <TrendChip tone="neutral">
-                  Catalog SKUs not yet linked here
-                </TrendChip>
-              }
-            />
-          </div>
-        </section>
-
-        <section aria-label="Supply lines">
-          <SectionEyebrow
-            icon={Package}
-            trailing={
-              availableVariants.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setModal("assign")}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold text-[color:var(--brand)] transition hover:bg-[color:var(--brand)]/8"
-                  style={{ ["--brand" as string]: BRAND }}
-                >
-                  <Plus className="size-3" />
-                  Assign variant
-                </button>
-              ) : null
-            }
-          >
-            Supply lines · {vendorProducts.length}
-          </SectionEyebrow>
-
-          {vendorProducts.length === 0 ? (
-            <div
-              className={`flex flex-col items-center gap-3 px-6 py-16 text-center ${CARD}`}
-            >
-              <Package className="size-12 text-slate-200" />
-              <p className="max-w-sm text-sm font-medium text-slate-500">
-                No variants assigned yet. Link catalog SKUs with base price and stock.
+              <h1 className="mt-2 text-2xl font-semibold">
+                {vendor.name ?? "Unnamed vendor"}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {vendor.contact?.trim() || "No contact on file."}
               </p>
+              <p className="mt-2 text-sm text-muted-foreground">ID · {shortId}…</p>
+            </div>
+
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Button variant="outline" disabled={isPending} onClick={handleToggle}>
+                {isActive ? "Deactivate" : "Activate"}
+              </Button>
+              <Button variant="outline" onClick={() => setModal({ kind: "editVendor" })}>
+                <Pencil data-icon="inline-start" />
+                Edit details
+              </Button>
               {availableVariants.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setModal("assign")}
-                  className="mt-2 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white shadow-[0_10px_22px_-8px_rgba(37,99,235,0.5)] transition hover:shadow-[0_14px_28px_-8px_rgba(37,99,235,0.55)]"
-                  style={{
-                    background: `linear-gradient(135deg, ${BRAND}, #b5102f)`,
-                  }}
-                >
-                  <Plus className="size-4" />
-                  Assign first variant
-                </button>
+                <Button onClick={() => setModal({ kind: "assign" })}>
+                  <Plus data-icon="inline-start" />
+                  Assign variant
+                </Button>
               ) : null}
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3">
-              {vendorProducts.map((vp) => (
-                <SupplyLineCard
-                  key={vp.id}
-                  vp={vp}
-                  isPending={isPending}
-                  onEdit={() => setModal(vp)}
-                  onRemove={() => handleRemove(vp.id)}
-                />
-              ))}
-            </div>
-          )}
+          </CardContent>
+        </Card>
+
+        <section aria-label="Vendor summary">
+          <p className="mb-3 text-sm font-medium">At a glance</p>
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+            <GlanceMetricCard
+              title="Supply lines"
+              value={metrics.lines.toLocaleString("en-IN")}
+              description={
+                metrics.lines > 0
+                  ? "Variants linked to this vendor"
+                  : "No supply lines yet"
+              }
+            />
+            <GlanceMetricCard
+              title="Listed stock"
+              value={metrics.totalStock.toLocaleString("en-IN")}
+              description={
+                metrics.totalStock > 0
+                  ? "Units across supply lines"
+                  : "No stock listed"
+              }
+            />
+            <GlanceMetricCard
+              title="Low stock lines"
+              value={metrics.lowStockLines.toLocaleString("en-IN")}
+              description={
+                metrics.lowStockLines > 0
+                  ? "Under 10 units on a line"
+                  : "All lines adequately stocked"
+              }
+            />
+            <GlanceMetricCard
+              title="Assignable variants"
+              value={metrics.assignable.toLocaleString("en-IN")}
+              description={
+                metrics.assignable > 0
+                  ? "Catalog SKUs not yet linked here"
+                  : "All variants assigned"
+              }
+            />
+          </div>
         </section>
 
-        <footer className="pt-1 text-center text-[10px] font-medium uppercase tracking-[0.16em] text-slate-300">
-          BuyHub · Vendor detail
-        </footer>
+        <Card className="border border-border ring-0">
+          <CardHeader className="border-b border-border">
+            <CardTitle>Supply lines</CardTitle>
+            <CardDescription>
+              {vendorProducts.length} line{vendorProducts.length !== 1 ? "s" : ""}. Manage base
+              price and stock for each variant this vendor supplies.
+            </CardDescription>
+            {availableVariants.length > 0 ? (
+              <CardAction>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setModal({ kind: "assign" })}
+                >
+                  <Plus data-icon="inline-start" />
+                  Assign variant
+                </Button>
+              </CardAction>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            {vendorProducts.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 py-8 text-center">
+                <Package className="text-muted-foreground" aria-hidden />
+                <p className="max-w-sm text-sm text-muted-foreground">
+                  No variants assigned yet. Link catalog SKUs with base price and stock.
+                </p>
+                {availableVariants.length > 0 ? (
+                  <Button onClick={() => setModal({ kind: "assign" })}>
+                    <Plus data-icon="inline-start" />
+                    Assign first variant
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Product</TableHead>
+                    <TableHead>Variant</TableHead>
+                    <TableHead>Base price</TableHead>
+                    <TableHead>Stock</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {vendorProducts.map((vp) => (
+                    <SupplyLineTableRow
+                      key={vp.id}
+                      vp={vp}
+                      disabled={isPending}
+                      onEdit={() => setModal({ kind: "editSupplyLine", vp })}
+                      onRemove={() => handleRemove(vp.id)}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </>
   );

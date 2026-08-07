@@ -248,7 +248,7 @@ export function ProductPricingSection({
               <Badge variant="secondary">Beta</Badge>
             </div>
             <FieldDescription className="text-sm">
-              Admin-only cost and margin suggestions. Does not change customer prices until you
+              Dynamic cost and margin suggestions. Does not change customer prices until you
               apply list prices.
             </FieldDescription>
             <div className="mt-1 flex flex-wrap items-center gap-2">

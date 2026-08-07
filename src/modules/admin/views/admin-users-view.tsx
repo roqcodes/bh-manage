@@ -3,15 +3,22 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 
 import type { AdminUser, DBUser } from "@/common/admin/types";
-import { PageHeader } from "@/modules/admin/components/page-header";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
-import { StoresPanel } from "@/modules/users/components/stores-panel";
-import { PortalStaffPanel } from "@/modules/users/components/portal-staff-panel";
-import { AccessRequestsPanel } from "@/modules/users/components/access-requests-panel";
+import { UsersListPanel } from "@/modules/users/components/users-list-panel";
+import { UsersMetricsBar } from "@/modules/users/components/users-metrics-bar";
+import {
+  exportPendingUsersCsv,
+  exportPortalUsersCsv,
+  exportStoresUsersCsv,
+} from "@/modules/users/components/users-data-table";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import type { UserCatalogStats } from "@/modules/users/services/users.service";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const USER_SEGMENTS = [
   { id: "stores", label: "Stores" },
@@ -28,6 +35,56 @@ type UsersApiContent =
   | { kind: "vendor"; data: DBUser[]; total: number }
   | { kind: "delivery"; data: DBUser[]; total: number }
   | { kind: "admin"; data: DBUser[]; total: number };
+
+function TabLink({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      className={cn(
+        "inline-flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition",
+        active
+          ? "bg-background text-foreground shadow-sm"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function SegmentLink({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      className={cn(
+        "inline-flex min-w-[88px] flex-1 items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition",
+        active
+          ? "bg-accent text-foreground"
+          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function AdminUsersView() {
   const searchParams = useSearchParams();
@@ -55,6 +112,7 @@ export function AdminUsersView() {
         primary: "users" | "requests";
         segment: UserSegment;
         page: number;
+        stats: UserCatalogStats;
         content: UsersApiContent;
       }>(`users?${q.toString()}`);
     },
@@ -64,118 +122,79 @@ export function AdminUsersView() {
   if (isPending && !data) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="px-3 py-6 text-sm font-semibold text-red-600 sm:px-4">
-        {error instanceof Error ? error.message : "Failed to load users."}
+      <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4">
+        <div className="flex items-start gap-3 rounded-xl border border-rose-200/60 bg-rose-50/40 p-5">
+          <AlertTriangle className="size-5 shrink-0 text-rose-600" />
+          <div>
+            <p className="text-sm font-semibold text-rose-900">
+              Failed to load users.
+            </p>
+            <p className="mt-1 text-sm text-rose-700">
+              {error instanceof Error ? error.message : "Unknown error."}
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
   if (!data) return <AdminPageSkeleton />;
 
-  const { pendingCount, content } = data;
-  const subtitle =
-    primary === "requests"
-      ? "Review and approve portal access requests."
-      : "Retail store customers and verified portal staff.";
+  const { pendingCount, stats, content } = data;
 
   function segmentHref(seg: UserSegment) {
     const q = new URLSearchParams({ tab: "users", segment: seg });
     return `/admin/users?${q.toString()}`;
   }
 
-  return (
-    <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-5 sm:py-4">
-      <PageHeader title="Users" subtitle={subtitle} />
+  function handleExport() {
+    if (content.kind === "requests") {
+      exportPendingUsersCsv(content.pending);
+      return;
+    }
+    if (content.kind === "stores") {
+      exportStoresUsersCsv(content.data);
+      return;
+    }
+    exportPortalUsersCsv(content.data, content.kind);
+  }
 
-      <div className="mb-4 flex gap-1 rounded-2xl bg-slate-100 p-1">
-        <Link
-          href={`/admin/users?tab=users&segment=${segment}`}
-          scroll={false}
-          className={[
-            "flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-center text-sm font-bold transition",
-            primary === "users"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-500 hover:text-slate-700",
-          ].join(" ")}
-        >
+  return (
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-3 py-3 sm:px-4 sm:py-4">
+      <UsersMetricsBar stats={stats} onExport={handleExport} />
+
+      <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
+        <TabLink href={`/admin/users?tab=users&segment=${segment}`} active={primary === "users"}>
           Users
-        </Link>
-        <Link
-          href="/admin/users?tab=requests"
-          scroll={false}
-          className={[
-            "flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-center text-sm font-bold transition",
-            primary === "requests"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-500 hover:text-slate-700",
-          ].join(" ")}
-        >
+        </TabLink>
+        <TabLink href="/admin/users?tab=requests" active={primary === "requests"}>
           Requests
-          {pendingCount > 0 && (
-            <span className="rounded-full bg-[#2563EB] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+          {pendingCount > 0 ? (
+            <Badge variant="secondary" className="tabular-nums">
               {pendingCount}
-            </span>
-          )}
-        </Link>
+            </Badge>
+          ) : null}
+        </TabLink>
       </div>
 
-      {primary === "users" && (
-        <div className="mb-6 flex min-w-0 flex-wrap gap-1 rounded-2xl border border-slate-100 bg-white p-1 shadow-sm">
+      {primary === "users" ? (
+        <div className="flex min-w-0 flex-wrap gap-1 rounded-lg border border-border bg-background p-1">
           {USER_SEGMENTS.map((s) => (
-            <Link
+            <SegmentLink
               key={s.id}
               href={segmentHref(s.id)}
-              scroll={false}
-              className={[
-                "min-w-[100px] flex-1 rounded-xl px-4 py-2 text-center text-sm font-bold transition",
-                segment === s.id
-                  ? "bg-[#2563EB]/10 text-[#2563EB]"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700",
-              ].join(" ")}
+              active={segment === s.id}
             >
               {s.label}
-            </Link>
+            </SegmentLink>
           ))}
         </div>
-      )}
+      ) : null}
 
-      {content.kind === "stores" && (
-        <StoresPanel
-          users={content.data}
-          total={content.total}
-          page={page}
-        />
-      )}
-
-      {content.kind === "vendor" && (
-        <PortalStaffPanel
-          users={content.data}
-          total={content.total}
-          page={page}
-          segment="vendor"
-        />
-      )}
-
-      {content.kind === "delivery" && (
-        <PortalStaffPanel
-          users={content.data}
-          total={content.total}
-          page={page}
-          segment="delivery"
-        />
-      )}
-
-      {content.kind === "admin" && (
-        <PortalStaffPanel
-          users={content.data}
-          total={content.total}
-          page={page}
-          segment="admin"
-        />
-      )}
-
-      {content.kind === "requests" && (
-        <AccessRequestsPanel pendingUsers={content.pending} />
-      )}
+      <UsersListPanel
+        content={content}
+        segment={primary === "requests" ? "requests" : segment}
+        page={page}
+      />
     </div>
   );
 }

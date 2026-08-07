@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 import { getProductPricingRule } from "@/modules/pricing/services/pricing.service";
 import { getCategories } from "@/modules/products/services/categories.service";
+import { getBrands } from "@/modules/products/services/brands.service";
 import { getProductAtGlanceMetrics } from "@/modules/products/services/product-at-glance.service";
 import {
   getProductById,
@@ -18,10 +19,11 @@ export async function GET(
 
   const { id } = await params;
 
-  const [product, variants, categories, pricingRule] = await Promise.all([
+  const [product, variants, categories, brands, pricingRule] = await Promise.all([
     getProductById(id),
     getProductVariants(id),
     getCategories(),
+    getBrands(),
     getProductPricingRule(id),
   ]);
 
@@ -35,5 +37,5 @@ export async function GET(
     product.use_smart_pricing === true,
   );
 
-  return NextResponse.json({ product, variants, categories, pricingRule, glance });
+  return NextResponse.json({ product, variants, categories, brands, pricingRule, glance });
 }

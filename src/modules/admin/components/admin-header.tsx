@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { format } from "date-fns";
-import { PanelLeft, PanelLeftClose, Search } from "lucide-react";
+import { PanelLeft, PanelLeftClose } from "lucide-react";
+
+import { AdminSearchTrigger } from "@/modules/admin/components/admin-global-search";
 
 type AdminHeaderProps = {
   sidebarCollapsed: boolean;
@@ -18,7 +19,6 @@ export function AdminHeader({
   isMdViewport,
   onToggleSidebar,
 }: AdminHeaderProps) {
-  const [query, setQuery] = useState("");
   const now = new Date();
 
   const day = format(now, "d");
@@ -87,18 +87,8 @@ export function AdminHeader({
 
         <div className="mx-auto w-full max-w-md justify-self-center px-0 md:px-1">
           <label className="relative block w-full">
-            <span className="sr-only">Search</span>
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
-              aria-hidden
-            />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search…"
-              className="h-9 w-full rounded-xl border border-slate-200/80 bg-white/90 pl-10 pr-3 text-sm font-medium text-slate-900 shadow-sm shadow-slate-900/5 outline-none ring-slate-900/5 placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-[#2563EB]/15"
-            />
+            <span className="sr-only">Quick search</span>
+            <AdminSearchTrigger />
           </label>
         </div>
 

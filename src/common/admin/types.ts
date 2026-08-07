@@ -60,8 +60,27 @@ export interface Category {
   id: string;
   name: string | null;
   parent_id: string | null;
+  thumbnail_url: string | null;
   image_url: string | null;
+  sort_order: number | null;
+  is_active: boolean | null;
+  slug: string | null;
+  description: string | null;
   created_at: string | null;
+  updated_at?: string | null;
+}
+
+export interface Brand {
+  id: string;
+  name: string | null;
+  logo_url: string | null;
+  image_url: string | null;
+  sort_order: number | null;
+  is_active: boolean | null;
+  slug: string | null;
+  description: string | null;
+  created_at: string | null;
+  updated_at?: string | null;
 }
 
 export interface Product {
@@ -69,14 +88,40 @@ export interface Product {
   name: string | null;
   description: string | null;
   category_id: string | null;
+  brand_id: string | null;
   image_url: string | null;
   is_active: boolean | null;
   use_smart_pricing: boolean | null;
+  specs: Record<string, string> | null;
   created_at: string | null;
 }
 
 export interface ProductWithCategory extends Product {
   categories: Category | null;
+  brands: Brand | null;
+}
+
+/** List-row aggregates for admin products table (server-computed per page). */
+export interface ProductListSummary {
+  stock_total: number;
+  price_min: number | null;
+  mrp_min: number | null;
+  variant_count: number;
+  sku_label: string | null;
+}
+
+export type ProductWithCategoryListItem = ProductWithCategory & ProductListSummary;
+
+/** Admin products catalog summary (server-computed). */
+export interface ProductCatalogStats {
+  total: number;
+  active: number;
+  inactive: number;
+  categoriesCount: number;
+  uncategorized: number;
+  categoryCounts: Record<string, number>;
+  outOfStock: number;
+  inventoryValue: number;
 }
 
 /** Admin product detail “at a glance” (server-computed). */
@@ -171,12 +216,23 @@ export interface OrderUser {
   phone: string | null;
 }
 
+export interface OrderItemPreview {
+  id: string;
+  product_name: string | null;
+  quantity: number | null;
+}
+
 export interface Order {
   id: string;
   created_at: string | null;
   status: OrderStatus;
+  payment_status: string | null;
   total_amount: number | null;
+  merchant_note: string | null;
   users: OrderUser | null;
+  item_count: number;
+  order_items_preview: OrderItemPreview[];
+  customer_order_count: number;
 }
 
 /** Admin orders list summary (server-computed, all orders). */
@@ -187,6 +243,9 @@ export interface OrderCatalogStats {
   shippedCount: number;
   deliveredCount: number;
   cancelledCount: number;
+  itemsOrdered: number;
+  ordersFulfilled: number;
+  salesReversals: number;
 }
 
 export interface OrderItem {
@@ -203,14 +262,30 @@ export interface OrderItem {
   created_at: string | null;
 }
 
+export interface OrderAddress {
+  label?: string | null;
+  address_line?: string | null;
+  line1?: string | null;
+  line2?: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
 export interface OrderWithItems {
   id: string;
   created_at: string | null;
   status: string;
   payment_status: string | null;
   total_amount: number | null;
+  merchant_note: string | null;
+  address_id: string | null;
   users: OrderUser | null;
+  addresses: OrderAddress | null;
   order_items: OrderItem[];
+  customer_order_count: number;
 }
 
 // ─── Purchase orders (vendor supply) ──────────────────────────────────────────
@@ -279,6 +354,18 @@ export interface DashboardMetrics {
 }
 
 export type DashboardAlertSeverity = "critical" | "warning" | "attention";
+
+/** Sidebar count pill tone (maps to dashboard alert severity). */
+export type AdminNavBadgeTone = "critical" | "warning" | "info";
+
+export interface AdminNavBadge {
+  count: number;
+  tone: AdminNavBadgeTone;
+}
+
+export interface AdminNavBadgesPayload {
+  badges: Record<string, AdminNavBadge>;
+}
 
 export interface DashboardAlert {
   id: string;

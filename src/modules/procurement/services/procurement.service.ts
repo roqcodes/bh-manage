@@ -12,6 +12,7 @@ import type {
   VariantDemandRow,
   VendorProductOffer,
 } from "@/modules/procurement/types";
+import type { ProcurementInsights } from "@/common/admin/types";
 
 /** Order statuses that count toward procurement demand (unfulfilled pipeline). */
 const DEMAND_STATUSES = ["pending", "processing"] as const;
@@ -245,5 +246,49 @@ async function attachProcurementDisplayLabels(plan: ProcurementPlan): Promise<vo
     line.product_name = v?.product_name ?? null;
     line.variant_name = v?.variant_name ?? null;
   }
+}
+
+export async function getProcurementInsights(): Promise<ProcurementInsights> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+
+  const [stockRows, outOfStockResult, lowStockResult, demandRows] =
+    await Promise.all([
+      supabase.from("inventory").select("stock"),
+      supabase
+        .from("inventory")
+        .select("id", { count: "exact", head: true })
+        .lte("stock", 0),
+      supabase
+        .from("inventory")
+        .select("id", { count: "exact", head: true })
+        .gt("stock", 0)
+        .lte("stock", 10),
+      aggregatePendingOrderDemand(),
+    ]);
+
+  const availableInventoryUnits = (stockRows.data ?? []).reduce(
+    (sum, row) => sum + Math.max(0, Math.floor(Number(row.stock ?? 0))),
+    0,
+  );
+
+  const pipelineDemandUnits = demandRows.reduce((s, r) => s + r.demand_qty, 0);
+  const variantIds = demandRows.map((r) => r.variant_id);
+  const stockMap = await getInventoryStockForVariants(variantIds);
+  const demand = new Map(demandRows.map((d) => [d.variant_id, d.demand_qty]));
+  const shortages = computeShortages(demand, stockMap);
+  const shortageUnits = shortages.reduce((s, r) => s + r.shortage_qty, 0);
+
+  const outOfStockCount = outOfStockResult.count ?? 0;
+  const lowStockItems = lowStockResult.count ?? 0;
+
+  return {
+    pipelineDemandUnits,
+    availableInventoryUnits,
+    shortageUnits,
+    pipelineShortageVariants: shortages.length,
+    demandTodayUnits: 0,
+    productsNeedingRestock: outOfStockCount + lowStockItems,
+  };
 }
 

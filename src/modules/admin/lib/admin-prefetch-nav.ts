@@ -26,6 +26,22 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
     });
   }
 
+  if (p === "/admin/categories") {
+    return qc.prefetchQuery({
+      queryKey: ["admin", "categories"],
+      queryFn: () => adminGet("categories"),
+      staleTime: STALE,
+    });
+  }
+
+  if (p === "/admin/brands") {
+    return qc.prefetchQuery({
+      queryKey: ["admin", "brands"],
+      queryFn: () => adminGet("brands"),
+      staleTime: STALE,
+    });
+  }
+
   if (p === "/admin/vendors") {
     return qc.prefetchQuery({
       queryKey: adminQueryKeys.vendors(0),

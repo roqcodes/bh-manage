@@ -1,8 +1,9 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { OrderWithItems } from "@/common/admin/types";
 import { InvoicePrintToolbar } from "@/modules/admin/components/invoice-print-toolbar";
@@ -15,6 +16,59 @@ type OrderDetailPayload = { order: OrderWithItems };
 
 function shortOrderRef(id: string) {
   return id.split("-")[0]?.toUpperCase() ?? id.slice(0, 8);
+}
+
+function AdminOrderInvoiceContent({ order }: { order: OrderWithItems }) {
+  const searchParams = useSearchParams();
+  const [downloading, setDownloading] = useState(false);
+  const autoDownloadedRef = useRef(false);
+
+  const handleDownloadPdf = useCallback(async () => {
+    const element = document.querySelector("[data-invoice-document]");
+    if (!element) return;
+
+    setDownloading(true);
+    try {
+      const html2pdf = (await import("html2pdf.js")).default;
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename: `BuyHub-Invoice-${shortOrderRef(order.id)}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        })
+        .from(element)
+        .save();
+    } finally {
+      setDownloading(false);
+    }
+  }, [order.id]);
+
+  useEffect(() => {
+    if (
+      searchParams.get("download") === "1" &&
+      !autoDownloadedRef.current &&
+      !downloading
+    ) {
+      autoDownloadedRef.current = true;
+      void handleDownloadPdf();
+    }
+  }, [searchParams, downloading, handleDownloadPdf]);
+
+  return (
+    <div className="min-h-0 flex-1 bg-slate-50 print:bg-white">
+      <InvoicePrintToolbar
+        backHref={`/admin/orders/${order.id}`}
+        title={`Order invoice · #${shortOrderRef(order.id)}`}
+        onDownloadPdf={handleDownloadPdf}
+        downloading={downloading}
+      />
+      <div className="pb-10 pt-4 print:pb-0 print:pt-0">
+        <OrderInvoiceDocument order={order} />
+      </div>
+    </div>
+  );
 }
 
 export function AdminOrderInvoicePage() {
@@ -62,17 +116,5 @@ export function AdminOrderInvoicePage() {
     );
   }
 
-  const { order } = data;
-
-  return (
-    <div className="min-h-0 flex-1 bg-slate-50 print:bg-white">
-      <InvoicePrintToolbar
-        backHref={`/admin/orders/${order.id}`}
-        title={`Order invoice · #${shortOrderRef(order.id)}`}
-      />
-      <div className="pb-10 pt-4 print:pb-0 print:pt-0">
-        <OrderInvoiceDocument order={order} />
-      </div>
-    </div>
-  );
+  return <AdminOrderInvoiceContent order={data.order} />;
 }

@@ -122,6 +122,62 @@ export async function getPendingPortalRequestCount(): Promise<number> {
   return count ?? 0;
 }
 
+export interface UserCatalogStats {
+  stores: number;
+  storesActive: number;
+  vendor: number;
+  delivery: number;
+  admin: number;
+  pendingRequests: number;
+}
+
+export async function getUsersCatalogStats(): Promise<UserCatalogStats> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+
+  const [storesRes, storesActiveRes, vendorRes, deliveryRes, adminRes, pendingRes] =
+    await Promise.all([
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .is("role", null),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .is("role", null)
+        .eq("is_verified", true),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "vendor")
+        .eq("is_verified", true),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "delivery")
+        .eq("is_verified", true),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "admin")
+        .eq("is_verified", true),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .in("role", STAFF_ROLES)
+        .eq("is_verified", false),
+    ]);
+
+  return {
+    stores: storesRes.count ?? 0,
+    storesActive: storesActiveRes.count ?? 0,
+    vendor: vendorRes.count ?? 0,
+    delivery: deliveryRes.count ?? 0,
+    admin: adminRes.count ?? 0,
+    pendingRequests: pendingRes.count ?? 0,
+  };
+}
+
 /**
  * Verified delivery riders — call only after `requireAdminApiProfile` in Route Handlers.
  * Reuses an existing server Supabase client to avoid a second SSR client + duplicate RBAC.

@@ -72,7 +72,7 @@ export function AdminOrdersView() {
   if (!data) return <AdminPageSkeleton />;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-3 py-3 sm:px-4 sm:py-4">
+    <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
       <OrdersPanel
         orders={data.data}
         total={data.total}

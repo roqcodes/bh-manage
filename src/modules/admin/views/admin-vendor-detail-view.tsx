@@ -1,8 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import Link from "next/link";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useParams } from "next/navigation";
 
 import type {
@@ -10,6 +9,8 @@ import type {
   VendorProductWithVariant,
   VariantWithProduct,
 } from "@/common/admin/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { VendorDetailPanel } from "@/modules/vendors/components/vendor-detail-panel";
 import { adminGetNullable } from "@/modules/admin/lib/admin-api-client";
@@ -20,6 +21,18 @@ type VendorDetailPayload = {
   vendorProducts: VendorProductWithVariant[];
   availableVariants: VariantWithProduct[];
 };
+
+function VendorDetailNav({ vendorName }: { vendorName?: string | null }) {
+  return (
+    <AdminBreadcrumb
+      backHref="/admin/vendors"
+      items={[
+        { label: "Vendors", href: "/admin/vendors" },
+        { label: vendorName?.trim() || "Vendor" },
+      ]}
+    />
+  );
+}
 
 export function AdminVendorDetailView() {
   const params = useParams();
@@ -36,8 +49,8 @@ export function AdminVendorDetailView() {
 
   if (!id) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] px-3 py-6 sm:px-4">
-        <p className="text-sm font-medium text-slate-600">Missing vendor id.</p>
+      <div className="mx-auto w-full max-w-7xl px-3 py-2.5 sm:px-4">
+        <p className="text-sm text-muted-foreground">Missing vendor id.</p>
       </div>
     );
   }
@@ -45,36 +58,22 @@ export function AdminVendorDetailView() {
   if (isPending && data === undefined) return <AdminPageSkeleton />;
   if (isError) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] px-3 py-6 sm:px-4">
-        <div className="flex items-start gap-3 rounded-2xl border border-rose-200/60 bg-rose-50/40 p-5">
-          <AlertTriangle className="size-5 shrink-0 text-rose-600" />
-          <div>
-            <p className="text-sm font-semibold text-rose-900">
-              Failed to load vendor.
-            </p>
-            <p className="mt-1 text-[13px] font-medium text-rose-700">
-              {error instanceof Error ? error.message : "Unknown error."}
-            </p>
-          </div>
-        </div>
+      <div className="mx-auto w-full max-w-7xl px-3 py-2.5 sm:px-4">
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertTitle>Failed to load vendor</AlertTitle>
+          <AlertDescription>
+            {error instanceof Error ? error.message : "Unknown error."}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
   if (data === null) {
     return (
-      <div className="mx-auto w-full max-w-[1200px] space-y-4 px-3 py-3 sm:px-4 sm:py-4">
-        <Link
-          href="/admin/vendors"
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-[12.5px] font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-        >
-          <ArrowLeft className="size-3.5" aria-hidden />
-          All vendors
-        </Link>
-        <div className="rounded-2xl border border-slate-200/70 bg-white p-10 text-center shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_18px_40px_-24px_rgba(15,23,42,0.14)]">
-          <p className="text-sm font-medium text-slate-500">
-            This vendor could not be found.
-          </p>
-        </div>
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-2.5 sm:px-4">
+        <VendorDetailNav />
+        <p className="text-sm text-muted-foreground">This vendor could not be found.</p>
       </div>
     );
   }
@@ -82,14 +81,8 @@ export function AdminVendorDetailView() {
   const { vendor, vendorProducts, availableVariants } = data;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] space-y-4 px-3 py-3 sm:px-4 sm:py-4">
-      <Link
-        href="/admin/vendors"
-        className="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-[12.5px] font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-      >
-        <ArrowLeft className="size-3.5" aria-hidden />
-        All vendors
-      </Link>
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-2.5 font-sans sm:px-4">
+      <VendorDetailNav vendorName={vendor.name} />
 
       <VendorDetailPanel
         vendor={vendor}
