@@ -152,7 +152,7 @@ async function enrichOrderItems(
   const byVariantId = new Map<string, VariantRowForOrder>();
   const productIds = new Set<string>();
 
-  for (const row of (variantRows ?? []) as VariantRowForOrder[]) {
+  for (const row of (variantRows ?? []) as unknown as VariantRowForOrder[]) {
     byVariantId.set(row.id, row);
     if (row.products?.id) productIds.add(row.products.id);
   }
@@ -179,7 +179,7 @@ async function enrichOrderItems(
     }
   }
 
-  const enrichedItems = items.map((item) => {
+  const enrichedItems: OrderItem[] = items.map((item) => {
     if (!item.variant_id) return item;
     const v = byVariantId.get(item.variant_id);
     if (!v) return item;
@@ -189,6 +189,8 @@ async function enrichOrderItems(
       return (a.sort_order ?? 0) - (b.sort_order ?? 0);
     });
     const thumb = images[0]?.url ?? v.products?.image_url ?? null;
+    const layout =
+      v.products?.variant_layout === "grouped" ? "grouped" : "flat";
 
     return {
       ...item,
@@ -201,8 +203,7 @@ async function enrichOrderItems(
               id: v.products.id,
               name: v.products.name,
               image_url: v.products.image_url,
-              variant_layout:
-                v.products.variant_layout === "grouped" ? "grouped" : "flat",
+              variant_layout: layout,
             }
           : null,
         image_url: thumb,
