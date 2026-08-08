@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useMemo, Fragment, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence } from "framer-motion";
 import { Package, Pencil, Plus, Trash2 } from "lucide-react";
 
 import type {
@@ -10,6 +11,7 @@ import type {
   ProductAtGlanceMetrics,
   ProductVariant,
   ProductWithCategory,
+  VariantGroup,
 } from "@/common/admin/types";
 import type { PricingRuleRow } from "@/modules/pricing/types";
 import { Badge } from "@/components/ui/badge";
@@ -33,30 +35,16 @@ import {
 } from "@/components/ui/table";
 import { ProductPricingSection } from "@/modules/products/components/product-pricing-section";
 import { ProductSpecsSection } from "@/modules/products/components/product-specs-section";
+import { toggleProductAction } from "@/modules/products/actions/products.actions";
 import {
-  updateProductAction,
-  toggleProductAction,
-} from "@/modules/products/actions/products.actions";
-import {
-  createVariantAction,
-  updateVariantAction,
   deleteVariantAction,
+  updateVariantAction,
 } from "@/modules/products/actions/variants.actions";
-import {
-  Modal,
-  FieldLabel as LegacyFieldLabel,
-  FormError,
-  PrimaryBtn,
-  SecondaryBtn,
-  inputCls,
-  selectCls,
-  textareaCls,
-} from "@/modules/admin/components/modal";
-import { ProductImageField } from "@/modules/products/components/product-image-field";
-import { formatCategoryOptionLabel } from "@/modules/products/lib/categories.utils";
-import { VariantImagesField } from "@/modules/products/components/variant-images-field";
-import { VariantImagesManager } from "@/modules/products/components/variant-images-manager";
+import { ProductManageModal } from "@/modules/products/components/product-manage-modal";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { useAdminAction } from "@/modules/admin/hooks/use-admin-action";
+import { currencyLabel, formatInr } from "@/lib/format-currency";
+import { useCurrencySettings } from "@/modules/settings/providers/currency-settings-provider";
 
 function formatSku(variantId: string) {
   return variantId.slice(0, 8).toUpperCase();
@@ -66,9 +54,6 @@ function previewImageUrl(variant: ProductVariant): string | null {
   const images = variant.images ?? [];
   const preview = images.find((img) => img.is_preview) ?? images[0];
   return preview?.url?.trim() ?? null;
-}
-function formatInr(n: number) {
-  return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 function roundMoney2(n: number): number {
@@ -174,17 +159,21 @@ function VariantTableRow({
   variant,
   productId,
   disabled,
+  showMrp,
+  hideThumbnail,
   onEdit,
   onDelete,
 }: {
   variant: ProductVariant;
   productId: string;
   disabled: boolean;
+  showMrp: boolean;
+  hideThumbnail?: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [savePending, startSave] = useTransition();
+  const { runAction: runSaveAction, isPending: savePending } = useAdminAction();
   const [priceStr, setPriceStr] = useState(moneyInputValue(variant.price));
   const [mrpStr, setMrpStr] = useState(moneyInputValue(variant.mrp));
 
@@ -198,15 +187,16 @@ function VariantTableRow({
 
   function savePrices() {
     const price = roundMoney2(parseFloat(priceStr));
-    const mrp = roundMoney2(parseFloat(mrpStr));
-    if (!Number.isFinite(price) || !Number.isFinite(mrp)) return;
+    const mrp = showMrp ? roundMoney2(parseFloat(mrpStr)) : 0;
+    if (!Number.isFinite(price)) return;
+    if (showMrp && !Number.isFinite(mrp)) return;
     if (
       price === roundMoney2(Number(variant.price ?? 0)) &&
       mrp === roundMoney2(Number(variant.mrp ?? 0))
     ) {
       return;
     }
-    startSave(async () => {
+    runSaveAction(async () => {
       await updateVariantAction(variant.id, productId, {
         name: variant.name ?? "Unnamed variant",
         price,
@@ -221,9 +211,11 @@ function VariantTableRow({
 
   return (
     <TableRow>
-      <TableCell>
-        <VariantThumbnail variant={variant} onClick={onEdit} />
-      </TableCell>
+      {!hideThumbnail ? (
+        <TableCell>
+          <VariantThumbnail variant={variant} onClick={onEdit} />
+        </TableCell>
+      ) : null}
       <TableCell className="font-medium">{variantLabel}</TableCell>
       <TableCell>
         <code className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
@@ -244,19 +236,21 @@ function VariantTableRow({
           aria-label={`Selling price for ${variantLabel}`}
         />
       </TableCell>
-      <TableCell>
-        <Input
-          className="h-7 w-24 tabular-nums"
-          type="number"
-          min={0}
-          step="0.01"
-          value={mrpStr}
-          onChange={(e) => setMrpStr(e.target.value)}
-          onBlur={savePrices}
-          disabled={disabled || savePending}
-          aria-label={`MRP for ${variantLabel}`}
-        />
-      </TableCell>
+      {showMrp ? (
+        <TableCell>
+          <Input
+            className="h-7 w-24 tabular-nums"
+            type="number"
+            min={0}
+            step="0.01"
+            value={mrpStr}
+            onChange={(e) => setMrpStr(e.target.value)}
+            onBlur={savePrices}
+            disabled={disabled || savePending}
+            aria-label={`MRP for ${variantLabel}`}
+          />
+        </TableCell>
+      ) : null}
       <TableCell>
         <div className="flex items-center justify-end gap-1">
           <Button
@@ -283,248 +277,49 @@ function VariantTableRow({
   );
 }
 
-function VariantForm({
-  productId,
-  variant,
-  liveVariant,
-  onClose,
-}: {
-  productId: string;
-  variant?: ProductVariant;
-  liveVariant?: ProductVariant;
-  onClose: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [images, setImages] = useState<string[]>([]);
-  const [previewIndex, setPreviewIndex] = useState(0);
-  const [imageUploading, setImageUploading] = useState(false);
+function buildVariantTableSections(
+  groups: VariantGroup[],
+  variants: ProductVariant[],
+): Array<{ key: string; title: string | null; variants: ProductVariant[] }> {
+  if (groups.length === 0) {
+    return [{ key: "__all", title: null, variants }];
+  }
 
-  const isEdit = Boolean(variant);
-  const imagesVariant = liveVariant ?? variant;
+  const sorted = [...groups].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const groupIds = new Set(sorted.map((g) => g.id));
+  const sections = sorted
+    .map((g) => ({
+      key: g.id,
+      title: (g.name ?? "").trim() || "Unnamed",
+      variants: variants.filter((v) => v.variant_group_id === g.id),
+    }))
+    .filter((s) => s.variants.length > 0);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const name = (fd.get("name") as string).trim();
-    const price = roundMoney2(parseFloat(fd.get("price") as string));
-    const mrp = roundMoney2(parseFloat(fd.get("mrp") as string));
-    if (!name || !Number.isFinite(price) || !Number.isFinite(mrp)) {
-      return setError("All fields required.");
+  const ungrouped = variants.filter(
+    (v) => !v.variant_group_id || !groupIds.has(v.variant_group_id),
+  );
+  if (ungrouped.length > 0) {
+    if (sections.length > 0) {
+      sections[0] = {
+        ...sections[0]!,
+        variants: [...sections[0]!.variants, ...ungrouped],
+      };
+    } else {
+      sections.push({
+        key: "__ungrouped",
+        title: "Models",
+        variants: ungrouped,
+      });
     }
-    setError(null);
-    startTransition(async () => {
-      try {
-        if (isEdit && variant) {
-          await updateVariantAction(variant.id, productId, { name, price, mrp });
-        } else {
-          const orderedImages =
-            previewIndex > 0 && previewIndex < images.length
-              ? [images[previewIndex], ...images.filter((_, i) => i !== previewIndex)]
-              : images;
-          await createVariantAction(productId, {
-            name,
-            price,
-            mrp,
-            imageUrls: orderedImages,
-          });
-        }
-        await queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.productDetail(productId),
-        });
-        await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-        onClose();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed.");
-      }
-    });
   }
 
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <LegacyFieldLabel label="Variant Name (e.g. Black, 128 GB)">
-        <input
-          className={inputCls}
-          name="name"
-          defaultValue={variant?.name ?? ""}
-          placeholder="e.g. 128 GB / Black"
-          required
-        />
-      </LegacyFieldLabel>
-      <div className="grid grid-cols-2 gap-3">
-        <LegacyFieldLabel label="Selling Price (₹)">
-          <input
-            className={inputCls}
-            name="price"
-            type="number"
-            step="0.01"
-            min="0"
-            defaultValue={isEdit ? moneyInputValue(variant?.price) : undefined}
-            required
-          />
-        </LegacyFieldLabel>
-        <LegacyFieldLabel label="MRP (₹)">
-          <input
-            className={inputCls}
-            name="mrp"
-            type="number"
-            step="0.01"
-            min="0"
-            defaultValue={isEdit ? moneyInputValue(variant?.mrp) : undefined}
-            required
-          />
-        </LegacyFieldLabel>
-      </div>
-      {isEdit && imagesVariant ? (
-        <div className="flex flex-col gap-2">
-          <span className="text-[13px] font-bold text-slate-700">
-            Images <span className="font-medium text-slate-400">· optional</span>
-          </span>
-          <VariantImagesManager
-            embedded
-            productId={productId}
-            variant={imagesVariant}
-            onClose={onClose}
-          />
-        </div>
-      ) : (
-        <VariantImagesField
-          images={images}
-          previewIndex={previewIndex}
-          onChange={(next, preview) => {
-            setImages(next);
-            setPreviewIndex(preview);
-          }}
-          onUploadingChange={setImageUploading}
-        />
-      )}
-      <FormError message={error} />
-      <div className="flex justify-end gap-2">
-        <SecondaryBtn onClick={onClose}>Cancel</SecondaryBtn>
-        <PrimaryBtn type="submit" disabled={isPending || imageUploading}>
-          {imageUploading
-            ? "Uploading…"
-            : isPending
-              ? "Saving…"
-              : isEdit
-                ? "Save changes"
-                : "Add Variant"}
-        </PrimaryBtn>
-      </div>
-    </form>
-  );
+  return sections.length > 0 ? sections : [{ key: "__all", title: null, variants }];
 }
-
-function ProductEditForm({
-  product,
-  categories,
-  brands,
-  onClose,
-}: {
-  product: ProductWithCategory;
-  categories: Category[];
-  brands: Brand[];
-  onClose: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState(product.image_url?.trim() ?? "");
-  const [imageUploading, setImageUploading] = useState(false);
-
-  useEffect(() => {
-    setImageUrl(product.image_url?.trim() ?? "");
-  }, [product.id, product.image_url]);
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const name = (fd.get("name") as string).trim();
-    const description = (fd.get("description") as string).trim();
-    const categoryId = (fd.get("categoryId") as string) || null;
-    const brandId = (fd.get("brandId") as string) || null;
-    const imageUrlValue = imageUrl.trim() || null;
-    if (!name) return setError("Name is required.");
-    setError(null);
-    startTransition(async () => {
-      try {
-        await updateProductAction(product.id, {
-          name,
-          description,
-          categoryId,
-          brandId,
-          imageUrl: imageUrlValue,
-        });
-        await queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.productDetail(product.id),
-        });
-        await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-        onClose();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed.");
-      }
-    });
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <LegacyFieldLabel label="Product Name">
-        <input className={inputCls} name="name" defaultValue={product.name ?? ""} required />
-      </LegacyFieldLabel>
-      <ProductImageField
-        value={imageUrl}
-        onChange={setImageUrl}
-        onUploadingChange={setImageUploading}
-      />
-      <LegacyFieldLabel label="Description">
-        <textarea
-          className={textareaCls}
-          name="description"
-          defaultValue={product.description ?? ""}
-          rows={3}
-        />
-      </LegacyFieldLabel>
-      <LegacyFieldLabel label="Category">
-        <select name="categoryId" className={selectCls} defaultValue={product.category_id ?? ""}>
-          <option value="">No category</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {formatCategoryOptionLabel(c, categories)}
-            </option>
-          ))}
-        </select>
-      </LegacyFieldLabel>
-      <LegacyFieldLabel label="Brand">
-        <select name="brandId" className={selectCls} defaultValue={product.brand_id ?? ""}>
-          <option value="">No brand</option>
-          {brands.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name ?? "Unnamed"}
-            </option>
-          ))}
-        </select>
-      </LegacyFieldLabel>
-      <FormError message={error} />
-      <div className="flex justify-end gap-2">
-        <SecondaryBtn onClick={onClose}>Cancel</SecondaryBtn>
-        <PrimaryBtn type="submit" disabled={isPending || imageUploading}>
-          {imageUploading ? "Uploading…" : isPending ? "Saving…" : "Save Changes"}
-        </PrimaryBtn>
-      </div>
-    </form>
-  );
-}
-
-type DetailModal =
-  | { kind: "editProduct" }
-  | { kind: "addVariant" }
-  | { kind: "manageVariant"; variant: ProductVariant }
-  | null;
 
 export function ProductDetailPanel({
   product,
   variants,
+  variantGroups = [],
   categories,
   brands,
   pricingRule,
@@ -532,28 +327,66 @@ export function ProductDetailPanel({
 }: {
   product: ProductWithCategory;
   variants: ProductVariant[];
+  variantGroups?: VariantGroup[];
   categories: Category[];
   brands: Brand[];
   pricingRule: PricingRuleRow | null;
   glance: ProductAtGlanceMetrics;
 }) {
   const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
-  const [modal, setModal] = useState<DetailModal>(null);
+  const { settings } = useCurrencySettings();
+  const showMrp = settings.show_mrp;
+  const { runAction, isPending } = useAdminAction();
+  const [manageOpen, setManageOpen] = useState(false);
+  const [manageInitialStep, setManageInitialStep] = useState<"details" | "variants">("details");
+  const [manageInitialVariantId, setManageInitialVariantId] = useState<string | null | undefined>(
+    undefined,
+  );
+
+  const isGroupedProduct =
+    product.variant_layout === "grouped" || variantGroups.length > 0;
+
+  function openManageModal(
+    step: "details" | "variants" = "details",
+    variantId?: string | null,
+  ) {
+    setManageInitialStep(step);
+    if (step === "variants") {
+      setManageInitialVariantId(variantId ?? null);
+    } else {
+      setManageInitialVariantId(undefined);
+    }
+    setManageOpen(true);
+  }
+
+  function handleAddVariant() {
+    openManageModal("variants");
+  }
+
+  const variantTableSections = useMemo(
+    () =>
+      isGroupedProduct
+        ? buildVariantTableSections(variantGroups, variants)
+        : [{ key: "__all", title: null, variants }],
+    [isGroupedProduct, variantGroups, variants],
+  );
+
+  const variantTableColCount =
+    (isGroupedProduct ? 0 : 1) + 4 + (showMrp ? 1 : 0) + 1;
 
   function handleDelete(variantId: string) {
     if (!confirm("Delete this variant? This cannot be undone.")) return;
-    startTransition(async () => {
+    runAction(async () => {
       await deleteVariantAction(variantId, product.id);
       await queryClient.invalidateQueries({
         queryKey: adminQueryKeys.productDetail(product.id),
       });
       await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-    });
+    }, { errorTitle: "Couldn't delete variant" });
   }
 
   function handleToggle() {
-    startTransition(async () => {
+    runAction(async () => {
       await toggleProductAction(product.id, !product.is_active);
       await queryClient.invalidateQueries({
         queryKey: adminQueryKeys.productDetail(product.id),
@@ -598,33 +431,25 @@ export function ProductDetailPanel({
 
   return (
     <>
-      {modal?.kind === "editProduct" && (
-        <Modal title="Edit Product" onClose={() => setModal(null)}>
-          <ProductEditForm
+      <AnimatePresence>
+        {manageOpen ? (
+          <ProductManageModal
+            key={`edit-${product.id}-${manageInitialStep}-${manageInitialVariantId ?? "none"}`}
+            mode="edit"
             product={product}
             categories={categories}
             brands={brands}
-            onClose={() => setModal(null)}
+            initialStepId={manageInitialStep}
+            initialVariantId={manageInitialVariantId}
+            onClose={() => {
+              setManageOpen(false);
+              void queryClient.invalidateQueries({
+                queryKey: adminQueryKeys.productDetail(product.id),
+              });
+            }}
           />
-        </Modal>
-      )}
-      {modal?.kind === "addVariant" && (
-        <Modal title="Add Variant" onClose={() => setModal(null)} size="sm">
-          <VariantForm productId={product.id} onClose={() => setModal(null)} />
-        </Modal>
-      )}
-      {modal?.kind === "manageVariant" && (
-        <Modal title="Edit Variant" onClose={() => setModal(null)} size="sm">
-          <VariantForm
-            productId={product.id}
-            variant={modal.variant}
-            liveVariant={
-              variants.find((v) => v.id === modal.variant.id) ?? modal.variant
-            }
-            onClose={() => setModal(null)}
-          />
-        </Modal>
-      )}
+        ) : null}
+      </AnimatePresence>
 
       <div className="flex flex-col gap-3">
         <Card className="border border-border ring-0">
@@ -665,11 +490,11 @@ export function ProductDetailPanel({
               <Button variant="outline" disabled={isPending} onClick={handleToggle}>
                 {isActive ? "Deactivate" : "Activate"}
               </Button>
-              <Button variant="outline" onClick={() => setModal({ kind: "editProduct" })}>
+              <Button variant="outline" onClick={() => openManageModal("details")}>
                 <Pencil data-icon="inline-start" />
-                Edit details
+                Edit product
               </Button>
-              <Button onClick={() => setModal({ kind: "addVariant" })}>
+              <Button onClick={handleAddVariant}>
                 <Plus data-icon="inline-start" />
                 Add variant
               </Button>
@@ -690,7 +515,7 @@ export function ProductDetailPanel({
               }
             />
             <GlanceMetricCard
-              title="List price"
+              title={currencyLabel("List price")}
               value={listPriceValue}
               description={
                 suggestedDescription ? (
@@ -730,11 +555,13 @@ export function ProductDetailPanel({
           <CardHeader className="border-b border-border">
             <CardTitle>Variants</CardTitle>
             <CardDescription>
-              {variants.length} SKU{variants.length !== 1 ? "s" : ""}. Edit prices inline or open a
-              variant to change details and images.
+              {variants.length} SKU{variants.length !== 1 ? "s" : ""}.
+              {isGroupedProduct
+                ? " Media is managed at product level — edit models inline or open Edit product for groups."
+                : " Edit prices inline or open a variant to change details and images."}
             </CardDescription>
             <CardAction>
-              <Button variant="outline" size="sm" onClick={() => setModal({ kind: "addVariant" })}>
+              <Button variant="outline" size="sm" onClick={handleAddVariant}>
                 <Plus data-icon="inline-start" />
                 Add variant
               </Button>
@@ -747,7 +574,7 @@ export function ProductDetailPanel({
                 <p className="max-w-sm text-sm text-muted-foreground">
                   No variants yet. Add at least one variant to make this product purchasable.
                 </p>
-                <Button onClick={() => setModal({ kind: "addVariant" })}>
+                <Button onClick={handleAddVariant}>
                   <Plus data-icon="inline-start" />
                   Add first variant
                 </Button>
@@ -756,25 +583,46 @@ export function ProductDetailPanel({
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-14">Thumbnail</TableHead>
+                    {!isGroupedProduct ? (
+                      <TableHead className="w-14">Thumbnail</TableHead>
+                    ) : null}
                     <TableHead>Variant</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead>Stock</TableHead>
-                    <TableHead>Selling (₹)</TableHead>
-                    <TableHead>MRP (₹)</TableHead>
+                    <TableHead>{currencyLabel("Selling")}</TableHead>
+                    {showMrp ? <TableHead>{currencyLabel("MRP")}</TableHead> : null}
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {variants.map((v) => (
-                    <VariantTableRow
-                      key={v.id}
-                      variant={v}
-                      productId={product.id}
-                      disabled={isPending}
-                      onEdit={() => setModal({ kind: "manageVariant", variant: v })}
-                      onDelete={() => handleDelete(v.id)}
-                    />
+                  {variantTableSections.map((section) => (
+                    <Fragment key={section.key}>
+                      {isGroupedProduct && section.title ? (
+                        <TableRow
+                          key={`heading-${section.key}`}
+                          className="bg-muted/50 hover:bg-muted/50"
+                        >
+                          <TableCell
+                            colSpan={variantTableColCount}
+                            className="py-2 text-xs font-bold uppercase tracking-wide text-muted-foreground"
+                          >
+                            {section.title}
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                      {section.variants.map((v) => (
+                        <VariantTableRow
+                          key={v.id}
+                          variant={v}
+                          productId={product.id}
+                          disabled={isPending}
+                          showMrp={showMrp}
+                          hideThumbnail={isGroupedProduct}
+                          onEdit={() => openManageModal("variants", v.id)}
+                          onDelete={() => handleDelete(v.id)}
+                        />
+                      ))}
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>

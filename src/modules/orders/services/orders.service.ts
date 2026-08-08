@@ -6,10 +6,12 @@ import type { Database } from "@/lib/integrations/supabase/types";
 import type {
   Order,
   OrderCatalogStats,
+  OrderItem,
   OrderItemPreview,
   OrderStatusFilter,
   OrderWithItems,
   Paginated,
+  VariantGroup,
 } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
 import { normalizeOrderAddress } from "@/modules/orders/lib/order-address";
@@ -99,6 +101,116 @@ export async function getOrders(
     data: rows.map((row) => mapOrderListRow(row, customerCounts)),
     total: count ?? 0,
   };
+}
+
+type VariantRowForOrder = {
+  id: string;
+  name: string | null;
+  variant_group_id: string | null;
+  product_id: string | null;
+  products: {
+    id: string;
+    name: string | null;
+    image_url: string | null;
+    variant_layout: "flat" | "grouped" | null;
+  } | null;
+  variant_images: Array<{
+    url: string;
+    is_preview: boolean;
+    sort_order: number;
+  }> | null;
+};
+
+async function enrichOrderItems(
+  items: OrderItem[],
+): Promise<{
+  items: OrderItem[];
+  variant_groups: Record<string, VariantGroup[]>;
+}> {
+  const variantIds = [
+    ...new Set(
+      items
+        .map((i) => i.variant_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  if (variantIds.length === 0) {
+    return { items, variant_groups: {} };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: variantRows, error } = await supabase
+    .from("product_variants")
+    .select(
+      "id,name,variant_group_id,product_id,products(id,name,image_url,variant_layout),variant_images(url,is_preview,sort_order)",
+    )
+    .in("id", variantIds);
+
+  if (error) throw new Error(error.message);
+
+  const byVariantId = new Map<string, VariantRowForOrder>();
+  const productIds = new Set<string>();
+
+  for (const row of (variantRows ?? []) as VariantRowForOrder[]) {
+    byVariantId.set(row.id, row);
+    if (row.products?.id) productIds.add(row.products.id);
+  }
+
+  const variant_groups: Record<string, VariantGroup[]> = {};
+  if (productIds.size > 0) {
+    const { data: groups, error: groupErr } = await supabase
+      .from("variant_groups")
+      .select("id,product_id,name,sort_order")
+      .in("product_id", [...productIds])
+      .order("sort_order", { ascending: true });
+
+    if (groupErr) throw new Error(groupErr.message);
+
+    for (const g of groups ?? []) {
+      const pid = g.product_id as string;
+      if (!variant_groups[pid]) variant_groups[pid] = [];
+      variant_groups[pid].push({
+        id: g.id,
+        product_id: pid,
+        name: g.name,
+        sort_order: g.sort_order,
+      });
+    }
+  }
+
+  const enrichedItems = items.map((item) => {
+    if (!item.variant_id) return item;
+    const v = byVariantId.get(item.variant_id);
+    if (!v) return item;
+
+    const images = [...(v.variant_images ?? [])].sort((a, b) => {
+      if (a.is_preview !== b.is_preview) return a.is_preview ? -1 : 1;
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    });
+    const thumb = images[0]?.url ?? v.products?.image_url ?? null;
+
+    return {
+      ...item,
+      variant_meta: {
+        id: v.id,
+        name: v.name,
+        variant_group_id: v.variant_group_id,
+        product: v.products
+          ? {
+              id: v.products.id,
+              name: v.products.name,
+              image_url: v.products.image_url,
+              variant_layout:
+                v.products.variant_layout === "grouped" ? "grouped" : "flat",
+            }
+          : null,
+        image_url: thumb,
+      },
+    };
+  });
+
+  return { items: enrichedItems, variant_groups };
 }
 
 export async function getOrdersCatalogStats(): Promise<OrderCatalogStats> {
@@ -210,7 +322,17 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
     customer_order_count = count ?? 0;
   }
 
-  return { ...row, addresses, customer_order_count };
+  const { items: enrichedItems, variant_groups } = await enrichOrderItems(
+    row.order_items ?? [],
+  );
+
+  return {
+    ...row,
+    order_items: enrichedItems,
+    variant_groups,
+    addresses,
+    customer_order_count,
+  };
 }
 
 export async function listUsersForOrderFilter(): Promise<OrderFilterUserRow[]> {

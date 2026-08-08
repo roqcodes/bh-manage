@@ -3,14 +3,9 @@ import { format } from "date-fns";
 import type { OrderWithItems } from "@/common/admin/types";
 
 import { BuyHubInvoiceLogo } from "@/modules/brand/components/buyhub-logo";
+import { OrderLineItemsTableBody } from "@/modules/orders/components/order-line-items-list";
 
-function formatInr(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(n);
-}
+import { formatInr } from "@/lib/format-currency";
 
 function shortOrderRef(id: string) {
   return id.split("-")[0]?.toUpperCase() ?? id.slice(0, 8);
@@ -97,55 +92,13 @@ export function OrderInvoiceDocument({ order }: { order: OrderWithItems }) {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 print:bg-transparent">
                 <th className="px-3 py-2.5 font-semibold text-slate-600">Description</th>
-                <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Qty</th>
-                <th className="hidden px-3 py-2.5 text-right font-semibold text-slate-600 sm:table-cell print:table-cell">
-                  Unit
-                </th>
+                <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Rate</th>
+                <th className="px-3 py-2.5 text-center font-semibold text-slate-600">Qty</th>
                 <th className="px-3 py-2.5 text-right font-semibold text-slate-600">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {order.order_items.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-3 py-6 text-center font-medium text-slate-500"
-                  >
-                    No line items.
-                  </td>
-                </tr>
-              ) : (
-                order.order_items.map((item) => {
-                  const unitFinal =
-                    item.final_price != null
-                      ? Number(item.final_price)
-                      : Number(item.price ?? 0);
-                  const lineAmt = unitFinal * Number(item.quantity ?? 1);
-                  return (
-                    <tr key={item.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-3 py-2.5 align-top">
-                        <span className="font-semibold text-slate-900">
-                          {item.product_name ?? "—"}
-                        </span>
-                        {item.vendor_id ? (
-                          <span className="mt-0.5 block font-mono text-[10px] text-slate-400 print:text-[9px]">
-                            Vendor {item.vendor_id.slice(0, 8)}…
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums font-medium">
-                        {item.quantity ?? "—"}
-                      </td>
-                      <td className="hidden px-3 py-2.5 text-right tabular-nums text-slate-600 sm:table-cell print:table-cell">
-                        {formatInr(unitFinal)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-semibold tabular-nums">
-                        {formatInr(lineAmt)}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+              <OrderLineItemsTableBody order={order} />
             </tbody>
           </table>
         </div>

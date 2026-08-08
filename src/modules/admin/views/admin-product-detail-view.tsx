@@ -10,6 +10,7 @@ import type {
   ProductAtGlanceMetrics,
   ProductVariant,
   ProductWithCategory,
+  VariantGroup,
 } from "@/common/admin/types";
 import type { PricingRuleRow } from "@/modules/pricing/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -22,6 +23,7 @@ import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 type ProductDetailPayload = {
   product: ProductWithCategory;
   variants: ProductVariant[];
+  variant_groups?: VariantGroup[];
   categories: Category[];
   brands: Brand[];
   pricingRule: PricingRuleRow | null;
@@ -84,7 +86,7 @@ export function AdminProductDetailView() {
     );
   }
 
-  const { product, variants, categories, brands, pricingRule, glance } = data;
+  const { product, variants, variant_groups, categories, brands, pricingRule, glance } = data;
 
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-3 py-2.5 font-sans sm:px-4">
@@ -93,6 +95,7 @@ export function AdminProductDetailView() {
       <ProductDetailPanel
         product={product}
         variants={variants}
+        variantGroups={variant_groups ?? []}
         categories={categories}
         brands={brands ?? []}
         pricingRule={pricingRule}

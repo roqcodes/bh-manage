@@ -14,6 +14,7 @@ import {
 import type { Category } from "@/common/admin/types";
 import { getCategoryThumbnail } from "@/modules/products/lib/categories.utils";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
+import { useAdminAlert } from "@/modules/admin/components/admin-alert-provider";
 import {
   FormError,
   Modal,
@@ -249,6 +250,7 @@ function CategoryFormModal({
 
 export function AdminCategoriesView() {
   const queryClient = useQueryClient();
+  const { showError } = useAdminAlert();
   const [modal, setModal] = useState<ModalState>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -291,7 +293,7 @@ export function AdminCategoriesView() {
       await deleteCategoryAction(category.id);
       await queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Delete failed.");
+      showError(err, "Couldn't delete category");
     } finally {
       setDeletingId(null);
     }

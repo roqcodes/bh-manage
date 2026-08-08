@@ -1,6 +1,7 @@
 "use client";
 
 import type { OrderStatus } from "@/common/admin/types";
+import { formatCurrencyAmount } from "@/lib/format-currency";
 import { cn } from "@/lib/utils";
 
 /** Semantic accent tokens aligned with product detail / admin theme — no raw blue-* utilities. */
@@ -32,11 +33,7 @@ export const ORDERS_VIEW_FILTERS: { id: OrdersViewFilter; label: string }[] = [
 ];
 
 export function formatInr(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(n);
+  return formatCurrencyAmount(n);
 }
 
 export function shortOrderRef(id: string) {

@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignOutForm } from "@/modules/auth/components/sign-out-form";
 import { useAdminSession } from "@/modules/admin/providers/admin-session-provider";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
+import { RegionCurrencySettingsCard } from "@/modules/settings/components/region-currency-settings-card";
 import { cn } from "@/lib/utils";
 
 function SettingLinkCard({
@@ -157,6 +158,8 @@ export function AdminConfigView() {
             </div>
           </CardContent>
         </Card>
+
+        <RegionCurrencySettingsCard />
 
         <section aria-label="System settings">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">

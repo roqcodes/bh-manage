@@ -23,4 +23,5 @@ export const adminQueryKeys = {
   procurement: () => ["admin", "procurement"] as const,
   searchIndex: () => ["admin", "search-index"] as const,
   taxRates: () => ["admin", "tax-rates"] as const,
+  appSettings: () => ["admin", "app-settings"] as const,
 };

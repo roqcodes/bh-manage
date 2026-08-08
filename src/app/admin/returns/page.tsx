@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Package, CheckCircle, XCircle } from "lucide-react";
+import { currencyLabel, formatCurrencyAmount } from "@/lib/format-currency";
 
 interface ReturnItem {
   id: string;
@@ -101,11 +102,7 @@ export default function AdminReturnsPage() {
   };
 
   const formatMoney = (n: number) =>
-    new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-    }).format(n);
+    formatCurrencyAmount(n, { minimumFractionDigits: 2 });
 
   if (isLoading) {
     return (
@@ -220,7 +217,7 @@ export default function AdminReturnsPage() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-slate-500">Refund Amount</p>
+                  <p className="text-sm text-slate-500">{currencyLabel("Refund amount")}</p>
                   <p className="text-lg font-bold text-emerald-600">
                     {formatMoney(ret.refund_amount)}
                   </p>

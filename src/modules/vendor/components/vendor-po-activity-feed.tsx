@@ -4,14 +4,12 @@ import { ArrowRight } from "lucide-react";
 
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import type { VendorRecentPoRow } from "@/modules/vendor/types";
+import { CurrencyAmount } from "@/components/currency-amount";
+import { formatCurrencyAmount } from "@/lib/format-currency";
 
 function formatMoney(n: number | null) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(n);
+  return formatCurrencyAmount(n, { minimumFractionDigits: 2 });
 }
 
 export function VendorPoActivityFeed({

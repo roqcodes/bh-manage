@@ -1,11 +1,9 @@
 "use client";
 
+import { formatCurrencyAmount } from "@/lib/format-currency";
+
 export function formatBillingInr(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(n);
+  return formatCurrencyAmount(n);
 }
 
 export function roundMoney2(n: number): number {

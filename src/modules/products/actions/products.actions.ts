@@ -3,13 +3,19 @@
 import { revalidatePath } from "next/cache";
 
 import {
-  deleteProductIfNoVariants,
+  deleteProduct,
   insertProduct,
   setProductActive,
   setProductsActiveByIds,
   updateProductById,
   updateProductSpecs,
 } from "@/modules/products/services/products.service";
+import {
+  addProductImages,
+  addProductVideos,
+  syncProductImages,
+  syncProductVideos,
+} from "@/modules/products/services/product-media.service";
 
 export async function createProductAction(data: {
   name: string;
@@ -17,6 +23,9 @@ export async function createProductAction(data: {
   categoryId: string | null;
   brandId: string | null;
   imageUrl: string | null;
+  variantLayout?: "flat" | "grouped";
+  imageUrls?: string[];
+  videoUrls?: string[];
 }): Promise<string> {
   const id = await insertProduct({
     name: data.name,
@@ -24,7 +33,14 @@ export async function createProductAction(data: {
     categoryId: data.categoryId || null,
     brandId: data.brandId || null,
     imageUrl: data.imageUrl,
+    variantLayout: data.variantLayout,
   });
+  if (data.imageUrls && data.imageUrls.length > 0) {
+    await addProductImages(id, data.imageUrls);
+  }
+  if (data.videoUrls && data.videoUrls.length > 0) {
+    await addProductVideos(id, data.videoUrls);
+  }
   revalidatePath("/admin/products");
   return id;
 }
@@ -37,6 +53,9 @@ export async function updateProductAction(
     categoryId: string | null;
     brandId: string | null;
     imageUrl: string | null;
+    imageUrls?: string[];
+    videoUrls?: string[];
+    imagePreviewIndex?: number;
   },
 ): Promise<void> {
   await updateProductById(id, {
@@ -46,6 +65,12 @@ export async function updateProductAction(
     brandId: data.brandId || null,
     imageUrl: data.imageUrl,
   });
+  if (data.imageUrls !== undefined) {
+    await syncProductImages(id, data.imageUrls, data.imagePreviewIndex ?? 0);
+  }
+  if (data.videoUrls !== undefined) {
+    await syncProductVideos(id, data.videoUrls);
+  }
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);
 }
@@ -69,7 +94,7 @@ export async function updateProductSpecsAction(
 }
 
 export async function deleteProductAction(id: string): Promise<void> {
-  await deleteProductIfNoVariants(id);
+  await deleteProduct(id);
   revalidatePath("/admin/products");
 }
 
@@ -87,7 +112,7 @@ export async function bulkSetProductsActiveAction(
 
 export async function bulkDeleteProductsAction(ids: string[]): Promise<void> {
   for (const id of ids) {
-    await deleteProductIfNoVariants(id);
+    await deleteProduct(id);
   }
   revalidatePath("/admin/products");
 }

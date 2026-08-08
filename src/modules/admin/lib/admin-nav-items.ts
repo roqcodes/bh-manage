@@ -51,13 +51,13 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
     items: [
       { name: "Orders", href: "/admin/orders", icon: ClipboardList, keywords: ["sales", "fulfillment"] },
       { name: "Delivery", href: "/admin/delivery", icon: Truck },
-      { name: "Billing / Invoices", href: "/admin/billing", icon: Receipt, keywords: ["invoice", "pos"] },
+      { name: "Billing", href: "/admin/billing", icon: Receipt, keywords: ["invoice", "pos"] },
     ],
   },
   {
     label: "Supply Chain",
     items: [
-      { name: "Inventory / Stock", href: "/admin/inventory", icon: Warehouse, keywords: ["stock", "warehouse"] },
+      { name: "Inventory", href: "/admin/inventory", icon: Warehouse, keywords: ["stock", "warehouse"] },
       { name: "Procurement", href: "/admin/procurement", icon: ShoppingCart, keywords: ["buying", "restock"] },
       { name: "Purchase Orders", href: "/admin/purchase-orders", icon: Package, keywords: ["po", "vendor orders"] },
       { name: "Vendors", href: "/admin/vendors", icon: Building2, keywords: ["suppliers"] },
@@ -68,7 +68,7 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
     items: [
       { name: "Customers", href: "/admin/customers", icon: UserCircle, keywords: ["buyers", "accounts"] },
       { name: "Team & Users", href: "/admin/users", icon: Users, keywords: ["staff", "admin", "delivery"] },
-      { name: "Config / Settings", href: "/admin/config", icon: Settings, keywords: ["settings", "configuration"] },
+      { name: "Settings", href: "/admin/config", icon: Settings, keywords: ["settings", "configuration"] },
     ],
   },
 ];

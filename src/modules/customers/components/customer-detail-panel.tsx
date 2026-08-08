@@ -41,16 +41,10 @@ import {
   blockUserAction,
   unblockUserAction,
 } from "@/modules/users/actions/users.actions";
+import { currencyLabel, formatInr } from "@/lib/format-currency";
+import { CurrencyAmount } from "@/components/currency-amount";
 import type { CustomerDetailsResponse } from "@/modules/customers/services/customers.service";
 import { formatCustomerId } from "@/modules/customers/components/customers-ui";
-
-function formatInr(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(n);
-}
 
 function GlanceMetricCard({
   title,
@@ -201,7 +195,7 @@ export function CustomerDetailPanel({
         <p className="mb-3 text-sm font-medium">At a glance</p>
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
           <GlanceMetricCard
-            title="Wallet balance"
+            title={currencyLabel("Wallet balance")}
             value={formatInr(wallet.balance)}
             description="Current available balance"
           />
@@ -238,7 +232,7 @@ export function CustomerDetailPanel({
           <CardAction>
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <Wallet className="size-3.5" aria-hidden />
-              {formatInr(wallet.balance)}
+              <CurrencyAmount amount={wallet.balance} />
             </span>
           </CardAction>
         </CardHeader>
@@ -255,7 +249,7 @@ export function CustomerDetailPanel({
                   <TableHead>Date</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">{currencyLabel("Amount")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -334,7 +328,7 @@ export function CustomerDetailPanel({
                   <TableHead>Order</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">{currencyLabel("Total")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

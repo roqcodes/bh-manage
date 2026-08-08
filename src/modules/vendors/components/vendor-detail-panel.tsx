@@ -49,10 +49,7 @@ import {
   selectCls,
 } from "@/modules/admin/components/modal";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
-
-function formatInr(n: number) {
-  return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
+import { currencyLabel, formatInr } from "@/lib/format-currency";
 
 function GlanceMetricCard({
   title,
@@ -189,7 +186,7 @@ function AssignForm({
         </select>
       </FieldLabel>
       <div className="grid grid-cols-2 gap-3">
-        <FieldLabel label="Base Price (₹)">
+        <FieldLabel label={currencyLabel("Base Price")}>
           <input
             className={inputCls}
             name="basePrice"
@@ -265,7 +262,7 @@ function EditVPForm({
         {vp.product_variants?.products?.name ?? "—"} · {vp.product_variants?.name ?? "—"}
       </p>
       <div className="grid grid-cols-2 gap-3">
-        <FieldLabel label="Base Price (₹)">
+        <FieldLabel label={currencyLabel("Base Price")}>
           <input
             className={inputCls}
             name="basePrice"

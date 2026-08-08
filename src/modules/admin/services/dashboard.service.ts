@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { formatCurrency } from "@/lib/format-currency";
+import { getAppSettings } from "@/modules/settings/services/app-settings.service";
 import type {
   AdminDashboardPayload,
   CatalogInventoryCoverage,
@@ -58,6 +60,7 @@ function buildCatalogCoverage(
 /** One Supabase client + parallel queries for dashboard API (avoids duplicate SSR client setup). */
 export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload> {
   const supabase = await createSupabaseServerClient();
+  const currencySettings = await getAppSettings();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -361,7 +364,7 @@ export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload>
         vendorId,
         name,
         headline: "Avg. list price",
-        value: `₹${avg.toLocaleString("en-IN", { maximumFractionDigits: 0 })} · ${n} SKUs`,
+        value: `${formatCurrency(avg, { maximumFractionDigits: 0 }, currencySettings)} · ${n} SKUs`,
         avg,
       };
     },

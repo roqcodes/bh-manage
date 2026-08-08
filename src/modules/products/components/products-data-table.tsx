@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,6 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { currencyLabel } from "@/lib/format-currency";
 import {
   bulkDeleteProductsAction,
   bulkSetProductsActiveAction,
@@ -47,6 +48,7 @@ import {
   ProductStatusBadge,
   StockBadge,
 } from "@/modules/products/components/products-ui";
+import { useAdminAction } from "@/modules/admin/hooks/use-admin-action";
 
 function ProductThumbnail({ url }: { url: string | null }) {
   const [failed, setFailed] = useState(false);
@@ -115,7 +117,7 @@ export function ProductsBulkActionBar({
   onClearSelection: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
+  const { runAction, isPending } = useAdminAction();
 
   if (selectedIds.size === 0) return null;
 
@@ -131,7 +133,7 @@ export function ProductsBulkActionBar({
           size="sm"
           disabled={isPending}
           onClick={() => {
-            startTransition(async () => {
+            runAction(async () => {
               await bulkSetProductsActiveAction(ids, true);
               void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
               onClearSelection();
@@ -145,7 +147,7 @@ export function ProductsBulkActionBar({
           variant="outline"
           disabled={isPending}
           onClick={() => {
-            startTransition(async () => {
+            runAction(async () => {
               await bulkSetProductsActiveAction(ids, false);
               void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
               onClearSelection();
@@ -159,11 +161,11 @@ export function ProductsBulkActionBar({
           variant="destructive"
           disabled={isPending}
           onClick={() => {
-            startTransition(async () => {
+            runAction(async () => {
               await bulkDeleteProductsAction(ids);
               void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
               onClearSelection();
-            });
+            }, { errorTitle: "Couldn't delete products" });
           }}
         >
           <Trash2 data-icon="inline-start" />
@@ -190,7 +192,7 @@ export function ProductsDataTable({
   onEdit: (product: ProductWithCategoryListItem) => void;
 }) {
   const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
+  const { runAction, isPending } = useAdminAction();
 
   const pageIds = products.map((p) => p.id);
   const allPageSelected =
@@ -219,17 +221,17 @@ export function ProductsDataTable({
   }
 
   function runToggle(productId: string, isActive: boolean) {
-    startTransition(async () => {
+    runAction(async () => {
       await toggleProductAction(productId, isActive);
       void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
     });
   }
 
   function runDelete(productId: string) {
-    startTransition(async () => {
+    runAction(async () => {
       await deleteProductAction(productId);
       void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-    });
+    }, { errorTitle: "Couldn't delete product" });
   }
 
   if (products.length === 0) {
@@ -256,8 +258,8 @@ export function ProductsDataTable({
           <TableHead>Status</TableHead>
           <TableHead>Inventory</TableHead>
           <TableHead>Category</TableHead>
-          <TableHead className="text-right">Price</TableHead>
-          <TableHead className="text-right">MRP</TableHead>
+          <TableHead className="text-right">{currencyLabel("Price")}</TableHead>
+          <TableHead className="text-right">{currencyLabel("MRP")}</TableHead>
           <TableHead className="w-24 text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>

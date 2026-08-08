@@ -3,6 +3,7 @@
 import type { ProductCatalogStats } from "@/common/admin/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { currencyLabel } from "@/lib/format-currency";
 import {
   MiniSparkline,
   TrendBadge,
@@ -103,7 +104,7 @@ export function ProductsMetricsBar({
             flatSpark
           />
           <MetricSegment
-            label="Total inventory value"
+            label={currencyLabel("Total inventory value")}
             value={formatProductPrice(stats.inventoryValue)}
             trendTone="neutral"
             sparkSeed={Math.floor(stats.inventoryValue)}

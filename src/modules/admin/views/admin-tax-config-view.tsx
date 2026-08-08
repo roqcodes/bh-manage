@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/table";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
+import { useAdminAlert } from "@/modules/admin/components/admin-alert-provider";
+import { formatActionError } from "@/modules/admin/lib/format-action-error";
 import {
   FormError,
   inputCls,
@@ -189,6 +191,7 @@ function EditTaxRateModal({
 
 export function AdminTaxConfigView() {
   const queryClient = useQueryClient();
+  const { showError } = useAdminAlert();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingRate, setEditingRate] = useState<TaxRate | null>(null);
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
@@ -207,12 +210,13 @@ export function AdminTaxConfigView() {
         body: JSON.stringify({ isDefault: true }),
       });
       if (!res.ok) {
-        alert("Failed to set default rate.");
+        const body = await res.json().catch(() => null);
+        showError(body?.error ?? "Failed to set default rate.", "Couldn't update tax rate");
         return;
       }
       await queryClient.invalidateQueries({ queryKey: adminQueryKeys.taxRates() });
-    } catch {
-      alert("Failed to set default rate.");
+    } catch (err) {
+      showError(err, "Couldn't update tax rate");
     } finally {
       setSettingDefaultId(null);
     }

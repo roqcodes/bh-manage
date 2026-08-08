@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -44,6 +44,7 @@ import {
   formatCustomerId,
   isCustomerBlocked,
 } from "@/modules/customers/components/customers-ui";
+import { useAdminAction } from "@/modules/admin/hooks/use-admin-action";
 
 export function exportCustomersCsv(users: AdminUser[]) {
   const headers = ["Name", "ID", "Email", "Phone", "Orders", "Status", "Joined"];
@@ -81,7 +82,7 @@ export function CustomersBulkActionBar({
   onClearSelection: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
+  const { runAction, isPending } = useAdminAction();
 
   if (selectedIds.size === 0) return null;
 
@@ -97,7 +98,7 @@ export function CustomersBulkActionBar({
           size="sm"
           disabled={isPending}
           onClick={() => {
-            startTransition(async () => {
+            runAction(async () => {
               await bulkUnblockUsersAction(ids);
               void queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
               onClearSelection();
@@ -111,7 +112,7 @@ export function CustomersBulkActionBar({
           variant="destructive"
           disabled={isPending}
           onClick={() => {
-            startTransition(async () => {
+            runAction(async () => {
               await bulkBlockUsersAction(ids);
               void queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
               onClearSelection();
@@ -166,7 +167,7 @@ export function CustomersDataTable({
   onSelectedIdsChange: (ids: Set<string>) => void;
 }) {
   const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
+  const { runAction, isPending } = useAdminAction();
 
   const pageIds = users.map((u) => u.id);
   const allPageSelected =
@@ -195,7 +196,7 @@ export function CustomersDataTable({
   }
 
   function runBlock(userId: string, block: boolean) {
-    startTransition(async () => {
+    runAction(async () => {
       if (block) await blockUserAction(userId);
       else await unblockUserAction(userId);
       void queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });

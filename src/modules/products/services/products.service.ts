@@ -5,6 +5,10 @@ import {
   requireAdminOrManagerProfile,
 } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import {
+  assertVariantsNotLinkedToOrdersOrPurchaseOrders,
+  deleteVariantSupplyRowsWithoutLinkCheck,
+} from "@/modules/products/services/product-variants.service";
 import type {
   Paginated,
   ProductCatalogStats,
@@ -26,7 +30,7 @@ export async function getProducts(
   let query = supabase
     .from("products")
     .select(
-      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
+      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,variant_layout,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
     );
 
   let countQuery = supabase
@@ -233,7 +237,7 @@ export async function getProductById(
   const { data } = await supabase
     .from("products")
     .select(
-      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
+      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,variant_layout,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -248,7 +252,7 @@ export async function getProductVariants(
   const { data, error } = await supabase
     .from("product_variants")
     .select(
-      "id,product_id,name,price,mrp,created_at,variant_images(id,variant_id,url,is_preview,sort_order,created_at)",
+      "id,product_id,name,price,mrp,variant_group_id,created_at,variant_images(id,variant_id,url,is_preview,sort_order,created_at)",
     )
     .eq("product_id", productId)
     .order("created_at", { ascending: true });
@@ -258,7 +262,7 @@ export async function getProductVariants(
   if (error) {
     const { data: plain } = await supabase
       .from("product_variants")
-      .select("id,product_id,name,price,mrp,created_at")
+      .select("id,product_id,name,price,mrp,variant_group_id,created_at")
       .eq("product_id", productId)
       .order("created_at", { ascending: true });
     const plainVariants = ((plain ?? []) as Omit<ProductVariant, "images">[]).map(
@@ -330,6 +334,7 @@ export async function insertProduct(input: {
   categoryId: string | null;
   brandId: string | null;
   imageUrl: string | null;
+  variantLayout?: "flat" | "grouped";
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -341,6 +346,7 @@ export async function insertProduct(input: {
       category_id: input.categoryId,
       brand_id: input.brandId,
       image_url: input.imageUrl,
+      variant_layout: input.variantLayout ?? "flat",
       is_active: true,
     })
     .select("id")
@@ -409,13 +415,35 @@ export async function updateProductSpecs(
   if (error) throw new Error(error.message);
 }
 
-export async function deleteProductIfNoVariants(productId: string): Promise<void> {
+export async function deleteProduct(productId: string): Promise<void> {
   await requireAdminOnlyProfile();
-  const n = await countVariantsForProduct(productId);
-  if (n > 0) {
-    throw new Error("Cannot delete product while variants exist.");
-  }
   const supabase = await createSupabaseServerClient();
+
+  const { data: variants, error: variantErr } = await supabase
+    .from("product_variants")
+    .select("id")
+    .eq("product_id", productId);
+  if (variantErr) throw new Error(variantErr.message);
+
+  const variantIds = (variants ?? []).map((v) => v.id);
+  if (variantIds.length > 0) {
+    await assertVariantsNotLinkedToOrdersOrPurchaseOrders(variantIds);
+    for (const variantId of variantIds) {
+      await deleteVariantSupplyRowsWithoutLinkCheck(variantId);
+    }
+  }
+
+  const { error: pricingErr } = await supabase
+    .from("pricing_rules")
+    .delete()
+    .eq("product_id", productId);
+  if (pricingErr) throw new Error(pricingErr.message);
+
   const { error } = await supabase.from("products").delete().eq("id", productId);
   if (error) throw new Error(error.message);
+}
+
+/** @deprecated Use deleteProduct */
+export async function deleteProductIfNoVariants(productId: string): Promise<void> {
+  await deleteProduct(productId);
 }

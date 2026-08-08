@@ -24,13 +24,11 @@ export const PRODUCT_STATUS_FILTERS: {
 export const ALL_CATEGORIES = "__all__";
 export const UNCATEGORIZED = "__uncategorized__";
 
+import { formatCurrencyAmount } from "@/lib/format-currency";
+
 export function formatProductPrice(n: number | null) {
   if (n == null || !Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(n);
+  return formatCurrencyAmount(n);
 }
 
 export function formatSkuLabel(product: ProductWithCategoryListItem) {

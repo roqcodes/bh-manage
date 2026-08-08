@@ -34,6 +34,7 @@ import {
   updateProcurementDefaultsAction,
 } from "@/modules/procurement/actions/procurement.actions";
 import { approveProcurementPlanAction } from "@/modules/purchase-orders/actions/purchase-orders.actions";
+import { currencyLabel } from "@/lib/format-currency";
 import { ProcurementMetricsBar } from "@/modules/procurement/components/procurement-metrics-bar";
 import { formatProcurementInr } from "@/modules/procurement/components/procurement-ui";
 import type {
@@ -394,8 +395,8 @@ export function ProcurementWorkspace() {
                     <TableHead>Product · variant</TableHead>
                     <TableHead className="hidden md:table-cell">On hand / min</TableHead>
                     <TableHead className="w-24">Qty</TableHead>
-                    <TableHead>Vendor cost</TableHead>
-                    <TableHead>Line total</TableHead>
+                    <TableHead>{currencyLabel("Vendor cost")}</TableHead>
+                    <TableHead>{currencyLabel("Line total")}</TableHead>
                     <TableHead className="w-12" />
                   </TableRow>
                 </TableHeader>

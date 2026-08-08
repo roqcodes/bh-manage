@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { currencyLabel } from "@/lib/format-currency";
 import {
   formatInr,
   MiniSparkline,
@@ -242,7 +243,7 @@ export function OrdersMetricsBar({
             sparkTone="green"
           />
           <MetricSegment
-            label="Sales reversals"
+            label={currencyLabel("Sales reversals")}
             value={formatInr(stats.salesReversals)}
             trendTone="neutral"
             sparkSeed={stats.cancelledCount}

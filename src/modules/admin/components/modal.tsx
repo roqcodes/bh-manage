@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldLabel as UiFieldLabel } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
+import { formatActionError } from "@/modules/admin/lib/format-action-error";
 
 interface ModalProps {
   title: string;
@@ -102,7 +103,7 @@ export function FormError({ message }: { message: string | null }) {
   if (!message) return null;
   return (
     <Alert variant="destructive">
-      <AlertDescription className="text-sm">{message}</AlertDescription>
+      <AlertDescription className="text-sm">{formatActionError(message)}</AlertDescription>
     </Alert>
   );
 }

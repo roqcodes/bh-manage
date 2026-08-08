@@ -2,8 +2,10 @@ import "server-only";
 
 import { format } from "date-fns";
 
+import { formatCurrency } from "@/lib/format-currency";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { getAppSettings } from "@/modules/settings/services/app-settings.service";
 import type {
   AdminSearchBadge,
   AdminSearchBadgeTone,
@@ -18,12 +20,8 @@ function shortRef(id: string): string {
   return segment.slice(0, 4);
 }
 
-function formatInr(n: number | null | undefined): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(Number(n ?? 0));
+function formatMoney(n: number | null | undefined, settings: Parameters<typeof formatCurrency>[2]) {
+  return formatCurrency(Number(n ?? 0), { maximumFractionDigits: 0 }, settings);
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -88,6 +86,7 @@ function pushItem(
 export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
+  const currencySettings = await getAppSettings();
 
   const [
     ordersRes,
@@ -193,7 +192,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
       group: "orders",
       ref: `#${ref}`,
       title: customer,
-      subtitle: [formatInr(row.total_amount as number), formatDate(row.created_at as string)]
+      subtitle: [formatMoney(row.total_amount as number, currencySettings), formatDate(row.created_at as string)]
         .filter(Boolean)
         .join(" · "),
       badges,
@@ -226,7 +225,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
       group: "purchase_orders",
       ref: `PO #${ref}`,
       title: vendor,
-      subtitle: [formatInr(row.total_amount as number), formatDate(row.created_at as string)]
+      subtitle: [formatMoney(row.total_amount as number, currencySettings), formatDate(row.created_at as string)]
         .filter(Boolean)
         .join(" · "),
       badges: [{ label: titleCaseStatus(status), tone: fulfillmentBadgeTone(status) }],
@@ -274,7 +273,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
       group: "inventory",
       ref: `SKU ${sku}`,
       title: `${product} · ${variantName}`,
-      subtitle: formatInr(row.price as number),
+      subtitle: formatMoney(row.price as number, currencySettings),
       badges: [{ label: `${stock} in stock`, tone: stockBadgeTone(stock) }],
       href: "/admin/inventory",
       searchText: buildSearchText(

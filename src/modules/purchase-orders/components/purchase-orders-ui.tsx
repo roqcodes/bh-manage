@@ -27,12 +27,10 @@ export const PURCHASE_ORDERS_VIEW_FILTERS: {
   { id: "cancelled", label: "Cancelled" },
 ];
 
+import { formatCurrencyAmount } from "@/lib/format-currency";
+
 export function formatInr(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(n);
+  return formatCurrencyAmount(n);
 }
 
 export function shortPoRef(id: string) {

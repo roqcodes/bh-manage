@@ -43,6 +43,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { currencyLabel } from "@/lib/format-currency";
 import {
   bulkUpdateOrderStatusAction,
 } from "@/modules/orders/actions/orders.actions";
@@ -443,7 +444,7 @@ export function OrdersDataTable({
           <TableHead>Payment</TableHead>
           <TableHead>Fulfillment</TableHead>
           <TableHead>Items</TableHead>
-          <TableHead className="text-right">Total</TableHead>
+          <TableHead className="text-right">{currencyLabel("Total")}</TableHead>
           <TableHead className="w-10" />
         </TableRow>
       </TableHeader>

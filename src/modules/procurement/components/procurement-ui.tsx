@@ -1,9 +1,7 @@
 "use client";
 
+import { formatCurrencyAmount } from "@/lib/format-currency";
+
 export function formatProcurementInr(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(n);
+  return formatCurrencyAmount(n);
 }

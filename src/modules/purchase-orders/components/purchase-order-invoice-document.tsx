@@ -4,13 +4,11 @@ import type { AdminPurchaseOrderDetail } from "@/common/admin/types";
 
 import { BuyHubInvoiceLogo } from "@/modules/brand/components/buyhub-logo";
 
+import { formatCurrency } from "@/lib/format-currency";
+
 function formatMoney(n: number | null) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(n);
+  return formatCurrency(n, { minimumFractionDigits: 2 });
 }
 
 function shortPoRef(id: string) {

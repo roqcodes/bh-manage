@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Package, DollarSign, TrendingUp, ClipboardList } from "lucide-react";
+import { currencyLabel, formatCurrencyAmount } from "@/lib/format-currency";
 
 interface FinanceSummary {
   total_revenue: number;
@@ -118,11 +119,7 @@ export default function AdminFinancePage() {
   }
 
   const formatMoney = (n: number) =>
-    new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-    }).format(n);
+    formatCurrencyAmount(n, { minimumFractionDigits: 2 });
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
@@ -176,7 +173,7 @@ export default function AdminFinancePage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500">Total Revenue (30d)</p>
+                  <p className="text-xs text-slate-500">{currencyLabel("Total Revenue (30d)")}</p>
                   <p className="mt-1 text-2xl font-bold text-slate-900">
                     {formatMoney(financeData.summary.total_revenue)}
                   </p>
@@ -202,7 +199,7 @@ export default function AdminFinancePage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500">Avg Order Value</p>
+                  <p className="text-xs text-slate-500">{currencyLabel("Avg order value")}</p>
                   <p className="mt-1 text-2xl font-bold text-slate-900">
                     {formatMoney(financeData.summary.avg_order_value)}
                   </p>
@@ -232,19 +229,19 @@ export default function AdminFinancePage() {
             <h2 className="mb-4 text-lg font-bold text-slate-900">Transaction Summary</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-lg bg-emerald-50 p-4">
-                <p className="text-xs text-emerald-700">Total Credits</p>
+                <p className="text-xs text-emerald-700">{currencyLabel("Total credits")}</p>
                 <p className="mt-1 text-xl font-bold text-emerald-900">
                   {formatMoney(financeData.transactions.total_credits)}
                 </p>
               </div>
               <div className="rounded-lg bg-red-50 p-4">
-                <p className="text-xs text-red-700">Total Debits</p>
+                <p className="text-xs text-red-700">{currencyLabel("Total debits")}</p>
                 <p className="mt-1 text-xl font-bold text-red-900">
                   {formatMoney(financeData.transactions.total_debits)}
                 </p>
               </div>
               <div className="rounded-lg bg-slate-50 p-4">
-                <p className="text-xs text-slate-700">Net Cash Flow</p>
+                <p className="text-xs text-slate-700">{currencyLabel("Net cash flow")}</p>
                 <p
                   className={`mt-1 text-xl font-bold ${
                     financeData.transactions.net_flow >= 0
@@ -267,7 +264,10 @@ export default function AdminFinancePage() {
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-900">Outstanding Receivables</h2>
               <p className="text-sm text-slate-500">
-                Total: <span className="font-semibold text-slate-900">{formatMoney(receivablesData.totalOutstanding)}</span>
+                {currencyLabel("Total")}:{" "}
+                <span className="font-semibold text-slate-900">
+                  {formatMoney(receivablesData.totalOutstanding)}
+                </span>
               </p>
             </div>
             {receivablesData.receivables.length === 0 ? (
@@ -282,8 +282,8 @@ export default function AdminFinancePage() {
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Order</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Customer</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Total</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Outstanding</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">{currencyLabel("Total")}</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">{currencyLabel("Outstanding")}</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Due Date</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
                     </tr>
@@ -337,19 +337,19 @@ export default function AdminFinancePage() {
           {/* Summary Cards */}
           <div className="grid gap-4 sm:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <p className="text-xs text-slate-500">Total Revenue</p>
+              <p className="text-xs text-slate-500">{currencyLabel("Total revenue")}</p>
               <p className="mt-1 text-2xl font-bold text-slate-900">
                 {formatMoney(profitData.totals.totalRevenue)}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <p className="text-xs text-slate-500">Total Cost</p>
+              <p className="text-xs text-slate-500">{currencyLabel("Total cost")}</p>
               <p className="mt-1 text-2xl font-bold text-slate-900">
                 {formatMoney(profitData.totals.totalCost)}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <p className="text-xs text-slate-500">Total Margin</p>
+              <p className="text-xs text-slate-500">{currencyLabel("Total margin")}</p>
               <p className="mt-1 text-2xl font-bold text-emerald-600">
                 {formatMoney(profitData.totals.totalMargin)}
               </p>
@@ -376,9 +376,9 @@ export default function AdminFinancePage() {
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Period</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Revenue</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Cost</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Margin</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">{currencyLabel("Revenue")}</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">{currencyLabel("Cost")}</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-700">{currencyLabel("Margin")}</th>
                       <th className="px-4 py-3 text-right font-semibold text-slate-700">Margin %</th>
                       <th className="px-4 py-3 text-center font-semibold text-slate-700">Orders</th>
                     </tr>

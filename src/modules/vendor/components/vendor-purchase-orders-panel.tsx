@@ -11,14 +11,11 @@ import type { VendorPoStatusFilter } from "@/modules/vendor/types";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { EmptyState, TableShell } from "@/modules/admin/components/empty-state";
 import { Pagination } from "@/modules/admin/components/pagination";
+import { currencyLabel, formatCurrencyAmount } from "@/lib/format-currency";
 
 function formatMoney(n: number | null) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(n);
+  return formatCurrencyAmount(n, { minimumFractionDigits: 2 });
 }
 
 export function VendorPurchaseOrdersPanel({
@@ -79,7 +76,7 @@ export function VendorPurchaseOrdersPanel({
                   <th className="px-4 py-3">PO</th>
                   <th className="px-4 py-3">Created</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-end">Total</th>
+                  <th className="px-4 py-3 text-end">{currencyLabel("Total")}</th>
                 </tr>
               </thead>
               <tbody>

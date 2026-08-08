@@ -36,6 +36,12 @@ import type {
 } from "@/common/admin/types";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
+import { CurrencyAmount } from "@/components/currency-amount";
+import {
+  formatCurrencyAmount,
+  formatCurrencyCompactAmount,
+  currencyLabel,
+} from "@/lib/format-currency";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 
@@ -52,14 +58,11 @@ const RAIL_GRADIENT = {
 /* ─────────────────────────── formatters ─────────────────────────── */
 
 function formatInr(n: number, opts?: Intl.NumberFormatOptions) {
-  return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0, ...opts })}`;
+  return formatCurrencyAmount(n, { maximumFractionDigits: 0, ...opts });
 }
 
 function compactInr(n: number) {
-  if (n >= 1e7) return `₹${(n / 1e7).toFixed(n >= 1e8 ? 1 : 2)}Cr`;
-  if (n >= 1e5) return `₹${(n / 1e5).toFixed(n >= 1e6 ? 1 : 2)}L`;
-  if (n >= 1e3) return `₹${(n / 1e3).toFixed(1)}K`;
-  return `₹${n.toLocaleString("en-IN")}`;
+  return formatCurrencyCompactAmount(n);
 }
 
 function compactNum(n: number) {
@@ -662,7 +665,7 @@ function RevenueBreakdown({
         >
           <div className="flex items-start justify-between gap-2">
             <p className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-slate-400">
-              Gross revenue
+              {currencyLabel("Gross revenue")}
             </p>
             <ArrowUpRight
               className="size-3.5 shrink-0 text-slate-300 opacity-0 transition-all duration-300 group-hover/revhead:opacity-100 group-hover/revhead:text-[color:var(--brand)]"
@@ -679,7 +682,15 @@ function RevenueBreakdown({
               {orders.toLocaleString("en-IN")} orders
             </TrendChip>
             <TrendChip tone="neutral">
-              AOV {orders > 0 ? formatInr(aov) : "—"}
+              AOV{" "}
+              {orders > 0 ? (
+                <CurrencyAmount
+                  amount={aov}
+                  options={{ maximumFractionDigits: 0, minimumFractionDigits: 0 }}
+                />
+              ) : (
+                "—"
+              )}
             </TrendChip>
           </div>
 
@@ -724,28 +735,28 @@ function RevenueBreakdown({
 
         <div className="grid h-full grid-cols-1 gap-4 md:col-span-3 md:grid-cols-2">
           <RevenueTile
-            label="Margin today"
+            label={currencyLabel("Margin today")}
             value={formatInr(margin)}
             sub={`${marginPct.toFixed(1)}% of revenue`}
             tone="emerald"
             href="/admin/orders"
           />
           <RevenueTile
-            label="Estimated cost"
+            label={currencyLabel("Estimated cost")}
             value={formatInr(costs)}
             sub={`${costPct.toFixed(1)}% of revenue`}
             tone="slate"
             href="/admin/orders"
           />
           <RevenueTile
-            label="Avg order value"
+            label={currencyLabel("Avg order value")}
             value={orders > 0 ? formatInr(aov) : "—"}
             sub={`${orders.toLocaleString("en-IN")} orders placed`}
             tone="indigo"
             href="/admin/orders"
           />
           <RevenueTile
-            label="Contribution per order"
+            label={currencyLabel("Contribution per order")}
             value={orders > 0 ? formatInr(margin / orders) : "—"}
             sub="Margin / orders today"
             tone="rose"
@@ -1127,7 +1138,7 @@ function RecentOrdersFeed({ orders }: { orders: Order[] }) {
                       {compactInr(Number(order.total_amount ?? 0))}
                     </p>
                     <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                      Order total
+                      {currencyLabel("Order total")}
                     </p>
                   </div>
                   <ChevronRight className="size-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-700" />
@@ -1253,7 +1264,7 @@ export function AdminDashboardView() {
           </SectionEyebrow>
           <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
             <KpiCard
-              label="Revenue"
+              label={currencyLabel("Revenue")}
               value={compactInr(business.revenueToday)}
               icon={Sparkles}
               tint="linear-gradient(135deg, #fce8ec, #e9b8c4)"
@@ -1270,7 +1281,7 @@ export function AdminDashboardView() {
             >
               <InlineRail
                 pct={marginPct}
-                label="Margin vs revenue"
+                label={currencyLabel("Margin")}
                 value={compactInr(business.marginToday)}
                 gradient={RAIL_GRADIENT.success}
               />
@@ -1285,9 +1296,11 @@ export function AdminDashboardView() {
                 <div className="flex flex-wrap items-center gap-2">
                   <TrendChip tone="neutral">
                     AOV{" "}
-                    {business.ordersToday > 0
-                      ? compactInr(business.averageOrderValue)
-                      : "—"}
+                    {business.ordersToday > 0 ? (
+                      <CurrencyAmount amount={business.averageOrderValue} compact />
+                    ) : (
+                      "—"
+                    )}
                   </TrendChip>
                   <TrendChip tone="neutral">
                     {pipeline.pending.toLocaleString("en-IN")} pending

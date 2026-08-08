@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Package, MapPin, Phone, CheckCircle, X } from "lucide-react";
+import { currencyLabel, formatCurrencyAmount } from "@/lib/format-currency";
 
 interface OrderItem {
   id: string;
@@ -91,11 +92,7 @@ export default function DeliveryDashboardPage() {
   };
 
   const formatMoney = (n: number) =>
-    new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-    }).format(n);
+    formatCurrencyAmount(n, { minimumFractionDigits: 2 });
 
   const statusColors: Record<string, string> = {
     confirmed: "bg-blue-100 text-blue-800",
@@ -190,7 +187,7 @@ export default function DeliveryDashboardPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-slate-500">Total</p>
+                    <p className="text-sm text-slate-500">{currencyLabel("Total")}</p>
                     <p className="text-lg font-bold text-slate-900">
                       {formatMoney(order.total_amount)}
                     </p>

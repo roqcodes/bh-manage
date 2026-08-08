@@ -39,6 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { currencyLabel } from "@/lib/format-currency";
 import {
   formatInr,
   PO_ACCENT,
@@ -245,7 +246,7 @@ export function PurchaseOrdersDataTable({
           <TableHead>Vendor</TableHead>
           <TableHead>Date</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead className="text-right">Total</TableHead>
+          <TableHead className="text-right">{currencyLabel("Total")}</TableHead>
           <TableHead className="w-10" />
         </TableRow>
       </TableHeader>

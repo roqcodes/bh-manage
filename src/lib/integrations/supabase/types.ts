@@ -244,6 +244,38 @@ export interface Database {
         };
         Relationships: [];
       };
+      app_settings: {
+        Row: {
+          id: number;
+          country_code: string;
+          country_name: string;
+          currency_code: string;
+          currency_symbol: string;
+          locale: string;
+          show_mrp: boolean;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          country_code?: string;
+          country_name?: string;
+          currency_code?: string;
+          currency_symbol?: string;
+          locale?: string;
+          show_mrp?: boolean;
+          updated_at?: string | null;
+        };
+        Update: {
+          country_code?: string;
+          country_name?: string;
+          currency_code?: string;
+          currency_symbol?: string;
+          locale?: string;
+          show_mrp?: boolean;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       order_items: {
         Row: {
           id: string;
@@ -343,6 +375,7 @@ export interface Database {
           name: string | null;
           price: number | null;
           mrp: number | null;
+          variant_group_id: string | null;
           created_at: string | null;
         };
         Insert: {
@@ -351,13 +384,118 @@ export interface Database {
           name?: string | null;
           price?: number | null;
           mrp?: number | null;
+          variant_group_id?: string | null;
         };
         Update: {
           name?: string | null;
           price?: number | null;
           mrp?: number | null;
+          variant_group_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "product_variants_variant_group_id_fkey";
+            columns: ["variant_group_id"];
+            referencedRelation: "variant_groups";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      variant_groups: {
+        Row: {
+          id: string;
+          product_id: string;
+          name: string;
+          sort_order: number;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          name: string;
+          sort_order?: number;
+          created_at?: string | null;
+        };
+        Update: {
+          product_id?: string;
+          name?: string;
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "variant_groups_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      product_images: {
+        Row: {
+          id: string;
+          product_id: string;
+          url: string;
+          is_preview: boolean;
+          sort_order: number;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          url: string;
+          is_preview?: boolean;
+          sort_order?: number;
+          created_at?: string | null;
+        };
+        Update: {
+          product_id?: string;
+          url?: string;
+          is_preview?: boolean;
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "product_images_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      product_videos: {
+        Row: {
+          id: string;
+          product_id: string;
+          url: string;
+          sort_order: number;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          url: string;
+          sort_order?: number;
+          created_at?: string | null;
+        };
+        Update: {
+          product_id?: string;
+          url?: string;
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "product_videos_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       variant_images: {
         Row: {
@@ -401,6 +539,7 @@ export interface Database {
           image_url: string | null;
           is_active: boolean | null;
           use_smart_pricing: boolean;
+          variant_layout: "flat" | "grouped";
           specs: Json;
           created_at: string | null;
         };
@@ -413,6 +552,7 @@ export interface Database {
           image_url?: string | null;
           is_active?: boolean | null;
           use_smart_pricing?: boolean;
+          variant_layout?: "flat" | "grouped";
           specs?: Json;
         };
         Update: {
@@ -423,6 +563,7 @@ export interface Database {
           image_url?: string | null;
           is_active?: boolean | null;
           use_smart_pricing?: boolean;
+          variant_layout?: "flat" | "grouped";
           specs?: Json;
         };
         Relationships: [

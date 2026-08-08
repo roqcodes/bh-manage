@@ -93,6 +93,7 @@ export interface Product {
   is_active: boolean | null;
   use_smart_pricing: boolean | null;
   specs: Record<string, string> | null;
+  variant_layout?: "flat" | "grouped" | null;
   created_at: string | null;
 }
 
@@ -156,11 +157,30 @@ export interface ProductVariant {
   name: string | null;
   price: number | null;
   mrp: number | null;
+  variant_group_id?: string | null;
   created_at: string | null;
   /** Ordered images for this variant; preview first. Empty when none. */
   images: VariantImage[];
   /** Central warehouse stock (from inventory). */
   central_stock?: number;
+}
+
+export interface ProductImage {
+  url: string;
+  is_preview: boolean;
+  sort_order: number;
+}
+
+export interface ProductVideo {
+  url: string;
+  sort_order: number;
+}
+
+export interface VariantGroup {
+  id: string;
+  name: string;
+  sort_order: number;
+  product_id?: string;
 }
 
 export interface VariantWithProduct extends ProductVariant {
@@ -262,6 +282,21 @@ export interface OrderItem {
   final_price: number | null;
   margin_amount: number | null;
   created_at: string | null;
+  /** Live catalog join when loading order detail (not stored on order_items). */
+  variant_meta?: OrderItemVariantMeta | null;
+}
+
+export interface OrderItemVariantMeta {
+  id: string;
+  name: string | null;
+  variant_group_id: string | null;
+  product: {
+    id: string;
+    name: string | null;
+    image_url: string | null;
+    variant_layout?: "flat" | "grouped" | null;
+  } | null;
+  image_url: string | null;
 }
 
 export interface OrderAddress {
@@ -288,6 +323,8 @@ export interface OrderWithItems {
   users: OrderUser | null;
   addresses: OrderAddress | null;
   order_items: OrderItem[];
+  /** Variant groups keyed by product id (order detail enrichment). */
+  variant_groups?: Record<string, VariantGroup[]>;
   customer_order_count: number;
 }
 

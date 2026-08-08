@@ -11,7 +11,6 @@ import {
   Mail,
   MapPin,
   MessageSquare,
-  Package,
   Pencil,
   Phone,
   Printer,
@@ -21,12 +20,14 @@ import {
 } from "lucide-react";
 
 import type { OrderStatus, OrderWithItems } from "@/common/admin/types";
+import { currencyLabel, getCurrencySymbol } from "@/lib/format-currency";
 import {
   cancelOrderAndRefundAction,
   updateOrderDetailsAction,
   updateOrderStatusAction,
 } from "@/modules/orders/actions/orders.actions";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
+import { OrderLineItemsList } from "@/modules/orders/components/order-line-items-list";
 import {
   FormError,
   Modal,
@@ -117,7 +118,7 @@ function buildTimeline(order: OrderWithItems, total: number) {
       title: "Payment captured",
       detail: `${formatInr(total)} paid via BuyHub wallet.`,
       at: order.created_at,
-      icon: "₹",
+      icon: getCurrencySymbol(),
     });
   } else if (!isCancelled(order.status)) {
     events.push({
@@ -588,39 +589,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 pt-4">
-              {order.order_items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No line items.</p>
-              ) : (
-                order.order_items.map((item) => {
-                  const unit =
-                    item.final_price != null
-                      ? Number(item.final_price)
-                      : Number(item.price ?? 0);
-                  const lineTotal = unit * Number(item.quantity ?? 1);
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex items-start gap-3 border-b border-border/60 pb-4 last:border-0 last:pb-0"
-                    >
-                      <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border bg-muted/40">
-                        <Package />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium">
-                          {item.product_name ?? "Item"}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Qty {item.quantity ?? 1} · {formatInr(unit)} each
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold tabular-nums">
-                        {formatInr(lineTotal)}
-                      </p>
-                    </div>
-                  );
-                })
-              )}
+              <OrderLineItemsList order={order} />
               {!cancelled && nextStatus ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
                   <p className="text-sm text-muted-foreground">
@@ -646,12 +615,12 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
             </CardHeader>
             <CardContent className="flex flex-col gap-2 pt-4 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-muted-foreground">{currencyLabel("Subtotal")}</span>
                 <span className="tabular-nums">{formatInr(subtotal)}</span>
               </div>
               <Separator />
               <div className="flex justify-between font-semibold">
-                <span>Order total</span>
+                <span>{currencyLabel("Order total")}</span>
                 <span className="tabular-nums">{formatInr(total)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
@@ -662,12 +631,12 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
               </div>
               {refunded ? (
                 <div className="flex justify-between font-medium text-rose-700">
-                  <span>Refunded to wallet</span>
+                  <span>{currencyLabel("Refunded to wallet")}</span>
                   <span className="tabular-nums">−{formatInr(total)}</span>
                 </div>
               ) : paid ? (
                 <div className="flex justify-between font-medium text-emerald-700">
-                  <span>Paid via wallet</span>
+                  <span>{currencyLabel("Paid via wallet")}</span>
                   <span className="tabular-nums">{formatInr(total)}</span>
                 </div>
               ) : null}

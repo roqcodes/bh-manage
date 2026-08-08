@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -44,6 +43,7 @@ import {
   formatVendorId,
   VendorStatusBadge,
 } from "@/modules/vendors/components/vendors-ui";
+import { useAdminAction } from "@/modules/admin/hooks/use-admin-action";
 
 export function exportVendorsCsv(vendors: Vendor[]) {
   const headers = ["Name", "ID", "Status", "Contact", "Created"];
@@ -79,7 +79,7 @@ export function VendorsBulkActionBar({
   onClearSelection: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
+  const { runAction, isPending } = useAdminAction();
 
   if (selectedIds.size === 0) return null;
 
@@ -95,7 +95,7 @@ export function VendorsBulkActionBar({
           size="sm"
           disabled={isPending}
           onClick={() => {
-            startTransition(async () => {
+            runAction(async () => {
               await bulkSetVendorsActiveAction(ids, true);
               void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
               onClearSelection();
@@ -109,7 +109,7 @@ export function VendorsBulkActionBar({
           variant="outline"
           disabled={isPending}
           onClick={() => {
-            startTransition(async () => {
+            runAction(async () => {
               await bulkSetVendorsActiveAction(ids, false);
               void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
               onClearSelection();
@@ -123,11 +123,11 @@ export function VendorsBulkActionBar({
           variant="destructive"
           disabled={isPending}
           onClick={() => {
-            startTransition(async () => {
+            runAction(async () => {
               await bulkDeleteVendorsAction(ids);
               void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
               onClearSelection();
-            });
+            }, { errorTitle: "Couldn't delete vendors" });
           }}
         >
           <Trash2 data-icon="inline-start" />
@@ -154,7 +154,7 @@ export function VendorsDataTable({
   onEdit: (vendor: Vendor) => void;
 }) {
   const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
+  const { runAction, isPending } = useAdminAction();
 
   const pageIds = vendors.map((v) => v.id);
   const allPageSelected =
@@ -183,21 +183,17 @@ export function VendorsDataTable({
   }
 
   function runToggle(vendorId: string, isActive: boolean) {
-    startTransition(async () => {
+    runAction(async () => {
       await toggleVendorAction(vendorId, isActive);
       void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
     });
   }
 
   function runDelete(vendorId: string) {
-    startTransition(async () => {
-      try {
-        await deleteVendorAction(vendorId);
-        void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
-      } catch (err) {
-        alert(err instanceof Error ? err.message : "Could not delete vendor.");
-      }
-    });
+    runAction(async () => {
+      await deleteVendorAction(vendorId);
+      void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
+    }, { errorTitle: "Couldn't delete vendor" });
   }
 
   if (vendors.length === 0) {

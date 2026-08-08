@@ -13,14 +13,12 @@ import {
 } from "@/modules/vendor/actions/vendor-purchase-orders.actions";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { TableShell } from "@/modules/admin/components/empty-state";
+import { CurrencyAmount } from "@/components/currency-amount";
+import { currencyLabel, formatCurrencyAmount } from "@/lib/format-currency";
 
 function formatMoney(n: number | null) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(n);
+  return formatCurrencyAmount(n, { minimumFractionDigits: 2 });
 }
 
 export function VendorPurchaseOrderDetailView({
@@ -91,7 +89,7 @@ export function VendorPurchaseOrderDetailView({
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge status={status} />
           <span className="text-lg font-extrabold text-slate-900">
-            {formatMoney(po.total_amount)}
+            <CurrencyAmount amount={po.total_amount} />
           </span>
         </div>
       </div>
@@ -138,8 +136,8 @@ export function VendorPurchaseOrderDetailView({
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Variant</th>
                 <th className="px-4 py-3 text-end">Qty</th>
-                <th className="px-4 py-3 text-end">Unit price</th>
-                <th className="px-4 py-3 text-end">Line total</th>
+                <th className="px-4 py-3 text-end">{currencyLabel("Unit price")}</th>
+                <th className="px-4 py-3 text-end">{currencyLabel("Line total")}</th>
               </tr>
             </thead>
             <tbody>

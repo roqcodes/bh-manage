@@ -9,6 +9,7 @@ import {
   MiniSparkline,
   TrendBadge,
 } from "@/modules/orders/components/orders-ui";
+import { currencyLabel } from "@/lib/format-currency";
 import { formatBillingInr } from "@/modules/billing/components/billing-ui";
 
 function MetricSegment({
@@ -96,14 +97,14 @@ export function BillingMetricsBar({
             sparkSeed={lineCount}
           />
           <MetricSegment
-            label="Subtotal"
+            label={currencyLabel("Subtotal")}
             value={formatBillingInr(subtotal)}
             trendTone="neutral"
             sparkSeed={Math.floor(subtotal)}
             sparkTone="primary"
           />
           <MetricSegment
-            label="Discount"
+            label={currencyLabel("Discount")}
             value={formatBillingInr(totalDiscount)}
             trendTone={totalDiscount > 0 ? "down" : "neutral"}
             sparkSeed={Math.floor(totalDiscount)}
@@ -111,7 +112,7 @@ export function BillingMetricsBar({
             flatSpark
           />
           <MetricSegment
-            label="Grand total"
+            label={currencyLabel("Grand total")}
             value={formatBillingInr(grandTotal)}
             trend="Tax excluded"
             trendTone="neutral"

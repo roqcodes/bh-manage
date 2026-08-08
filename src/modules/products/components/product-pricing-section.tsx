@@ -46,6 +46,7 @@ import {
   upsertProductPricingRuleAction,
 } from "@/modules/pricing/actions/product-pricing.actions";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { currencyLabel, formatInr } from "@/lib/format-currency";
 
 function parseOptionalNonNeg(s: string): number | null {
   const t = s.trim();
@@ -53,10 +54,6 @@ function parseOptionalNonNeg(s: string): number | null {
   const n = parseFloat(t);
   if (!Number.isFinite(n) || n < 0) return null;
   return n;
-}
-
-function formatInr(n: number) {
-  return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -300,7 +297,7 @@ export function ProductPricingSection({
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="fixed-markup" className="text-sm">
-                      Fixed markup (₹)
+                      {currencyLabel("Fixed markup")}
                     </FieldLabel>
                     <Input
                       id="fixed-markup"
@@ -344,7 +341,7 @@ export function ProductPricingSection({
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <Field className="sm:max-w-40">
                   <FieldLabel htmlFor="sample-cost" className="text-sm">
-                    Sample vendor cost (₹)
+                    {currencyLabel("Sample vendor cost")}
                   </FieldLabel>
                   <Input
                     id="sample-cost"
@@ -401,9 +398,9 @@ export function ProductPricingSection({
                     <TableRow>
                       <TableHead className="text-sm">SKU</TableHead>
                       <TableHead className="text-sm">Central stock</TableHead>
-                      <TableHead className="text-sm">Vendor cost</TableHead>
-                      <TableHead className="text-sm">Current list</TableHead>
-                      <TableHead className="text-sm">Suggested</TableHead>
+                      <TableHead className="text-sm">{currencyLabel("Vendor cost")}</TableHead>
+                      <TableHead className="text-sm">{currencyLabel("Current list")}</TableHead>
+                      <TableHead className="text-sm">{currencyLabel("Suggested")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
