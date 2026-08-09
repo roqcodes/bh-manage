@@ -140,7 +140,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
     supabase
       .from("users")
       .select("id,name,email,phone,role,is_verified,created_at")
-      .not("role", "is", null)
+      .in("role", ["admin", "manager", "vendor", "delivery"])
       .order("created_at", { ascending: false })
       .limit(FETCH_LIMIT),
     supabase

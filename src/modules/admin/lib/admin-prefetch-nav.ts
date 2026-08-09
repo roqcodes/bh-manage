@@ -76,8 +76,8 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
 
   if (p === "/admin/users") {
     return qc.prefetchQuery({
-      queryKey: adminQueryKeys.users("users", "stores", 0),
-      queryFn: () => adminGet("users?tab=users&segment=stores"),
+      queryKey: adminQueryKeys.users("users", "vendor", 0),
+      queryFn: () => adminGet("users?tab=users&segment=vendor"),
       staleTime: STALE,
     });
   }

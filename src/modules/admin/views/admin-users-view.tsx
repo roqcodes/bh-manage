@@ -5,23 +5,21 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 
-import type { AdminUser, DBUser } from "@/common/admin/types";
+import type { DBUser } from "@/common/admin/types";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { UsersListPanel } from "@/modules/users/components/users-list-panel";
 import { UsersMetricsBar } from "@/modules/users/components/users-metrics-bar";
 import {
   exportPendingUsersCsv,
   exportPortalUsersCsv,
-  exportStoresUsersCsv,
 } from "@/modules/users/components/users-data-table";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
-import type { UserCatalogStats } from "@/modules/users/services/users.service";
+import type { TeamCatalogStats } from "@/modules/users/services/users.service";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const USER_SEGMENTS = [
-  { id: "stores", label: "Stores" },
   { id: "vendor", label: "Vendor" },
   { id: "delivery", label: "Delivery" },
   { id: "admin", label: "Admin" },
@@ -31,7 +29,6 @@ type UserSegment = (typeof USER_SEGMENTS)[number]["id"];
 
 type UsersApiContent =
   | { kind: "requests"; pending: DBUser[] }
-  | { kind: "stores"; data: AdminUser[]; total: number }
   | { kind: "vendor"; data: DBUser[]; total: number }
   | { kind: "delivery"; data: DBUser[]; total: number }
   | { kind: "admin"; data: DBUser[]; total: number };
@@ -90,14 +87,12 @@ export function AdminUsersView() {
   const searchParams = useSearchParams();
   const primary = searchParams.get("tab") === "requests" ? "requests" : "users";
   const rawSegment = searchParams.get("segment");
-  const normalizedSegment =
-    rawSegment === "restaurants" ? "stores" : rawSegment;
   const segment: UserSegment =
-    normalizedSegment === "vendor" ||
-    normalizedSegment === "delivery" ||
-    normalizedSegment === "admin"
-      ? (normalizedSegment as UserSegment)
-      : "stores";
+    rawSegment === "vendor" ||
+    rawSegment === "delivery" ||
+    rawSegment === "admin"
+      ? (rawSegment as UserSegment)
+      : "vendor";
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
 
   const { data, isPending, isError, error } = useQuery({
@@ -112,7 +107,7 @@ export function AdminUsersView() {
         primary: "users" | "requests";
         segment: UserSegment;
         page: number;
-        stats: UserCatalogStats;
+        stats: TeamCatalogStats;
         content: UsersApiContent;
       }>(`users?${q.toString()}`);
     },
@@ -149,10 +144,6 @@ export function AdminUsersView() {
   function handleExport() {
     if (content.kind === "requests") {
       exportPendingUsersCsv(content.pending);
-      return;
-    }
-    if (content.kind === "stores") {
-      exportStoresUsersCsv(content.data);
       return;
     }
     exportPortalUsersCsv(content.data, content.kind);

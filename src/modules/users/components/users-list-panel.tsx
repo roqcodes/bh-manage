@@ -2,35 +2,20 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Ban, ChevronDown, Columns3, Search } from "lucide-react";
+import { Ban, Columns3, Search } from "lucide-react";
 
-import type { AdminUser, DBUser } from "@/common/admin/types";
+import type { DBUser } from "@/common/admin/types";
 import { Pagination } from "@/modules/admin/components/pagination";
 import {
   AccessRequestsDataTable,
   exportPendingUsersCsv,
   exportPortalUsersCsv,
-  exportStoresUsersCsv,
   PortalStaffDataTable,
-  StoresBulkActionBar,
-  StoresUsersDataTable,
 } from "@/modules/users/components/users-data-table";
 import { UsersRoleModal } from "@/modules/users/components/users-role-modal";
-import {
-  matchesUserSearch,
-  matchesUserStatusFilter,
-  USER_STATUS_FILTERS,
-  type UserStatusFilter,
-} from "@/modules/users/components/users-ui";
+import { matchesUserSearch } from "@/modules/users/components/users-ui";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   InputGroup,
   InputGroupAddon,
@@ -40,13 +25,11 @@ import {
 
 type UsersContent =
   | { kind: "requests"; pending: DBUser[] }
-  | { kind: "stores"; data: AdminUser[]; total: number }
   | { kind: "vendor"; data: DBUser[]; total: number }
   | { kind: "delivery"; data: DBUser[]; total: number }
   | { kind: "admin"; data: DBUser[]; total: number };
 
 const SEGMENT_LABELS: Record<string, string> = {
-  stores: "Stores",
   vendor: "Vendor",
   delivery: "Delivery",
   admin: "Admin",
@@ -62,11 +45,8 @@ export function UsersListPanel({
   page: number;
 }) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [roleUser, setRoleUser] = useState<DBUser | null>(null);
 
-  const isStores = content.kind === "stores";
   const isRequests = content.kind === "requests";
 
   const filtered = useMemo(() => {
@@ -74,22 +54,10 @@ export function UsersListPanel({
       return content.pending.filter((user) => matchesUserSearch(user, search));
     }
 
-    if (isStores) {
-      return content.data.filter((user) => {
-        if (!matchesUserStatusFilter(user, statusFilter)) return false;
-        return matchesUserSearch(user, search);
-      });
-    }
-
     return content.data.filter((user) => matchesUserSearch(user, search));
-  }, [content, isRequests, isStores, search, statusFilter]);
+  }, [content, isRequests, search]);
 
-  const isFiltering =
-    search.trim().length > 0 || (isStores && statusFilter !== "all");
-
-  const activeStatusLabel =
-    USER_STATUS_FILTERS.find((f) => f.id === statusFilter)?.label ??
-    "All Statuses";
+  const isFiltering = search.trim().length > 0;
 
   const total =
     content.kind === "requests" ? content.pending.length : content.total;
@@ -99,10 +67,6 @@ export function UsersListPanel({
   function handleExport() {
     if (content.kind === "requests") {
       exportPendingUsersCsv(filtered as DBUser[]);
-      return;
-    }
-    if (content.kind === "stores") {
-      exportStoresUsersCsv(filtered as AdminUser[]);
       return;
     }
     exportPortalUsersCsv(filtered as DBUser[], content.kind);
@@ -118,14 +82,12 @@ export function UsersListPanel({
     : `${SEGMENT_LABELS[segment] ?? "Users"} directory`;
 
   const sectionDescription = isRequests
-    ? "Accounts waiting for verification before they can sign in to the portal."
-    : segment === "stores"
-      ? "Retail store customers with order history."
-      : segment === "delivery"
-        ? "Verified delivery operators."
-        : segment === "vendor"
-          ? "Verified vendor portal accounts."
-          : "Verified admin accounts.";
+    ? "Staff accounts waiting for verification before they can sign in to the portal."
+    : segment === "delivery"
+      ? "Verified delivery operators."
+      : segment === "vendor"
+        ? "Verified vendor portal accounts."
+        : "Verified admin accounts.";
 
   return (
     <>
@@ -155,41 +117,6 @@ export function UsersListPanel({
 
           <div className="border-b p-2">
             <InputGroup className="h-9">
-              {isStores ? (
-                <>
-                  <InputGroupAddon align="inline-start" className="pl-1">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <InputGroupButton
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1 px-2"
-                          />
-                        }
-                      >
-                        {activeStatusLabel}
-                        <ChevronDown />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start">
-                        <DropdownMenuGroup>
-                          {USER_STATUS_FILTERS.map((option) => (
-                            <DropdownMenuItem
-                              key={option.id}
-                              onClick={() => setStatusFilter(option.id)}
-                            >
-                              {option.label}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </InputGroupAddon>
-                  <InputGroupAddon align="inline-start" className="px-0">
-                    <div className="h-4 w-px bg-border" aria-hidden />
-                  </InputGroupAddon>
-                </>
-              ) : null}
               <InputGroupAddon align="inline-start">
                 <Search aria-hidden />
               </InputGroupAddon>
@@ -203,7 +130,7 @@ export function UsersListPanel({
                 <InputGroupButton
                   variant="ghost"
                   size="icon-sm"
-                  aria-label="Column view"
+                  aria-label="Export list"
                   onClick={handleExport}
                 >
                   <Columns3 />
@@ -211,15 +138,6 @@ export function UsersListPanel({
               </InputGroupAddon>
             </InputGroup>
           </div>
-
-          {isStores ? (
-            <div className="px-2 pt-2">
-              <StoresBulkActionBar
-                selectedIds={selectedIds}
-                onClearSelection={() => setSelectedIds(new Set())}
-              />
-            </div>
-          ) : null}
 
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
@@ -233,10 +151,7 @@ export function UsersListPanel({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setSearch("");
-                    setStatusFilter("all");
-                  }}
+                  onClick={() => setSearch("")}
                 >
                   Clear filters
                 </Button>
@@ -246,12 +161,6 @@ export function UsersListPanel({
             <AccessRequestsDataTable
               users={filtered as DBUser[]}
               onEditRole={setRoleUser}
-            />
-          ) : isStores ? (
-            <StoresUsersDataTable
-              users={filtered as AdminUser[]}
-              selectedIds={selectedIds}
-              onSelectedIdsChange={setSelectedIds}
             />
           ) : (
             <PortalStaffDataTable

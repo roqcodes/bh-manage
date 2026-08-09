@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 
@@ -34,13 +34,19 @@ export function UsersRoleModal({
 }) {
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function handleSelect(newRole: string) {
     startTransition(async () => {
-      await updateUserRoleAction(user.id, newRole);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-      onUpdated?.();
-      onClose();
+      setError(null);
+      try {
+        await updateUserRoleAction(user.id, newRole);
+        void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+        onUpdated?.();
+        onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not update role.");
+      }
     });
   }
 
@@ -52,6 +58,11 @@ export function UsersRoleModal({
           <p className="text-muted-foreground">{user.email ?? "No email"}</p>
           {description ? (
             <p className="mt-2 text-xs text-muted-foreground">{description}</p>
+          ) : null}
+          {error ? (
+            <p className="mt-2 whitespace-pre-line text-xs font-medium text-destructive">
+              {error}
+            </p>
           ) : null}
           <div className="mt-2">
             <UserRoleBadge role={user.role} />

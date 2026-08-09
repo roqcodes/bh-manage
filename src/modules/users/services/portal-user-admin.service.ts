@@ -11,6 +11,11 @@ import {
   deleteVendorRowForUser,
   syncVendorRowFromUser,
 } from "@/modules/vendors/services/vendor-user-sync.service";
+import {
+  assertCanPromoteUserToStaff,
+  isStaffRole,
+  isStoreCustomerRole,
+} from "@/modules/users/services/customer-storefront-activity.service";
 
 const ASSIGNABLE_ROLES: readonly string[] = [
   UserRole.Admin,
@@ -60,6 +65,10 @@ export async function updateUserRoleById(
     .select("role,is_verified")
     .eq("id", userId)
     .maybeSingle();
+
+  if (isStoreCustomerRole(before?.role) && isStaffRole(newRole)) {
+    await assertCanPromoteUserToStaff(userId);
+  }
 
   const { error } = await supabase
     .from("users")

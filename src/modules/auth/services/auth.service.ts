@@ -11,6 +11,13 @@ import {
 } from "@/common/auth/types";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { recordAuthAudit } from "@/modules/auth/services/auth-audit.service";
+import {
+  formatPortalAuthError,
+  PORTAL_ACCESS_DENIED_MESSAGE,
+  PORTAL_CUSTOMER_DENIED_MESSAGE,
+  PORTAL_PENDING_VERIFICATION_MESSAGE,
+} from "@/modules/auth/lib/format-auth-error";
+import { assertEmailAvailableForStaffPortal } from "@/modules/users/services/portal-email-policy.service";
 
 const allowedAdminRoles = new Set<UserRole>(ALLOWED_PORTAL_ROLES);
 
@@ -94,7 +101,7 @@ export async function signInWithPassword(input: {
       outcome: "failure",
       reason: error.message,
     });
-    throw new Error(error.message);
+    throw new Error(formatPortalAuthError(error, "sign-in"));
   }
 
   const user = data.user;
@@ -111,7 +118,31 @@ export async function signInWithPassword(input: {
 
   const profile = await getUserProfileById(user.id);
 
-  if (!profile?.role || !allowedAdminRoles.has(profile.role)) {
+  if (!profile) {
+    await supabase.auth.signOut();
+    await recordAuthAudit({
+      action: "sign_in",
+      email: input.email,
+      userId: user.id,
+      outcome: "failure",
+      reason: "Missing users profile after sign in.",
+    });
+    throw new Error("Your account profile could not be loaded.");
+  }
+
+  if (!profile.role) {
+    await supabase.auth.signOut();
+    await recordAuthAudit({
+      action: "sign_in",
+      email: input.email,
+      userId: user.id,
+      outcome: "failure",
+      reason: "Storefront customer attempted portal sign-in.",
+    });
+    throw new Error(PORTAL_CUSTOMER_DENIED_MESSAGE);
+  }
+
+  if (!allowedAdminRoles.has(profile.role)) {
     await supabase.auth.signOut();
     await recordAuthAudit({
       action: "sign_in",
@@ -120,7 +151,20 @@ export async function signInWithPassword(input: {
       outcome: "failure",
       reason: "Role is not allowed for this admin application.",
     });
-    throw new Error("This account does not have access to the management portal.");
+    throw new Error(PORTAL_ACCESS_DENIED_MESSAGE);
+  }
+
+  if (!profile.is_verified) {
+    await supabase.auth.signOut();
+    await recordAuthAudit({
+      action: "sign_in",
+      email: input.email,
+      userId: user.id,
+      role: profile.role,
+      outcome: "failure",
+      reason: "Staff account pending verification.",
+    });
+    throw new Error(PORTAL_PENDING_VERIFICATION_MESSAGE);
   }
 
   await recordAuthAudit({
@@ -145,6 +189,8 @@ export async function requestAccess(input: {
   role: RequestAccessRole;
 }) {
   const supabase = await createSupabaseServerClient();
+  await assertEmailAvailableForStaffPortal(supabase, input.email);
+
   const { data, error } = await supabase.auth.signUp({
     email: input.email,
     password: input.password,
@@ -158,7 +204,7 @@ export async function requestAccess(input: {
       outcome: "failure",
       reason: error.message,
     });
-    throw new Error(error.message);
+    throw new Error(formatPortalAuthError(error, "request-access"));
   }
 
   const user = data.user;

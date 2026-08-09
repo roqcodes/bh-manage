@@ -8,7 +8,7 @@ import type { Database } from "@/lib/integrations/supabase/types";
 import type { AdminUser, DBUser, Paginated } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
 
-const STAFF_ROLES = ["admin", "vendor", "delivery"];
+const STAFF_ROLES = ["admin", "manager", "vendor", "delivery"];
 
 /** Portal staff lists (verified users by role). */
 export type PortalStaffSegment = "vendor" | "delivery" | "admin";
@@ -122,30 +122,21 @@ export async function getPendingPortalRequestCount(): Promise<number> {
   return count ?? 0;
 }
 
-export interface UserCatalogStats {
-  stores: number;
-  storesActive: number;
+export interface TeamCatalogStats {
   vendor: number;
   delivery: number;
   admin: number;
+  manager: number;
   pendingRequests: number;
 }
 
-export async function getUsersCatalogStats(): Promise<UserCatalogStats> {
+/** Portal team metrics — storefront customers are excluded. */
+export async function getTeamCatalogStats(): Promise<TeamCatalogStats> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
 
-  const [storesRes, storesActiveRes, vendorRes, deliveryRes, adminRes, pendingRes] =
+  const [vendorRes, deliveryRes, adminRes, managerRes, pendingRes] =
     await Promise.all([
-      supabase
-        .from("users")
-        .select("id", { count: "exact", head: true })
-        .is("role", null),
-      supabase
-        .from("users")
-        .select("id", { count: "exact", head: true })
-        .is("role", null)
-        .eq("is_verified", true),
       supabase
         .from("users")
         .select("id", { count: "exact", head: true })
@@ -164,16 +155,20 @@ export async function getUsersCatalogStats(): Promise<UserCatalogStats> {
       supabase
         .from("users")
         .select("id", { count: "exact", head: true })
+        .eq("role", "manager")
+        .eq("is_verified", true),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
         .in("role", STAFF_ROLES)
         .eq("is_verified", false),
     ]);
 
   return {
-    stores: storesRes.count ?? 0,
-    storesActive: storesActiveRes.count ?? 0,
     vendor: vendorRes.count ?? 0,
     delivery: deliveryRes.count ?? 0,
     admin: adminRes.count ?? 0,
+    manager: managerRes.count ?? 0,
     pendingRequests: pendingRes.count ?? 0,
   };
 }

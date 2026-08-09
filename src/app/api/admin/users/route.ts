@@ -5,12 +5,19 @@ import {
   getPendingPortalRequests,
   getPendingPortalRequestCount,
   getPortalStaffUsers,
-  getStoreUsers,
-  getUsersCatalogStats,
+  getTeamCatalogStats,
+  type PortalStaffSegment,
 } from "@/modules/users/services/users.service";
 
 type PrimaryTab = "users" | "requests";
-type UserSegment = "stores" | "vendor" | "delivery" | "admin";
+type UserSegment = PortalStaffSegment;
+
+function resolveStaffSegment(segmentParam: string | null): UserSegment {
+  if (segmentParam === "vendor" || segmentParam === "delivery" || segmentParam === "admin") {
+    return segmentParam;
+  }
+  return "vendor";
+}
 
 export async function GET(request: Request) {
   const auth = await requireAdminApiProfile();
@@ -19,22 +26,13 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const primary: PrimaryTab =
     searchParams.get("tab") === "requests" ? "requests" : "users";
-  let segmentParam = searchParams.get("segment");
-  if (segmentParam === "restaurants") {
-    segmentParam = "stores";
-  }
-  const segment: UserSegment =
-    segmentParam === "vendor" ||
-    segmentParam === "delivery" ||
-    segmentParam === "admin"
-      ? segmentParam
-      : "stores";
+  const segment = resolveStaffSegment(searchParams.get("segment"));
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
 
   if (primary === "requests") {
     const [pending, stats] = await Promise.all([
       getPendingPortalRequests(),
-      getUsersCatalogStats(),
+      getTeamCatalogStats(),
     ]);
     return NextResponse.json({
       pendingCount: pending.length,
@@ -48,11 +46,8 @@ export async function GET(request: Request) {
 
   const [pendingCount, stats, content] = await Promise.all([
     getPendingPortalRequestCount(),
-    getUsersCatalogStats(),
+    getTeamCatalogStats(),
     (async () => {
-      if (segment === "stores") {
-        return { kind: "stores" as const, ...(await getStoreUsers(page)) };
-      }
       if (segment === "vendor") {
         return { kind: "vendor" as const, ...(await getPortalStaffUsers("vendor", page)) };
       }

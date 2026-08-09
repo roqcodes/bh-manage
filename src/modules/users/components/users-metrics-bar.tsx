@@ -1,6 +1,6 @@
 "use client";
 
-import type { UserCatalogStats } from "@/modules/users/services/users.service";
+import type { TeamCatalogStats } from "@/modules/users/services/users.service";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -45,13 +45,11 @@ export function UsersMetricsBar({
   stats,
   onExport,
 }: {
-  stats: UserCatalogStats;
+  stats: TeamCatalogStats;
   onExport: () => void;
 }) {
-  const portalStaff = stats.vendor + stats.delivery + stats.admin;
-  const blockedStores = Math.max(0, stats.stores - stats.storesActive);
-  const activePct =
-    stats.stores > 0 ? Math.round((stats.storesActive / stats.stores) * 100) : 0;
+  const portalStaff =
+    stats.vendor + stats.delivery + stats.admin + stats.manager;
 
   return (
     <div className="flex flex-col gap-3">
@@ -59,7 +57,8 @@ export function UsersMetricsBar({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Team & Users</h1>
           <p className="text-sm text-muted-foreground">
-            Retail stores, portal staff, and access requests.
+            Portal staff and access requests. Storefront customers live under
+            Customers.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -72,12 +71,6 @@ export function UsersMetricsBar({
       <Card className="overflow-hidden border border-border py-0 ring-0">
         <div className="flex flex-col divide-y divide-border lg:flex-row lg:divide-x lg:divide-y-0">
           <MetricSegment
-            label="Store accounts"
-            value={stats.stores.toLocaleString("en-IN")}
-            trend={`${activePct}% active`}
-            sparkSeed={stats.stores}
-          />
-          <MetricSegment
             label="Portal staff"
             value={portalStaff.toLocaleString("en-IN")}
             trend={`${stats.vendor} vendors · ${stats.delivery} delivery`}
@@ -86,20 +79,20 @@ export function UsersMetricsBar({
             sparkTone="green"
           />
           <MetricSegment
+            label="Admins & managers"
+            value={(stats.admin + stats.manager).toLocaleString("en-IN")}
+            trend={`${stats.admin} admins · ${stats.manager} managers`}
+            trendTone="neutral"
+            sparkSeed={stats.admin + stats.manager + 1}
+            sparkTone="primary"
+          />
+          <MetricSegment
             label="Pending requests"
             value={stats.pendingRequests.toLocaleString("en-IN")}
             trendTone={stats.pendingRequests > 0 ? "down" : "neutral"}
             sparkSeed={stats.pendingRequests}
             sparkTone="neutral"
             flatSpark
-          />
-          <MetricSegment
-            label="Blocked stores"
-            value={blockedStores.toLocaleString("en-IN")}
-            trend={`${stats.admin} admins`}
-            trendTone="neutral"
-            sparkSeed={blockedStores + 5}
-            sparkTone="primary"
           />
         </div>
       </Card>

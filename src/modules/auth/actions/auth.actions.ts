@@ -12,6 +12,7 @@ import {
   getAccessRedirectPath,
   canAccessRolePath,
 } from "@/modules/auth/access.control";
+import { formatPortalAuthError } from "@/modules/auth/lib/format-auth-error";
 import {
   AUTH_ROUTES,
   getDashboardRouteForRole,
@@ -68,7 +69,9 @@ export async function signInAction(
     if (!profile.role) {
       return {
         ...INITIAL_AUTH_ACTION_STATE,
-        errorMessage: "Your account role is not allowed in this portal.",
+        errorMessage: formatPortalAuthError(
+          "This account does not have access to the management portal.",
+        ),
       };
     }
 
@@ -76,8 +79,7 @@ export async function signInAction(
   } catch (error) {
     return {
       ...INITIAL_AUTH_ACTION_STATE,
-      errorMessage:
-        error instanceof Error ? error.message : "Unable to sign you in.",
+      errorMessage: formatPortalAuthError(error, "sign-in"),
     };
   }
 }
@@ -123,8 +125,7 @@ export async function requestAccessAction(
   } catch (error) {
     return {
       ...INITIAL_AUTH_ACTION_STATE,
-      errorMessage:
-        error instanceof Error ? error.message : "Unable to request access.",
+      errorMessage: formatPortalAuthError(error, "request-access"),
     };
   }
 }
