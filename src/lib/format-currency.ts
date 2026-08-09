@@ -35,6 +35,15 @@ export function currencyLabel(prefix: string): string {
   return `${prefix} (${activeSettings.currency_symbol})`;
 }
 
+function normalizeFractionDigits(
+  options: Intl.NumberFormatOptions,
+): Intl.NumberFormatOptions {
+  const min = options.minimumFractionDigits;
+  const max = options.maximumFractionDigits;
+  if (min == null || max == null || min <= max) return options;
+  return { ...options, minimumFractionDigits: max };
+}
+
 export function formatCurrency(
   amount: number | null | undefined,
   options?: Intl.NumberFormatOptions,
@@ -42,12 +51,13 @@ export function formatCurrency(
 ): string {
   if (amount == null || !Number.isFinite(amount)) return "—";
   const s = settings ?? activeSettings;
-  return new Intl.NumberFormat(s.locale, {
+  const fmt = normalizeFractionDigits({
     style: "currency",
     currency: s.currency_code,
     maximumFractionDigits: 2,
     ...options,
-  }).format(amount);
+  });
+  return new Intl.NumberFormat(s.locale, fmt).format(amount);
 }
 
 /** Numeric amount only — use with symbol in column headers / KPI labels. */
@@ -58,12 +68,13 @@ export function formatCurrencyAmount(
 ): string {
   if (amount == null || !Number.isFinite(amount)) return "—";
   const s = settings ?? activeSettings;
-  return new Intl.NumberFormat(s.locale, {
+  const fmt = normalizeFractionDigits({
     style: "decimal",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
     ...options,
-  }).format(amount);
+  });
+  return new Intl.NumberFormat(s.locale, fmt).format(amount);
 }
 
 /** Compact amounts for dashboards (e.g. $1.2K, ₹2.5L). */
