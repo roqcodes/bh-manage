@@ -253,6 +253,7 @@ export interface Database {
           currency_symbol: string;
           locale: string;
           show_mrp: boolean;
+          capture_payments: boolean;
           updated_at: string | null;
         };
         Insert: {
@@ -263,6 +264,7 @@ export interface Database {
           currency_symbol?: string;
           locale?: string;
           show_mrp?: boolean;
+          capture_payments?: boolean;
           updated_at?: string | null;
         };
         Update: {
@@ -272,6 +274,7 @@ export interface Database {
           currency_symbol?: string;
           locale?: string;
           show_mrp?: boolean;
+          capture_payments?: boolean;
           updated_at?: string | null;
         };
         Relationships: [];
