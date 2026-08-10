@@ -11,6 +11,7 @@ import type { AppSettingsPatch } from "@/modules/settings/types";
 function rowToSettings(
   row: Record<string, unknown>,
   showMrpDefault = true,
+  capturePaymentsDefault = true,
 ): CurrencySettings {
   return {
     country_code: String(row.country_code ?? DEFAULT_CURRENCY_SETTINGS.country_code),
@@ -20,6 +21,10 @@ function rowToSettings(
     locale: String(row.locale ?? DEFAULT_CURRENCY_SETTINGS.locale),
     show_mrp:
       "show_mrp" in row ? row.show_mrp !== false : showMrpDefault,
+    capture_payments:
+      "capture_payments" in row
+        ? row.capture_payments !== false
+        : capturePaymentsDefault,
   };
 }
 
@@ -29,23 +34,35 @@ const APP_SETTINGS_BASE_SELECT =
 async function fetchAppSettingsRow(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
 ) {
-  const withMrp = await supabase
+  const withFlags = await supabase
     .from("app_settings")
-    .select(`${APP_SETTINGS_BASE_SELECT},show_mrp`)
+    .select(`${APP_SETTINGS_BASE_SELECT},show_mrp,capture_payments`)
     .eq("id", 1)
     .maybeSingle();
 
-  if (!withMrp.error) return withMrp;
+  if (!withFlags.error) return withFlags;
 
-  if (/show_mrp/i.test(withMrp.error.message)) {
-    return supabase
+  if (/show_mrp|capture_payments/i.test(withFlags.error.message)) {
+    const withMrp = await supabase
       .from("app_settings")
-      .select(APP_SETTINGS_BASE_SELECT)
+      .select(`${APP_SETTINGS_BASE_SELECT},show_mrp`)
       .eq("id", 1)
       .maybeSingle();
+
+    if (!withMrp.error) return withMrp;
+
+    if (/show_mrp/i.test(withMrp.error.message)) {
+      return supabase
+        .from("app_settings")
+        .select(APP_SETTINGS_BASE_SELECT)
+        .eq("id", 1)
+        .maybeSingle();
+    }
+
+    return withMrp;
   }
 
-  return withMrp;
+  return withFlags;
 }
 
 export async function getAppSettings(): Promise<CurrencySettings> {
@@ -77,6 +94,7 @@ export async function updateAppSettings(
     currency_symbol: patch.currency_symbol?.trim() || current.currency_symbol,
     locale: patch.locale?.trim() || current.locale,
     show_mrp: patch.show_mrp ?? current.show_mrp,
+    capture_payments: patch.capture_payments ?? current.capture_payments,
   };
 
   const updatedAt = new Date().toISOString();
@@ -88,9 +106,13 @@ export async function updateAppSettings(
 
   let { error } = await supabase.from("app_settings").upsert(upsertPayload);
 
-  if (error && /show_mrp/i.test(error.message)) {
-    const { show_mrp: _omit, ...withoutMrp } = upsertPayload;
-    ({ error } = await supabase.from("app_settings").upsert(withoutMrp));
+  if (error && /show_mrp|capture_payments/i.test(error.message)) {
+    const {
+      show_mrp: _omitMrp,
+      capture_payments: _omitCapture,
+      ...withoutFlags
+    } = upsertPayload;
+    ({ error } = await supabase.from("app_settings").upsert(withoutFlags));
   }
 
   if (error) throw new Error(error.message);

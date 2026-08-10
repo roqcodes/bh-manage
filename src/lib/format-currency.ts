@@ -5,6 +5,7 @@ export type CurrencySettings = {
   currency_symbol: string;
   locale: string;
   show_mrp: boolean;
+  capture_payments: boolean;
 };
 
 export const DEFAULT_CURRENCY_SETTINGS: CurrencySettings = {
@@ -14,6 +15,7 @@ export const DEFAULT_CURRENCY_SETTINGS: CurrencySettings = {
   currency_symbol: "₹",
   locale: "en-IN",
   show_mrp: true,
+  capture_payments: true,
 };
 
 let activeSettings: CurrencySettings = { ...DEFAULT_CURRENCY_SETTINGS };

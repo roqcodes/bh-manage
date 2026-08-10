@@ -49,6 +49,17 @@ export function isRefunded(paymentStatus: string | null) {
   return paymentStatus === "refunded";
 }
 
+export function isPaymentNotRequired(paymentStatus: string | null) {
+  return paymentStatus === "not_required";
+}
+
+export function paymentStatusLabel(paymentStatus: string | null) {
+  if (isRefunded(paymentStatus)) return "Refunded";
+  if (isPaid(paymentStatus)) return "Paid";
+  if (isPaymentNotRequired(paymentStatus)) return "No payment";
+  return "Unpaid";
+}
+
 export function isCancelled(status: string) {
   return status === "cancelled";
 }
@@ -101,7 +112,10 @@ export function matchesViewFilter(
     case "unfulfilled":
       return order.status === "pending" || order.status === "processing";
     case "unpaid":
-      return !isPaid(order.payment_status);
+      return (
+        !isPaid(order.payment_status) &&
+        !isPaymentNotRequired(order.payment_status)
+      );
     case "open":
       return (
         order.status === "pending" ||
@@ -216,6 +230,7 @@ export function PaymentPill({
 }) {
   const paid = isPaid(paymentStatus);
   const refunded = isRefunded(paymentStatus);
+  const notRequired = isPaymentNotRequired(paymentStatus);
 
   return (
     <span
@@ -225,10 +240,12 @@ export function PaymentPill({
           ? "bg-rose-50 text-rose-700"
           : paid
             ? "bg-emerald-50 text-emerald-700"
-            : "bg-muted text-muted-foreground",
+            : notRequired
+              ? "bg-sky-50 text-sky-700"
+              : "bg-muted text-muted-foreground",
       )}
     >
-      {refunded ? "Refunded" : paid ? "Paid" : "Unpaid"}
+      {paymentStatusLabel(paymentStatus)}
     </span>
   );
 }

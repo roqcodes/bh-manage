@@ -46,6 +46,7 @@ import {
   getNextFulfillmentStatus,
   isCancelled,
   isPaid,
+  isPaymentNotRequired,
   isRefunded,
   ORDER_FULFILLMENT_FLOW,
   PaymentPill,
@@ -119,6 +120,14 @@ function buildTimeline(order: OrderWithItems, total: number) {
       detail: `${formatInr(total)} paid via BuyHub wallet.`,
       at: order.created_at,
       icon: getCurrencySymbol(),
+    });
+  } else if (isPaymentNotRequired(order.payment_status)) {
+    events.push({
+      id: "payment-not-required",
+      title: "No payment required",
+      detail: "Order placed without wallet payment.",
+      at: order.created_at,
+      icon: "—",
     });
   } else if (!isCancelled(order.status)) {
     events.push({
@@ -244,6 +253,7 @@ function OrderEditDialog({
           >
             <option value="pending">Pending</option>
             <option value="paid">Paid</option>
+            <option value="not_required">No payment</option>
             <option value="refunded">Refunded</option>
           </select>
         </div>
@@ -397,6 +407,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
   const cancelled = isCancelled(order.status);
   const paid = isPaid(order.payment_status);
   const refunded = isRefunded(order.payment_status);
+  const paymentNotRequired = isPaymentNotRequired(order.payment_status);
   const nextStatus = getNextFulfillmentStatus(order.status);
   const nextActionLabel = fulfillmentActionLabel(order.status);
 
@@ -449,11 +460,11 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
   }
 
   function handleCancelAndRefund() {
-    if (
-      !confirm(
-        `Cancel order #${shortOrderRef(order.id)} and refund ${formatInr(total)} to the customer wallet? Stock will be restored.`,
-      )
-    ) {
+    const confirmMessage = paid
+      ? `Cancel order #${shortOrderRef(order.id)} and refund ${formatInr(total)} to the customer wallet? Stock will be restored.`
+      : `Cancel order #${shortOrderRef(order.id)}? Stock will be restored. No wallet refund applies to this order.`;
+
+    if (!confirm(confirmMessage)) {
       return;
     }
     setActionError(null);
@@ -515,7 +526,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
               onClick={handleCancelAndRefund}
             >
               <RotateCcw data-icon="inline-start" />
-              Cancel & refund
+              {paid ? "Cancel & refund" : "Cancel order"}
             </Button>
           ) : null}
           <Button
@@ -625,8 +636,10 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Payment status</span>
-                <span className="capitalize">
-                  {order.payment_status ?? "pending"}
+                <span>
+                  {paymentNotRequired
+                    ? "No payment required"
+                    : (order.payment_status ?? "pending")}
                 </span>
               </div>
               {refunded ? (
@@ -638,6 +651,11 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                 <div className="flex justify-between font-medium text-emerald-700">
                   <span>{currencyLabel("Paid via wallet")}</span>
                   <span className="tabular-nums">{formatInr(total)}</span>
+                </div>
+              ) : paymentNotRequired ? (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Payment method</span>
+                  <span>Not captured</span>
                 </div>
               ) : null}
             </CardContent>

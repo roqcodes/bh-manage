@@ -18,7 +18,7 @@ const VALID_STATUSES: OrderStatus[] = [
   "cancelled",
 ];
 
-const VALID_PAYMENT_STATUSES = ["pending", "paid", "refunded"] as const;
+const VALID_PAYMENT_STATUSES = ["pending", "paid", "refunded", "not_required"] as const;
 
 export async function updateOrderStatusAction(
   orderId: string,

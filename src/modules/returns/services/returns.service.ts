@@ -231,12 +231,20 @@ export async function updateReturnStatus(
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Return not found");
 
-  // If approved, process refund to wallet
+  // If refunded, credit wallet only when the original order was paid.
   if (status === "refunded" && data.refund_amount) {
-    await supabase.rpc("wallet_top_up", {
-      p_amount: data.refund_amount,
-      p_reference: `Return refund: ${returnId}`,
-    });
+    const { data: order } = await supabase
+      .from("orders")
+      .select("payment_status")
+      .eq("id", data.order_id)
+      .maybeSingle();
+
+    if (order?.payment_status === "paid") {
+      await supabase.rpc("wallet_top_up", {
+        p_amount: data.refund_amount,
+        p_reference: `Return refund: ${returnId}`,
+      });
+    }
   }
 
   return data as ReturnRow;

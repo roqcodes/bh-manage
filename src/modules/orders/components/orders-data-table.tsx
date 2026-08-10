@@ -52,8 +52,8 @@ import {
   FulfillmentPill,
   ORDERS_ACCENT,
   PaymentPill,
+  paymentStatusLabel,
   shortOrderRef,
-  isPaid,
   customerInitials,
 } from "@/modules/orders/components/orders-ui";
 
@@ -285,7 +285,7 @@ function exportOrdersCsv(orders: Order[]) {
     order.created_at
       ? format(new Date(order.created_at), "yyyy-MM-dd HH:mm")
       : "",
-    isPaid(order.payment_status) ? "Paid" : "Unpaid",
+    paymentStatusLabel(order.payment_status),
     order.status,
     String(order.item_count),
     String(Number(order.total_amount ?? 0)),

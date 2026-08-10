@@ -48,6 +48,7 @@ function fulfillmentBadgeTone(status: string): AdminSearchBadgeTone {
 function paymentBadgeTone(status: string | null | undefined): AdminSearchBadgeTone {
   if (status === "paid") return "success";
   if (status === "refunded") return "danger";
+  if (status === "not_required") return "info";
   return "warning";
 }
 
