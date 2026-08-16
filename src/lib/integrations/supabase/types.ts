@@ -87,6 +87,8 @@ export interface Database {
           pincode: string;
           phone: string;
           is_default: boolean;
+          latitude: number | null;
+          longitude: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -101,6 +103,8 @@ export interface Database {
           pincode: string;
           phone: string;
           is_default?: boolean;
+          latitude?: number | null;
+          longitude?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -114,6 +118,8 @@ export interface Database {
           pincode?: string;
           phone?: string;
           is_default?: boolean;
+          latitude?: number | null;
+          longitude?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -292,6 +298,7 @@ export interface Database {
           margin_amount: number | null;
           product_name: string | null;
           created_at: string | null;
+          customer_edit_flag: string | null;
         };
         Insert: {
           id?: string;
@@ -305,8 +312,8 @@ export interface Database {
           margin_amount?: number | null;
           product_name?: string | null;
           created_at?: string | null;
+          customer_edit_flag?: string | null;
         };
-        /** Snapshot/pricing columns are enforced at insert and blocked on update (service + DB trigger). */
         Update: {
           order_id?: string | null;
           variant_id?: string | null;
@@ -334,6 +341,8 @@ export interface Database {
           discount: number | null;
           created_by_admin_id: string | null;
           merchant_note: string | null;
+          inventory_committed?: boolean;
+          customer_edited_at?: string | null;
         };
         Insert: {
           id?: string;
@@ -354,6 +363,7 @@ export interface Database {
           discount?: number | null;
           created_by_admin_id?: string | null;
           merchant_note?: string | null;
+          customer_edited_at?: string | null;
         };
         Update: {
           status?: string;
@@ -368,6 +378,8 @@ export interface Database {
           tax?: number | null;
           discount?: number | null;
           merchant_note?: string | null;
+          total_amount?: number | null;
+          customer_edited_at?: string | null;
         };
         Relationships: [];
       };
@@ -962,6 +974,66 @@ export interface Database {
           },
         ];
       };
+      shopping_list_items: {
+        Row: {
+          id: string;
+          list_id: string | null;
+          variant_id: string | null;
+          quantity: number | null;
+        };
+        Insert: {
+          id?: string;
+          list_id?: string | null;
+          variant_id?: string | null;
+          quantity?: number | null;
+        };
+        Update: {
+          list_id?: string | null;
+          variant_id?: string | null;
+          quantity?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "shopping_list_items_list_id_fkey";
+            columns: ["list_id"];
+            referencedRelation: "shopping_lists";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shopping_list_items_variant_id_fkey";
+            columns: ["variant_id"];
+            referencedRelation: "product_variants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      shopping_lists: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          name: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          name?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string | null;
+          name?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "shopping_lists_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       returns: {
         Row: {
           id: string;
@@ -1135,6 +1207,129 @@ export interface Database {
         };
         Relationships: [];
       };
+      product_view_reach: {
+        Row: {
+          user_id: string;
+          product_id: string;
+          variant_id: string | null;
+          first_seen_at: string;
+        };
+        Insert: {
+          user_id: string;
+          product_id: string;
+          variant_id?: string | null;
+          first_seen_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          product_id?: string;
+          variant_id?: string | null;
+          first_seen_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "product_view_reach_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "product_view_reach_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "product_view_reach_variant_id_fkey";
+            columns: ["variant_id"];
+            referencedRelation: "product_variants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      cart_reach: {
+        Row: {
+          user_id: string;
+          variant_id: string;
+          product_id: string | null;
+          quantity: number;
+          value_amount: number;
+          first_carted_at: string;
+        };
+        Insert: {
+          user_id: string;
+          variant_id: string;
+          product_id?: string | null;
+          quantity?: number;
+          value_amount?: number;
+          first_carted_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          variant_id?: string;
+          product_id?: string | null;
+          quantity?: number;
+          value_amount?: number;
+          first_carted_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "cart_reach_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cart_reach_variant_id_fkey";
+            columns: ["variant_id"];
+            referencedRelation: "product_variants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cart_reach_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      order_funnel_reach: {
+        Row: {
+          order_id: string;
+          user_id: string | null;
+          total_amount: number;
+          checkout_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          order_id: string;
+          user_id?: string | null;
+          total_amount?: number;
+          checkout_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          order_id?: string;
+          user_id?: string | null;
+          total_amount?: number;
+          checkout_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "order_funnel_reach_order_id_fkey";
+            columns: ["order_id"];
+            referencedRelation: "orders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "order_funnel_reach_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -1177,6 +1372,53 @@ export interface Database {
         Args: { p_user_id: string };
         Returns: Json;
       };
+      record_product_view: {
+        Args: {
+          p_product_id: string;
+          p_variant_id?: string | null;
+        };
+        Returns: boolean;
+      };
+      customer_has_viewed_product: {
+        Args: {
+          p_user_id: string;
+          p_product_id: string;
+        };
+        Returns: boolean;
+      };
+      analytics_funnel_reach: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_product_id?: string | null;
+        };
+        Returns: {
+          view_reach: number;
+          cart_reach: number;
+          checkout_reach: number;
+          purchase_reach: number;
+        }[];
+      };
+      analytics_product_reach_detail: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_product_id?: string | null;
+          p_limit?: number;
+        };
+        Returns: {
+          product_id: string;
+          product_name: string;
+          view_count: number;
+          cart_count: number;
+          order_count: number;
+          units_sold: number;
+          revenue: number;
+          viewers: Json;
+          carters: Json;
+          buyers: Json;
+        }[];
+      };
       create_address: {
         Args: {
           p_user_id: string;
@@ -1188,6 +1430,8 @@ export interface Database {
           p_pincode: string;
           p_phone: string;
           p_is_default?: boolean;
+          p_latitude?: number | null;
+          p_longitude?: number | null;
         };
         Returns: Json;
       };
@@ -1203,6 +1447,8 @@ export interface Database {
           p_pincode: string;
           p_phone: string;
           p_is_default: boolean;
+          p_latitude?: number | null;
+          p_longitude?: number | null;
         };
         Returns: Json;
       };
@@ -1252,12 +1498,27 @@ export interface Database {
         };
         Returns: number;
       };
+      wallet_debit_user: {
+        Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_reference: string;
+        };
+        Returns: number;
+      };
       inventory_apply_order_stock: {
         Args: {
           p_order_id: string;
           p_multiplier?: number;
         };
         Returns: undefined;
+      };
+      customer_edit_order: {
+        Args: {
+          p_order_id: string;
+          p_items: unknown;
+        };
+        Returns: unknown;
       };
       generate_invoice_number: {
         Args: Record<string, never>;

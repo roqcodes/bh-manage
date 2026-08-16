@@ -60,6 +60,7 @@ function mapOrderListRow(
     payment_status: row.payment_status,
     total_amount: row.total_amount,
     merchant_note: row.merchant_note,
+    customer_edited_at: row.customer_edited_at ?? null,
     users: row.users,
     item_count: preview.length,
     order_items_preview: preview,
@@ -79,7 +80,7 @@ export async function getOrders(
   let query = supabase
     .from("orders")
     .select(
-      "id,created_at,status,payment_status,total_amount,merchant_note,users:users!orders_user_fkey(id,name,email,phone),order_items(id,product_name,quantity)",
+      "id,created_at,status,payment_status,total_amount,merchant_note,customer_edited_at,users:users!orders_user_fkey(id,name,email,phone),order_items(id,product_name,quantity)",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })
@@ -288,7 +289,7 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id,created_at,status,payment_status,total_amount,merchant_note,address_id,users:users!orders_user_fkey(id,name,email,phone),order_items(id,order_id,variant_id,quantity,price,product_name,vendor_id,base_price,final_price,margin_amount,created_at)",
+      "id,created_at,status,payment_status,total_amount,subtotal,tax,discount,merchant_note,customer_edited_at,address_id,users:users!orders_user_fkey(id,name,email,phone),order_items(id,order_id,variant_id,quantity,price,product_name,vendor_id,base_price,final_price,margin_amount,customer_edit_flag,created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -369,7 +370,10 @@ export async function updateOrderStatusById(
 
   const { error } = await supabase
     .from("orders")
-    .update({ status })
+    .update({
+      status,
+      ...(status === "processing" ? { customer_edited_at: null } : {}),
+    })
     .eq("id", orderId);
   if (error) throw new Error(error.message);
 }

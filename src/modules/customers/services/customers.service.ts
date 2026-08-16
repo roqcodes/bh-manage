@@ -29,6 +29,20 @@ export interface WalletTransaction {
   created_at: string;
 }
 
+export interface CustomerAddress {
+  id: string;
+  label: string | null;
+  line1: string | null;
+  line2: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  phone: string | null;
+  is_default: boolean;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 export interface CustomerDetailsResponse {
   summary: CustomerSummary;
   wallet: {
@@ -37,6 +51,7 @@ export interface CustomerDetailsResponse {
     transactionsCount: number;
   };
   orders: Order[];
+  addresses: CustomerAddress[];
 }
 
 export async function getCustomerDetails(
@@ -74,13 +89,22 @@ export async function getCustomerDetails(
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
 
-  // 4. Get recent orders
-  const { data: ordersData } = await supabase
-    .from("orders")
-    .select("id, created_at, status, total_amount")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(5);
+  // 4. Get recent orders + addresses
+  const [{ data: ordersData }, { data: addressesData }] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("id, created_at, status, total_amount")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("addresses")
+      .select(
+        "id,label,line1,line2,city,state,pincode,phone,is_default,latitude,longitude",
+      )
+      .eq("user_id", userId)
+      .order("is_default", { ascending: false }),
+  ]);
 
   return {
     summary: user as CustomerSummary,
@@ -90,6 +114,7 @@ export async function getCustomerDetails(
       transactionsCount: txCount ?? 0,
     },
     orders: (ordersData ?? []) as unknown as Order[],
+    addresses: (addressesData ?? []) as unknown as CustomerAddress[],
   };
 }
 

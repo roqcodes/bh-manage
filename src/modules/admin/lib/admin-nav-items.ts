@@ -1,9 +1,11 @@
 import type { ComponentType } from "react";
 import {
   Award,
+  BarChart3,
   Building2,
   ClipboardList,
   FolderTree,
+  KeyRound,
   LayoutDashboard,
   Package,
   Receipt,
@@ -50,6 +52,13 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
     label: "Sales & Fulfillment",
     items: [
       { name: "Orders", href: "/admin/orders", icon: ClipboardList, keywords: ["sales", "fulfillment"] },
+      {
+        name: "Analytics",
+        href: "/admin/analytics",
+        icon: BarChart3,
+        badge: "NEW",
+        keywords: ["insights", "funnel", "revenue", "kpi", "reports"],
+      },
       { name: "Delivery", href: "/admin/delivery", icon: Truck },
       { name: "Billing", href: "/admin/billing", icon: Receipt, keywords: ["invoice", "pos"] },
     ],
@@ -78,6 +87,7 @@ export const ADMIN_EXTRA_NAV_ITEMS: AdminNavItem[] = [
   { name: "Finance Reports", href: "/admin/finance", icon: TrendingUp, keywords: ["revenue", "reports", "p&l"] },
   { name: "Returns", href: "/admin/returns", icon: RotateCcw, keywords: ["refunds", "rma"] },
   { name: "Tax Configuration", href: "/admin/config/tax", icon: Settings, keywords: ["gst", "tax rates"] },
+  { name: "Security", href: "/admin/config/security", icon: KeyRound, keywords: ["password", "reset"] },
 ];
 
 export function getAllAdminNavItems(): AdminNavItem[] {

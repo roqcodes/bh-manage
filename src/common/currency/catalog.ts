@@ -976,7 +976,7 @@ export const COUNTRIES: CountryEntry[] = [
     "code": "SA",
     "name": "Saudi Arabia",
     "currency": "SAR",
-    "locale": "ar-SA"
+    "locale": "en-SA"
   },
   {
     "code": "SN",
@@ -1812,7 +1812,7 @@ export const CURRENCIES: CurrencyEntry[] = [
   {
     "code": "SAR",
     "name": "Saudi Riyal",
-    "symbol": "SAR"
+    "symbol": "⃁"
   },
   {
     "code": "SBD",

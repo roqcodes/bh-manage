@@ -19,6 +19,7 @@ import { useAdminSession } from "@/modules/admin/providers/admin-session-provide
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { RegionCurrencySettingsCard } from "@/modules/settings/components/region-currency-settings-card";
 import { PaymentSettingsCard } from "@/modules/settings/components/payment-settings-card";
+import { SecuritySettingsCard } from "@/modules/settings/components/security-settings-card";
 import { cn } from "@/lib/utils";
 
 function SettingLinkCard({
@@ -164,6 +165,8 @@ export function AdminConfigView() {
 
         <PaymentSettingsCard />
 
+        <SecuritySettingsCard />
+
         <section aria-label="System settings">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             System settings
@@ -181,10 +184,12 @@ export function AdminConfigView() {
               title="Push notifications"
               description="Alerts and quiet hours."
             />
-            <SettingPlaceholderCard
+            <SettingLinkCard
+              href="/admin/config/security"
               icon={ShieldCheck}
+              iconClassName="bg-sky-100 text-sky-600"
               title="Security"
-              description="Sessions, passwords, and 2FA."
+              description="Password and account reset options."
             />
             <SettingPlaceholderCard
               icon={HelpCircle}

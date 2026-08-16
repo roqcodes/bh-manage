@@ -39,3 +39,19 @@ export async function creditCustomerWallet(
   });
   if (error) throw new Error(error.message);
 }
+
+/** Debit a customer's wallet (admin/manager only — uses security definer RPC). */
+export async function debitCustomerWallet(
+  userId: string,
+  amount: number,
+  reference: string,
+): Promise<void> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("wallet_debit_user", {
+    p_user_id: userId,
+    p_amount: amount,
+    p_reference: reference,
+  });
+  if (error) throw new Error(error.message);
+}

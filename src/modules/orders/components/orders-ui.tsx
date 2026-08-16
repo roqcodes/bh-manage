@@ -270,6 +270,43 @@ export function FulfillmentPill({ status }: { status: string }) {
   );
 }
 
+export function CustomerEditedPill() {
+  return (
+    <span
+      className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-800"
+    >
+      Edited
+    </span>
+  );
+}
+
+export function CustomerEditLineBadge({
+  flag,
+}: {
+  flag: string | null | undefined;
+}) {
+  if (flag !== "added" && flag !== "modified") return null;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+        flag === "added"
+          ? "bg-violet-100 text-violet-800"
+          : "bg-amber-100 text-amber-900",
+      )}
+    >
+      {flag === "added" ? "New" : "Edited"}
+    </span>
+  );
+}
+
+export function isCustomerEditedOrder(
+  customerEditedAt: string | null | undefined,
+): boolean {
+  return Boolean(customerEditedAt);
+}
+
 export {
   formatAddressLine,
   normalizeOrderAddress,

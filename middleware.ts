@@ -40,6 +40,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  // Recovery sessions land on reset-password; keep users there until they finish.
+  if (
+    pathname === AUTH_ROUTES.forgotPassword ||
+    pathname === AUTH_ROUTES.resetPassword
+  ) {
+    return response;
+  }
+
   return response;
 }
 

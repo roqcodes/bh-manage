@@ -18,6 +18,9 @@ export const DEFAULT_CURRENCY_SETTINGS: CurrencySettings = {
   capture_payments: true,
 };
 
+/** Official Saudi Riyal sign (U+20C1). */
+export const SAR_CURRENCY_SYMBOL = "\u20C1";
+
 let activeSettings: CurrencySettings = { ...DEFAULT_CURRENCY_SETTINGS };
 
 export function setCurrencySettings(settings: CurrencySettings) {
@@ -28,13 +31,19 @@ export function getCurrencySettings(): CurrencySettings {
   return activeSettings;
 }
 
-export function getCurrencySymbol(): string {
-  return activeSettings.currency_symbol;
+export function resolveCurrencySymbol(settings?: CurrencySettings): string {
+  const s = settings ?? activeSettings;
+  if (s.currency_code === "SAR") return SAR_CURRENCY_SYMBOL;
+  return s.currency_symbol;
+}
+
+export function getCurrencySymbol(settings?: CurrencySettings): string {
+  return resolveCurrencySymbol(settings);
 }
 
 /** Label helper, e.g. "Price (₹)" */
-export function currencyLabel(prefix: string): string {
-  return `${prefix} (${activeSettings.currency_symbol})`;
+export function currencyLabel(prefix: string, settings?: CurrencySettings): string {
+  return `${prefix} (${resolveCurrencySymbol(settings)})`;
 }
 
 function normalizeFractionDigits(
@@ -46,20 +55,18 @@ function normalizeFractionDigits(
   return { ...options, minimumFractionDigits: max };
 }
 
+import { isSarCurrency } from "@/lib/currency-symbol";
+
 export function formatCurrency(
   amount: number | null | undefined,
   options?: Intl.NumberFormatOptions,
   settings?: CurrencySettings,
 ): string {
-  if (amount == null || !Number.isFinite(amount)) return "—";
   const s = settings ?? activeSettings;
-  const fmt = normalizeFractionDigits({
-    style: "currency",
-    currency: s.currency_code,
-    maximumFractionDigits: 2,
-    ...options,
-  });
-  return new Intl.NumberFormat(s.locale, fmt).format(amount);
+  const num = formatCurrencyAmount(amount, options, s);
+  if (num === "—") return num;
+  if (isSarCurrency(s)) return `SAR ${num}`;
+  return `${resolveCurrencySymbol(s)}${num}`;
 }
 
 /** Numeric amount only — use with symbol in column headers / KPI labels. */
@@ -74,6 +81,7 @@ export function formatCurrencyAmount(
     style: "decimal",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+    numberingSystem: "latn",
     ...options,
   });
   return new Intl.NumberFormat(s.locale, fmt).format(amount);
@@ -84,9 +92,10 @@ export function formatCurrencyCompact(
   amount: number,
   settings?: CurrencySettings,
 ): string {
-  const sym = (settings ?? activeSettings).currency_symbol;
-  const compact = formatCurrencyCompactAmount(amount, settings);
-  return `${sym}${compact}`;
+  const s = settings ?? activeSettings;
+  const compact = formatCurrencyCompactAmount(amount, s);
+  if (isSarCurrency(s)) return `SAR ${compact}`;
+  return `${resolveCurrencySymbol(s)}${compact}`;
 }
 
 /** Compact numeric amount without currency symbol. */
@@ -102,7 +111,10 @@ export function formatCurrencyCompactAmount(
     return `${(amount / 1e5).toFixed(amount >= 1e6 ? 1 : 2)}L`;
   }
   if (amount >= 1e3) return `${(amount / 1e3).toFixed(1)}K`;
-  return amount.toLocaleString(locale, { maximumFractionDigits: 0 });
+  return amount.toLocaleString(locale, {
+    maximumFractionDigits: 0,
+    numberingSystem: "latn",
+  });
 }
 
 /** Backward-compatible alias — amount only (symbol in headers). */

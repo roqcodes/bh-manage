@@ -251,6 +251,7 @@ export interface Order {
   payment_status: string | null;
   total_amount: number | null;
   merchant_note: string | null;
+  customer_edited_at: string | null;
   users: OrderUser | null;
   item_count: number;
   order_items_preview: OrderItemPreview[];
@@ -282,6 +283,7 @@ export interface OrderItem {
   final_price: number | null;
   margin_amount: number | null;
   created_at: string | null;
+  customer_edit_flag?: string | null;
   /** Live catalog join when loading order detail (not stored on order_items). */
   variant_meta?: OrderItemVariantMeta | null;
 }
@@ -318,8 +320,12 @@ export interface OrderWithItems {
   status: string;
   payment_status: string | null;
   total_amount: number | null;
+  subtotal?: number | null;
+  tax?: number | null;
+  discount?: number | null;
   merchant_note: string | null;
   address_id: string | null;
+  customer_edited_at: string | null;
   users: OrderUser | null;
   addresses: OrderAddress | null;
   order_items: OrderItem[];

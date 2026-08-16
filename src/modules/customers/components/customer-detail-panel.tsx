@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   Ban,
   Mail,
+  MapPin,
   Package,
   Phone,
   ShieldCheck,
@@ -45,6 +46,7 @@ import { currencyLabel, formatInr } from "@/lib/format-currency";
 import { CurrencyAmount } from "@/components/currency-amount";
 import type { CustomerDetailsResponse } from "@/modules/customers/services/customers.service";
 import { formatCustomerId } from "@/modules/customers/components/customers-ui";
+import { AddressMapEmbed } from "@/modules/admin/components/address-map-embed";
 
 function GlanceMetricCard({
   title,
@@ -222,6 +224,61 @@ export function CustomerDetailPanel({
           />
         </div>
       </section>
+
+      <Card className="border border-border ring-0">
+        <CardHeader className="border-b border-border">
+          <CardTitle>Stores</CardTitle>
+          <CardDescription>
+            Store name and map pin from the customer app. Open Google Maps for the exact drop location.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 pt-4">
+          {details.addresses?.length ? (
+            details.addresses.map((address) => {
+              const summary = [address.line1, address.line2, address.city, address.state, address.pincode]
+                .filter(Boolean)
+                .join(", ");
+              const lat = address.latitude != null ? Number(address.latitude) : null;
+              const lng = address.longitude != null ? Number(address.longitude) : null;
+              const hasPin = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
+
+              return (
+                <div key={address.id} className="rounded-lg border border-border p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <MapPin className="size-4 text-muted-foreground" />
+                    <p className="text-sm font-semibold">{address.label || "Store"}</p>
+                    {address.is_default ? (
+                      <Badge variant="outline">Default</Badge>
+                    ) : null}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{summary}</p>
+                  {address.phone ? (
+                    <p className="mt-1 text-xs text-muted-foreground">Phone {address.phone}</p>
+                  ) : null}
+                  {hasPin ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Pin {lat.toFixed(6)}, {lng.toFixed(6)}
+                      </p>
+                      <AddressMapEmbed
+                        latitude={lat}
+                        longitude={lng}
+                        label={address.label ?? "Address"}
+                      />
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      No map pin stored for this store.
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <p className="text-sm text-muted-foreground">No stores saved.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="border border-border ring-0">
         <CardHeader className="border-b border-border">

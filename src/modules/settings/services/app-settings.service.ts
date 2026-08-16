@@ -2,22 +2,34 @@ import "server-only";
 
 import {
   DEFAULT_CURRENCY_SETTINGS,
+  SAR_CURRENCY_SYMBOL,
   type CurrencySettings,
 } from "@/lib/format-currency";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { AppSettingsPatch } from "@/modules/settings/types";
 
+function normalizeCurrencySymbol(currencyCode: string, currencySymbol: string): string {
+  if (currencyCode === "SAR") return SAR_CURRENCY_SYMBOL;
+  return currencySymbol;
+}
+
 function rowToSettings(
   row: Record<string, unknown>,
   showMrpDefault = true,
   capturePaymentsDefault = true,
 ): CurrencySettings {
+  const currencyCode = String(row.currency_code ?? DEFAULT_CURRENCY_SETTINGS.currency_code);
+  const currencySymbol = normalizeCurrencySymbol(
+    currencyCode,
+    String(row.currency_symbol ?? DEFAULT_CURRENCY_SETTINGS.currency_symbol),
+  );
+
   return {
     country_code: String(row.country_code ?? DEFAULT_CURRENCY_SETTINGS.country_code),
     country_name: String(row.country_name ?? DEFAULT_CURRENCY_SETTINGS.country_name),
-    currency_code: String(row.currency_code ?? DEFAULT_CURRENCY_SETTINGS.currency_code),
-    currency_symbol: String(row.currency_symbol ?? DEFAULT_CURRENCY_SETTINGS.currency_symbol),
+    currency_code: currencyCode,
+    currency_symbol: currencySymbol,
     locale: String(row.locale ?? DEFAULT_CURRENCY_SETTINGS.locale),
     show_mrp:
       "show_mrp" in row ? row.show_mrp !== false : showMrpDefault,
@@ -91,7 +103,10 @@ export async function updateAppSettings(
     country_code: patch.country_code?.trim() || current.country_code,
     country_name: patch.country_name?.trim() || current.country_name,
     currency_code: patch.currency_code?.trim().toUpperCase() || current.currency_code,
-    currency_symbol: patch.currency_symbol?.trim() || current.currency_symbol,
+    currency_symbol: normalizeCurrencySymbol(
+      patch.currency_code?.trim().toUpperCase() || current.currency_code,
+      patch.currency_symbol?.trim() || current.currency_symbol,
+    ),
     locale: patch.locale?.trim() || current.locale,
     show_mrp: patch.show_mrp ?? current.show_mrp,
     capture_payments: patch.capture_payments ?? current.capture_payments,

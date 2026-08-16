@@ -27,24 +27,21 @@ import {
   updateOrderStatusAction,
 } from "@/modules/orders/actions/orders.actions";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
+import { OrderEditModal } from "@/modules/orders/components/order-edit-modal";
 import { OrderLineItemsList } from "@/modules/orders/components/order-line-items-list";
-import {
-  FormError,
-  Modal,
-  PrimaryBtn,
-  SecondaryBtn,
-  selectCls,
-  textareaCls,
-} from "@/modules/admin/components/modal";
+import { AddressMapEmbed } from "@/modules/admin/components/address-map-embed";
+import { textareaCls } from "@/modules/admin/components/modal";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import {
   customerInitials,
+  CustomerEditedPill,
   formatAddressLine,
   formatInr,
   fulfillmentActionLabel,
   FulfillmentPill,
   getNextFulfillmentStatus,
   isCancelled,
+  isCustomerEditedOrder,
   isPaid,
   isPaymentNotRequired,
   isRefunded,
@@ -67,7 +64,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
+import { computeOrderPaymentSummary } from "@/modules/orders/lib/order-payment-summary";
 import { Separator } from "@/components/ui/separator";
 
 function TimelineAvatar({ label }: { label: string }) {
@@ -182,108 +179,6 @@ function buildTimeline(order: OrderWithItems, total: number) {
   }
 
   return events;
-}
-
-function OrderEditDialog({
-  order,
-  onClose,
-  onSaved,
-}: {
-  order: OrderWithItems;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState(order.status);
-  const [paymentStatus, setPaymentStatus] = useState(
-    order.payment_status ?? "pending",
-  );
-  const [merchantNote, setMerchantNote] = useState(
-    order.merchant_note ?? "",
-  );
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    startTransition(async () => {
-      try {
-        await updateOrderDetailsAction(order.id, {
-          status,
-          paymentStatus,
-          merchantNote: merchantNote.trim() || null,
-        });
-        onSaved();
-        onClose();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to save.");
-      }
-    });
-  }
-
-  return (
-    <Modal title="Edit order" subtitle={`#${shortOrderRef(order.id)}`} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="order-status">Fulfillment status</Label>
-          <select
-            id="order-status"
-            className={selectCls}
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            disabled={isCancelled(order.status)}
-          >
-            {ORDER_FULFILLMENT_FLOW.map((s) => (
-              <option key={s} value={s}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </option>
-            ))}
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="payment-status">Payment status</Label>
-          <select
-            id="payment-status"
-            className={selectCls}
-            value={paymentStatus}
-            onChange={(e) => setPaymentStatus(e.target.value)}
-            disabled={isCancelled(order.status)}
-          >
-            <option value="pending">Pending</option>
-            <option value="paid">Paid</option>
-            <option value="not_required">No payment</option>
-            <option value="refunded">Refunded</option>
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="merchant-note">Note for merchant</Label>
-          <textarea
-            id="merchant-note"
-            className={textareaCls}
-            rows={3}
-            value={merchantNote}
-            onChange={(e) => setMerchantNote(e.target.value)}
-            placeholder="Delivery instructions, preferences, etc."
-            maxLength={500}
-          />
-          <p className="text-[11px] text-muted-foreground">
-            {merchantNote.length}/500 · Left by customer at checkout or added by admin
-          </p>
-        </div>
-
-        <FormError message={error} />
-        <div className="flex justify-end gap-2">
-          <SecondaryBtn onClick={onClose}>Cancel</SecondaryBtn>
-          <PrimaryBtn type="submit" disabled={isPending}>
-            {isPending ? "Saving…" : "Save changes"}
-          </PrimaryBtn>
-        </div>
-      </form>
-    </Modal>
-  );
 }
 
 function MerchantNoteSection({
@@ -411,18 +306,11 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
   const nextStatus = getNextFulfillmentStatus(order.status);
   const nextActionLabel = fulfillmentActionLabel(order.status);
 
-  const subtotal = useMemo(
-    () =>
-      order.order_items.reduce((sum, item) => {
-        const unit =
-          item.final_price != null
-            ? Number(item.final_price)
-            : Number(item.price ?? 0);
-        return sum + unit * Number(item.quantity ?? 1);
-      }, 0),
-    [order.order_items],
+  const paymentSummary = useMemo(
+    () => computeOrderPaymentSummary(order),
+    [order],
   );
-  const total = Number(order.total_amount ?? 0);
+  const total = paymentSummary.grandTotal;
 
   const addressText = order.addresses
     ? formatAddressLine(order.addresses)
@@ -481,7 +369,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
   return (
     <div className="flex flex-col gap-4">
       {showEdit ? (
-        <OrderEditDialog
+        <OrderEditModal
           order={order}
           onClose={() => setShowEdit(false)}
           onSaved={() => void invalidate()}
@@ -502,6 +390,15 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
         </p>
       ) : null}
 
+      {isCustomerEditedOrder(order.customer_edited_at) ? (
+        <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+          <p className="font-semibold">Customer edited this order</p>
+          <p className="mt-1 text-violet-800/90">
+            Fulfillment was reset to pending. Review new or changed line items (tagged below), then confirm the order again.
+          </p>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-2">
           <h1 className="font-mono text-2xl font-semibold tracking-tight">
@@ -510,6 +407,9 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
           <div className="flex flex-wrap items-center gap-2">
             <PaymentPill paymentStatus={order.payment_status} />
             <FulfillmentPill status={order.status} />
+            {isCustomerEditedOrder(order.customer_edited_at) ? (
+              <CustomerEditedPill />
+            ) : null}
             <span className="text-sm text-muted-foreground">
               {order.created_at
                 ? format(new Date(order.created_at), "MMM d, yyyy · h:mm a")
@@ -627,8 +527,44 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
             <CardContent className="flex flex-col gap-2 pt-4 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{currencyLabel("Subtotal")}</span>
-                <span className="tabular-nums">{formatInr(subtotal)}</span>
+                <span className="tabular-nums">
+                  {formatInr(paymentSummary.catalogSubtotal ?? paymentSummary.itemTotal)}
+                </span>
               </div>
+              {paymentSummary.totalDiscount > 0 ? (
+                <>
+                  {paymentSummary.lineDiscount > 0 ? (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Line discounts</span>
+                      <span className="tabular-nums text-emerald-700">
+                        −{formatInr(paymentSummary.lineDiscount)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {paymentSummary.orderDiscount > 0 ? (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Extra order discount</span>
+                      <span className="tabular-nums text-emerald-700">
+                        −{formatInr(paymentSummary.orderDiscount)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {paymentSummary.lineDiscount <= 0 && paymentSummary.orderDiscount <= 0 ? (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Total discount</span>
+                      <span className="tabular-nums text-emerald-700">
+                        −{formatInr(paymentSummary.totalDiscount)}
+                      </span>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+              {paymentSummary.tax > 0 ? (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Tax</span>
+                  <span className="tabular-nums">{formatInr(paymentSummary.tax)}</span>
+                </div>
+              ) : null}
               <Separator />
               <div className="flex justify-between font-semibold">
                 <span>{currencyLabel("Order total")}</span>
@@ -766,7 +702,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <MapPin className="size-4 text-muted-foreground" />
-                  <p className="text-sm font-medium">Delivery address</p>
+                  <p className="text-sm font-medium">Delivery store</p>
                 </div>
                 {addressText ? (
                   <div className="rounded-lg border bg-background p-3.5">
@@ -783,10 +719,24 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                         Phone: {order.addresses.phone}
                       </p>
                     ) : null}
+                    {order.addresses?.latitude != null &&
+                    order.addresses?.longitude != null ? (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Pin {Number(order.addresses.latitude).toFixed(6)},{' '}
+                          {Number(order.addresses.longitude).toFixed(6)}
+                        </p>
+                        <AddressMapEmbed
+                          latitude={Number(order.addresses.latitude)}
+                          longitude={Number(order.addresses.longitude)}
+                          label={order.addresses.label ?? "Delivery"}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="rounded-lg border border-dashed bg-muted/20 p-3.5 text-sm text-muted-foreground">
-                    No delivery address saved for this order.
+                    No delivery store saved for this order.
                   </p>
                 )}
               </div>

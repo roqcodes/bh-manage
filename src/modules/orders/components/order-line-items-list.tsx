@@ -4,8 +4,12 @@ import type { ReactNode } from "react";
 import { Package } from "lucide-react";
 
 import type { OrderItem, OrderWithItems } from "@/common/admin/types";
-import { formatInr } from "@/modules/orders/components/orders-ui";
-import { getCurrencySymbol } from "@/lib/format-currency";
+import {
+  formatInr,
+  CustomerEditLineBadge,
+} from "@/modules/orders/components/orders-ui";
+import { CurrencySymbolMark } from "@/components/currency-symbol-mark";
+import { useCurrencySettings } from "@/modules/settings/providers/currency-settings-provider";
 import {
   buildOrderDisplayBlocks,
   buildOrderItemSections,
@@ -41,15 +45,19 @@ function LineThumb({ url }: { url: string | null }) {
 }
 
 function OrderItemsTableHeader() {
-  const sym = getCurrencySymbol();
+  const { settings } = useCurrencySettings();
   return (
     <div
       className={`${LINE_GRID} border-b border-border/60 bg-muted/30 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.06em] text-muted-foreground`}
     >
       <span>Item</span>
-      <span className="text-right">Rate ({sym})</span>
+      <span className="inline-flex items-baseline justify-end gap-0.5">
+        Rate (<CurrencySymbolMark settings={settings} />)
+      </span>
       <span className="text-center">Qty</span>
-      <span className="text-right">Amount ({sym})</span>
+      <span className="inline-flex items-baseline justify-end gap-0.5">
+        Amount (<CurrencySymbolMark settings={settings} />)
+      </span>
     </div>
   );
 }
@@ -61,7 +69,10 @@ function OrderLineRowGrid({ item }: { item: OrderLineItem }) {
 
   return (
     <div className={`${LINE_GRID} border-b border-border/40 px-3 py-2.5 last:border-b-0`}>
-      <p className="min-w-0 text-[12px] font-medium leading-snug">{variantLabel}</p>
+      <span className="inline-flex min-w-0 items-center gap-1.5">
+        <span className="min-w-0 text-[12px] font-medium leading-snug">{variantLabel}</span>
+        <CustomerEditLineBadge flag={item.customer_edit_flag} />
+      </span>
       <p className="text-right text-[12px] font-semibold tabular-nums">{formatInr(unit)}</p>
       <p className="text-center text-[12px] font-semibold tabular-nums">
         {item.quantity ?? 1}
@@ -133,7 +144,10 @@ function SingleOrderLineRow({ item }: { item: OrderLineItem }) {
       <LineThumb url={item.variant_meta?.image_url ?? null} />
       <div className={`min-w-0 flex-1 ${LINE_GRID}`}>
         <div className="min-w-0">
-          <p className="text-[13px] font-medium leading-snug">{productLabel}</p>
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 text-[13px] font-medium leading-snug">{productLabel}</span>
+            <CustomerEditLineBadge flag={item.customer_edit_flag} />
+          </span>
           {showVariantSub ? (
             <p className="text-[11px] text-muted-foreground">{variantLabel}</p>
           ) : null}

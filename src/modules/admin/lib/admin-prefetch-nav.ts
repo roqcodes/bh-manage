@@ -66,6 +66,14 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
     });
   }
 
+  if (p === "/admin/analytics") {
+    return qc.prefetchQuery({
+      queryKey: adminQueryKeys.analytics(""),
+      queryFn: () => adminGet("analytics"),
+      staleTime: STALE,
+    });
+  }
+
   if (p === "/admin/purchase-orders") {
     return qc.prefetchQuery({
       queryKey: adminQueryKeys.purchaseOrders("all", null, 0),

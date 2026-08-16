@@ -3,6 +3,8 @@ import { UserRole, type AuthMode } from "@/common/auth/types";
 export const AUTH_ROUTES = {
   signIn: "/sign-in",
   signUp: "/sign-up",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
   pendingApproval: "/pending-approval",
   admin: "/admin",
   vendor: "/vendor",

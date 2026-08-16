@@ -9,6 +9,7 @@ import {
   updateOrderStatusById,
   updateOrdersStatusByIds,
 } from "@/modules/orders/services/orders.service";
+import { updateOrderWithItems } from "@/modules/orders/services/update-order.service";
 
 const VALID_STATUSES: OrderStatus[] = [
   "pending",
@@ -81,4 +82,36 @@ export async function bulkUpdateOrderStatusAction(
   for (const orderId of orderIds) {
     revalidatePath(`/admin/orders/${orderId}`);
   }
+}
+
+export async function updateOrderWithItemsAction(
+  orderId: string,
+  input: {
+    items: {
+      variantId: string;
+      quantity: number;
+      listPrice: number;
+      unitPrice: number;
+    }[];
+    orderDiscount?: number;
+    status?: string;
+    paymentStatus?: string;
+    merchantNote?: string | null;
+  },
+): Promise<void> {
+  if (input.status && !VALID_STATUSES.includes(input.status as OrderStatus)) {
+    throw new Error("Invalid status value.");
+  }
+  if (
+    input.paymentStatus &&
+    !VALID_PAYMENT_STATUSES.includes(
+      input.paymentStatus as (typeof VALID_PAYMENT_STATUSES)[number],
+    )
+  ) {
+    throw new Error("Invalid payment status.");
+  }
+
+  await updateOrderWithItems(orderId, input);
+  revalidatePath("/admin/orders");
+  revalidatePath(`/admin/orders/${orderId}`);
 }

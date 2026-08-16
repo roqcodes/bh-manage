@@ -243,6 +243,17 @@ export function AuthScreenView({
               </label>
             </div>
 
+            {!isRequestMode ? (
+              <div className="flex justify-end">
+                <a
+                  className="text-[13px] font-bold text-[#2563EB] transition hover:text-[#1D4ED8]"
+                  href="/forgot-password"
+                >
+                  Forgot password?
+                </a>
+              </div>
+            ) : null}
+
             {actionState.errorMessage ? (
               <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                 {actionState.errorMessage}

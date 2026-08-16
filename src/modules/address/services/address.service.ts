@@ -14,6 +14,8 @@ export interface Address {
   pincode: string;
   phone: string;
   is_default: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -27,6 +29,8 @@ export interface CreateAddressInput {
   pincode: string;
   phone: string;
   is_default?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface UpdateAddressInput {
@@ -38,6 +42,8 @@ export interface UpdateAddressInput {
   pincode?: string;
   phone?: string;
   is_default?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 /**
@@ -130,6 +136,8 @@ export async function createAddress(
     p_pincode: input.pincode.trim(),
     p_phone: input.phone.trim(),
     p_is_default: input.is_default ?? false,
+    p_latitude: input.latitude ?? null,
+    p_longitude: input.longitude ?? null,
   });
 
   if (error) {
@@ -164,6 +172,8 @@ export async function updateAddress(
     p_pincode: input.pincode?.trim() ?? "",
     p_phone: input.phone?.trim() ?? "",
     p_is_default: input.is_default ?? false,
+    p_latitude: input.latitude ?? null,
+    p_longitude: input.longitude ?? null,
   });
 
   if (error) {

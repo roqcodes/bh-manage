@@ -49,7 +49,9 @@ import {
 } from "@/modules/orders/actions/orders.actions";
 import {
   formatInr,
+  CustomerEditedPill,
   FulfillmentPill,
+  isCustomerEditedOrder,
   ORDERS_ACCENT,
   PaymentPill,
   paymentStatusLabel,
@@ -169,6 +171,9 @@ function CustomerPopover({ order }: { order: Order }) {
             <div className="flex min-w-0 flex-wrap gap-1">
               <PaymentPill paymentStatus={order.payment_status} />
               <FulfillmentPill status={order.status} />
+              {isCustomerEditedOrder(order.customer_edited_at) ? (
+                <CustomerEditedPill />
+              ) : null}
             </div>
           </div>
           {order.users?.email ? (
@@ -493,7 +498,12 @@ export function OrdersDataTable({
                 <PaymentPill paymentStatus={order.payment_status} />
               </TableCell>
               <TableCell>
-                <FulfillmentPill status={order.status} />
+                <div className="flex flex-wrap items-center gap-1">
+                  <FulfillmentPill status={order.status} />
+                  {isCustomerEditedOrder(order.customer_edited_at) ? (
+                    <CustomerEditedPill />
+                  ) : null}
+                </div>
               </TableCell>
               <TableCell>
                 <ItemsPopover order={order} />

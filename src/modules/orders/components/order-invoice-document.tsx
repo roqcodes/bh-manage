@@ -5,7 +5,7 @@ import type { OrderWithItems } from "@/common/admin/types";
 import { BuyHubInvoiceLogo } from "@/modules/brand/components/buyhub-logo";
 import { OrderLineItemsTableBody } from "@/modules/orders/components/order-line-items-list";
 
-import { formatInr } from "@/lib/format-currency";
+import { CurrencyAmount } from "@/components/currency-amount";
 
 function shortOrderRef(id: string) {
   return id.split("-")[0]?.toUpperCase() ?? id.slice(0, 8);
@@ -109,7 +109,7 @@ export function OrderInvoiceDocument({ order }: { order: OrderWithItems }) {
           Amount payable
         </p>
         <p className="mt-1 text-2xl font-bold tabular-nums print:text-xl">
-          {formatInr(total)}
+          <CurrencyAmount amount={total} />
         </p>
         <p className="mt-6 max-w-md text-center text-[10px] font-medium leading-relaxed text-slate-400 print:text-[9px] sm:text-right">
           This document is generated from BuyHub Manage for internal and

@@ -1,8 +1,12 @@
 "use client";
 
+import { useCallback, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { PanelLeft, PanelLeftClose } from "lucide-react";
+import { PanelLeft, PanelLeftClose, RefreshCw } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { AdminSearchTrigger } from "@/modules/admin/components/admin-global-search";
 
 type AdminHeaderProps = {
@@ -19,6 +23,11 @@ export function AdminHeader({
   isMdViewport,
   onToggleSidebar,
 }: AdminHeaderProps) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [isPending, startTransition] = useTransition();
+  const [spinning, setSpinning] = useState(false);
+
   const now = new Date();
 
   const day = format(now, "d");
@@ -33,6 +42,34 @@ export function AdminHeader({
     : mobileNavOpen
       ? "Close navigation menu"
       : "Open navigation menu";
+
+  const refreshing = spinning || isPending;
+
+  const onRefresh = useCallback(() => {
+    if (refreshing) return;
+    setSpinning(true);
+    startTransition(() => {
+      void queryClient.invalidateQueries({ queryKey: ["admin"] });
+      router.refresh();
+    });
+    window.setTimeout(() => setSpinning(false), 650);
+  }, [queryClient, refreshing, router]);
+
+  const refreshBtn = (
+    <button
+      type="button"
+      onClick={onRefresh}
+      disabled={refreshing}
+      className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-200/60 hover:text-slate-900 disabled:opacity-60"
+      aria-label="Refresh data"
+      title="Refresh"
+    >
+      <RefreshCw
+        className={cn("size-[18px]", refreshing && "animate-spin")}
+        aria-hidden
+      />
+    </button>
+  );
 
   const timeEl = (
     <time
@@ -82,7 +119,10 @@ export function AdminHeader({
               <PanelLeft className="size-5" aria-hidden />
             )}
           </button>
-          <div className="md:hidden">{timeEl}</div>
+          <div className="flex items-center gap-1 md:hidden">
+            {refreshBtn}
+            {timeEl}
+          </div>
         </div>
 
         <div className="mx-auto w-full max-w-2xl justify-self-center px-0 md:px-1">
@@ -92,7 +132,8 @@ export function AdminHeader({
           </label>
         </div>
 
-        <div className="hidden min-w-0 items-center justify-end md:flex">
+        <div className="hidden min-w-0 items-center justify-end gap-1 md:flex">
+          {refreshBtn}
           {timeEl}
         </div>
       </div>

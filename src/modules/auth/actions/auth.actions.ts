@@ -19,8 +19,10 @@ import {
 } from "@/modules/auth/services/auth-route.service";
 import {
   requestAccess,
+  requestPasswordReset,
   signInWithPassword,
   signOutCurrentUser,
+  updateCurrentUserPassword,
 } from "@/modules/auth/services/auth.service";
 
 function readTrimmedField(formData: FormData, key: string) {
@@ -37,6 +39,16 @@ function getValidatedRole(value: string): RequestAccessRole | null {
   }
 
   return null;
+}
+
+function resolvePasswordResetRedirect(formData: FormData) {
+  const fromForm = readTrimmedField(formData, "redirectTo");
+  if (fromForm) return fromForm;
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+  if (siteUrl) return `${siteUrl}${AUTH_ROUTES.resetPassword}`;
+
+  return AUTH_ROUTES.resetPassword;
 }
 
 export async function signInAction(
@@ -133,6 +145,73 @@ export async function requestAccessAction(
 export async function signOutAction() {
   await signOutCurrentUser();
   redirect(AUTH_ROUTES.signIn);
+}
+
+export async function forgotPasswordAction(
+  _prevState: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const email = readTrimmedField(formData, "email").toLowerCase();
+
+  if (!email) {
+    return {
+      ...INITIAL_AUTH_ACTION_STATE,
+      errorMessage: "Enter the email address for your account.",
+    };
+  }
+
+  try {
+    await requestPasswordReset({
+      email,
+      redirectTo: resolvePasswordResetRedirect(formData),
+    });
+
+    return {
+      ...INITIAL_AUTH_ACTION_STATE,
+      successMessage:
+        "If an account exists for that email, we sent a password reset link. Check your inbox and spam folder.",
+    };
+  } catch (error) {
+    return {
+      ...INITIAL_AUTH_ACTION_STATE,
+      errorMessage: formatPortalAuthError(error, "sign-in"),
+    };
+  }
+}
+
+export async function updatePasswordAction(
+  _prevState: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  if (password.length < 8) {
+    return {
+      ...INITIAL_AUTH_ACTION_STATE,
+      errorMessage: "Password must be at least 8 characters.",
+    };
+  }
+
+  if (password !== confirmPassword) {
+    return {
+      ...INITIAL_AUTH_ACTION_STATE,
+      errorMessage: "Passwords do not match.",
+    };
+  }
+
+  try {
+    await updateCurrentUserPassword(password);
+    return {
+      ...INITIAL_AUTH_ACTION_STATE,
+      successMessage: "Your password has been updated.",
+    };
+  } catch (error) {
+    return {
+      ...INITIAL_AUTH_ACTION_STATE,
+      errorMessage: formatPortalAuthError(error, "sign-in"),
+    };
+  }
 }
 
 export async function redirectAuthorizedUserAction(role: UserRole, path: string) {

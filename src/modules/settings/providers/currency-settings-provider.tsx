@@ -7,7 +7,7 @@ import {
   DEFAULT_CURRENCY_SETTINGS,
   formatCurrency,
   formatCurrencyCompact,
-  getCurrencySymbol,
+  resolveCurrencySymbol,
   setCurrencySettings,
   type CurrencySettings,
 } from "@/lib/format-currency";
@@ -19,6 +19,8 @@ type CurrencyContextValue = {
   format: typeof formatCurrency;
   formatCompact: typeof formatCurrencyCompact;
   symbol: string;
+  /** e.g. `Price (₹)` using the active settings symbol */
+  label: (prefix: string) => string;
   isLoading: boolean;
 };
 
@@ -27,6 +29,8 @@ const CurrencyContext = createContext<CurrencyContextValue>({
   format: formatCurrency,
   formatCompact: formatCurrencyCompact,
   symbol: DEFAULT_CURRENCY_SETTINGS.currency_symbol,
+  label: (prefix) =>
+    `${prefix} (${DEFAULT_CURRENCY_SETTINGS.currency_symbol})`,
   isLoading: true,
 });
 
@@ -43,6 +47,7 @@ export function CurrencySettingsProvider({
   });
 
   const settings = data ?? DEFAULT_CURRENCY_SETTINGS;
+  const symbol = resolveCurrencySymbol(settings);
 
   useEffect(() => {
     setCurrencySettings(settings);
@@ -54,7 +59,8 @@ export function CurrencySettingsProvider({
         settings,
         format: formatCurrency,
         formatCompact: formatCurrencyCompact,
-        symbol: settings.currency_symbol || getCurrencySymbol(),
+        symbol,
+        label: (prefix) => `${prefix} (${symbol})`,
         isLoading,
       }}
     >

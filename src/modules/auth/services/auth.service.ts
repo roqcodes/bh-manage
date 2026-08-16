@@ -255,6 +255,37 @@ export async function requestAccess(input: {
   };
 }
 
+export async function requestPasswordReset(input: {
+  email: string;
+  redirectTo: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(input.email, {
+    redirectTo: input.redirectTo,
+  });
+
+  if (error) {
+    throw new Error(formatPortalAuthError(error, "sign-in"));
+  }
+}
+
+export async function updateCurrentUserPassword(password: string) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to change your password.");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    throw new Error(formatPortalAuthError(error, "sign-in"));
+  }
+}
+
 export async function signOutCurrentUser() {
   const supabase = await createSupabaseServerClient();
   const {

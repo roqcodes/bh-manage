@@ -73,7 +73,7 @@ export async function getCustomerStorefrontActivity(
     cartItems = count ?? 0;
   }
 
-  const listIds = listsRes.error ? [] : (listsRes.data ?? []).map((row) => row.id);
+  const listIds = (listsRes.data ?? []).map((row) => row.id);
   let shoppingListItems = 0;
   if (listIds.length > 0) {
     const { count, error } = await supabase
