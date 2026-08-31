@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Download, Plus } from "lucide-react";
 
 import type { ErpInvoiceListRow } from "@/common/erp/sales-types";
@@ -30,7 +30,6 @@ import { InvoiceFormView } from "@/modules/admin/views/sales/invoice-form-view";
 import { TableHead } from "@/components/ui/table";
 import { useErpListState } from "@/modules/admin/ui/use-erp-list-state";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 import { PAGE_SIZE } from "@/common/admin/types";
 
 const STATUS_OPTIONS = [
@@ -44,7 +43,6 @@ const STATUS_OPTIONS = [
 ];
 
 export function InvoicesListView() {
-  const { stores } = useErpStores();
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/invoices");
   const [reloadToken, setReloadToken] = useState(0);
   const {
@@ -63,6 +61,7 @@ export function InvoicesListView() {
     listParams,
     isFiltering,
     clearFilters,
+    activeStoreId,
   } = useErpListState();
   const [rows, setRows] = useState<ErpInvoiceListRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -87,7 +86,7 @@ export function InvoicesListView() {
   useEffect(() => {
     setLoading(true);
     reload().finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken]);
+  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken, activeStoreId]);
 
   function cancelInvoice(invoiceId: string) {
     startCancel(async () => {
@@ -95,14 +94,6 @@ export function InvoicesListView() {
       await reload();
     });
   }
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
 
   if (loading && rows.length === 0) return <AdminPageSkeleton />;
 
@@ -147,13 +138,6 @@ export function InvoicesListView() {
             value: status,
             options: STATUS_OPTIONS,
             onChange: setStatus,
-          },
-          {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: storeOptions,
-            onChange: setStoreId,
           },
         ]}
         footer={<AdminListFooter total={total} label="invoices" page={page} pageSize={PAGE_SIZE} />}

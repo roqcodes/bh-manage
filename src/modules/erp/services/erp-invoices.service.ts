@@ -4,7 +4,7 @@ import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.serv
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpLineInput, ErpInvoiceListRow } from "@/common/erp/sales-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 function linesToJson(lines: ErpLineInput[]): Json {
@@ -57,6 +57,7 @@ export async function listErpInvoices(filters?: {
   const page = filters?.page ?? 0;
   const limit = filters?.limit ?? 20;
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(filters?.storeId);
 
   let query = supabase
     .from("invoices")
@@ -67,7 +68,7 @@ export async function listErpInvoices(filters?: {
     .order("created_at", { ascending: false })
     .range(from, from + limit - 1);
 
-  if (filters?.storeId) query = query.eq("store_id", filters.storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
   if (filters?.userId) query = query.eq("user_id", filters.userId);
   if (filters?.status && filters.status !== "all") query = query.eq("status", filters.status);
   if (filters?.openOnly) query = query.gt("balance_due", 0);

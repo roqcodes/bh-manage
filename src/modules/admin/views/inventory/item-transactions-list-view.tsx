@@ -20,7 +20,7 @@ import {
   useDebouncedValue,
   useSortableData,
 } from "@/modules/admin/ui";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 
 const TRANSACTION_TYPES = [
   "all",
@@ -37,11 +37,10 @@ const TRANSACTION_TYPES = [
 ];
 
 export function ItemTransactionsListView() {
-  const { stores, activeStoreId } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const [rows, setRows] = useState<ItemTransactionRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [storeId, setStoreId] = useState("");
   const [type, setType] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -52,10 +51,6 @@ export function ItemTransactionsListView() {
     "created_at",
     "desc",
   );
-
-  useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
 
   useEffect(() => {
     setLoading(true);
@@ -73,15 +68,7 @@ export function ItemTransactionsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [storeId, type, dateFrom, dateTo, debouncedSearch]);
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
+  }, [storeId, type, dateFrom, dateTo, debouncedSearch, activeStoreId]);
 
   if (loading && rows.length === 0) return <AdminPageSkeleton />;
 
@@ -99,13 +86,12 @@ export function ItemTransactionsListView() {
         searchPlaceholder="Search item, barcode, invoice…"
         isEmpty={sorted.length === 0}
         emptyMessage="No item transactions found."
-        isFiltering={type !== "all" || Boolean(storeId) || Boolean(dateFrom) || Boolean(dateTo)}
+        isFiltering={type !== "all" || Boolean(dateFrom) || Boolean(dateTo) || Boolean(debouncedSearch.trim())}
         onClearFilters={() => {
           setSearch("");
           setType("all");
           setDateFrom("");
           setDateTo("");
-          setStoreId(activeStoreId ?? "");
         }}
         dateRange={{
           from: dateFrom,
@@ -114,13 +100,6 @@ export function ItemTransactionsListView() {
           onToChange: setDateTo,
         }}
         filters={[
-          {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: storeOptions,
-            onChange: setStoreId,
-          },
           {
             id: "type",
             label: "Type",

@@ -37,8 +37,10 @@ import {
 } from "@/modules/erp/components/sales-module-ui";
 import { useErpFormModal } from "@/modules/admin/ui";
 import { EstimateFormView } from "@/modules/admin/views/sales/estimate-form-view";
+import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
 export function AdminErpEstimatesView() {
+  const { activeStoreId } = useErpStores();
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/estimates");
   const [reloadToken, setReloadToken] = useState(0);
   const [rows, setRows] = useState<ErpEstimateListRow[]>([]);
@@ -46,10 +48,12 @@ export function AdminErpEstimatesView() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    adminGet<{ data: ErpEstimateListRow[] }>("erp/estimates?page=0")
+    const q = new URLSearchParams({ page: "0" });
+    if (activeStoreId) q.set("storeId", activeStoreId);
+    adminGet<{ data: ErpEstimateListRow[] }>(`erp/estimates?${q.toString()}`)
       .then((res) => setRows(res.data))
       .finally(() => setLoading(false));
-  }, [reloadToken]);
+  }, [reloadToken, activeStoreId]);
 
   const filtered = search.trim()
     ? rows.filter(

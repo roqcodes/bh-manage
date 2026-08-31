@@ -24,7 +24,7 @@ import {
   useErpFormModal,
   useSortableData,
 } from "@/modules/admin/ui";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { ProfitWithdrawalFormView } from "@/modules/admin/views/banking/profit-withdrawal-form-view";
 
 const PERIOD_OPTIONS = [
@@ -48,14 +48,13 @@ function periodToDates(period: string) {
 }
 
 export function ProfitWithdrawalsListView() {
-  const { stores, activeStoreId } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const { isOpen, modalProps, openNew } = useErpFormModal("/admin/erp/profit-withdrawals");
   const [reloadToken, setReloadToken] = useState(0);
   const [accounts, setAccounts] = useState<BankingAccountRow[]>([]);
   const [rows, setRows] = useState<ProfitWithdrawalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [storeId, setStoreId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [period, setPeriod] = useState("today");
   const debouncedSearch = useDebouncedValue(search, 350);
@@ -66,8 +65,7 @@ export function ProfitWithdrawalsListView() {
   );
 
   useEffect(() => {
-    const sid = storeId || activeStoreId;
-    const q = sid ? `?storeId=${encodeURIComponent(sid)}` : "";
+    const q = storeId ? `?storeId=${encodeURIComponent(storeId)}` : "";
     adminGet<{ data: BankingAccountRow[] }>(`erp/banking${q}`).then((res) =>
       setAccounts(res.data ?? []),
     );
@@ -88,7 +86,7 @@ export function ProfitWithdrawalsListView() {
         setRows(res.data ?? []);
       })
       .finally(() => setLoading(false));
-  }, [storeId, accountId, period, debouncedSearch, reloadToken]);
+  }, [storeId, accountId, period, debouncedSearch, reloadToken, activeStoreId]);
 
   const amountTotal = useMemo(
     () => sorted.reduce((sum, row) => sum + row.amount, 0),
@@ -117,16 +115,6 @@ export function ProfitWithdrawalsListView() {
         searchPlaceholder="Search number, account, reference…"
         filters={[
           {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: [
-              { value: "", label: "All stores" },
-              ...stores.map((s) => ({ value: s.id, label: s.name })),
-            ],
-            onChange: setStoreId,
-          },
-          {
             id: "account",
             label: "Account",
             value: accountId,
@@ -146,10 +134,9 @@ export function ProfitWithdrawalsListView() {
         ]}
         isEmpty={sorted.length === 0}
         emptyMessage="No profit withdrawals found."
-        isFiltering={Boolean(debouncedSearch.trim() || storeId || accountId || period !== "all")}
+        isFiltering={Boolean(debouncedSearch.trim() || accountId || period !== "all")}
         onClearFilters={() => {
           setSearch("");
-          setStoreId("");
           setAccountId("");
           setPeriod("all");
         }}

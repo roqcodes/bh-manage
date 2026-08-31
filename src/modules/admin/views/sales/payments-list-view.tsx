@@ -33,7 +33,7 @@ import {
   useErpFormModal,
   useSortableData,
 } from "@/modules/admin/ui";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { PaymentFormView } from "@/modules/admin/views/sales/payment-form-view";
 
 const PERIOD_OPTIONS = [
@@ -66,7 +66,7 @@ function SummaryCell({ label, value }: { label: string; value: number }) {
 
 export function PaymentsListView() {
   const searchParams = useSearchParams();
-  const { stores } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const { isOpen, modalProps, openNew } = useErpFormModal("/admin/erp/payments");
   const [reloadToken, setReloadToken] = useState(0);
   const [rows, setRows] = useState<ErpPaymentListRow[]>([]);
@@ -74,7 +74,6 @@ export function PaymentsListView() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [storeId, setStoreId] = useState(searchParams.get("storeId") ?? "");
   const [period, setPeriod] = useState(searchParams.get("period") ?? "today");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
@@ -103,23 +102,14 @@ export function PaymentsListView() {
         setSummary(res.summary);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, dateFrom, dateTo, debouncedSearch, reloadToken]);
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
+  }, [page, storeId, dateFrom, dateTo, debouncedSearch, reloadToken, activeStoreId]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
   if (period !== "today") listParams.period = period;
   if (debouncedSearch.trim()) listParams.search = debouncedSearch.trim();
 
-  const isFiltering =
-    Boolean(debouncedSearch.trim()) || Boolean(storeId) || period !== "all";
+  const isFiltering = Boolean(debouncedSearch.trim()) || period !== "all";
 
   const reportLabel =
     dateFrom && dateTo
@@ -171,17 +161,9 @@ export function PaymentsListView() {
         isFiltering={isFiltering}
         onClearFilters={() => {
           setSearch("");
-          setStoreId("");
           setPeriod("all");
         }}
         filters={[
-          {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: storeOptions,
-            onChange: setStoreId,
-          },
           {
             id: "period",
             label: "Period",

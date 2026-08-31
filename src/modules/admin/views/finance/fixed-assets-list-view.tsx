@@ -18,7 +18,7 @@ import { Pagination } from "@/modules/admin/components/pagination";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { fixedAssetsListQueryKey } from "@/modules/admin/lib/admin-query-keys";
 import { deleteFixedAssetAction } from "@/modules/erp/actions/fixed-assets.actions";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { formatErpDocRef } from "@/lib/erp-document-ref";
 import { Badge } from "@/components/ui/badge";
@@ -61,17 +61,16 @@ export function FixedAssetsListView() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { showError } = useAdminAlert();
-  const { stores, activeStoreId } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/fixed-assets");
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [storeId, setStoreId] = useState(searchParams.get("storeId") ?? activeStoreId ?? "");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search, 350);
 
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
 
   const { data, isPending, isError, error } = useQuery({
-    queryKey: fixedAssetsListQueryKey(page, storeId, debouncedSearch),
+    queryKey: fixedAssetsListQueryKey(page, storeId, debouncedSearch, activeStoreId),
     queryFn: () => {
       const q = new URLSearchParams({ page: String(page) });
       if (storeId) q.set("storeId", storeId);
@@ -93,14 +92,6 @@ export function FixedAssetsListView() {
   const totalAmount = useMemo(
     () => sorted.reduce((sum, row) => sum + row.purchase_amount, 0),
     [sorted],
-  );
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
   );
 
   async function handleDelete(row: FixedAssetListRow) {
@@ -157,20 +148,10 @@ export function FixedAssetsListView() {
         searchPlaceholder="Search asset name, number, brand…"
         isEmpty={sorted.length === 0}
         emptyMessage="No fixed assets found."
-        isFiltering={Boolean(debouncedSearch.trim()) || Boolean(storeId)}
+        isFiltering={Boolean(debouncedSearch.trim())}
         onClearFilters={() => {
           setSearch("");
-          setStoreId("");
         }}
-        filters={[
-          {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: storeOptions,
-            onChange: setStoreId,
-          },
-        ]}
         footer={<AdminListFooter total={total} label="assets" page={page} pageSize={PAGE_SIZE} />}
       >
         {sorted.length === 0 ? (

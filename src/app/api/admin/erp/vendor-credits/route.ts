@@ -10,8 +10,9 @@ export async function GET(request: Request) {
   const auth = await requireAdminApiProfile();
   if (!auth.ok) return auth.response;
   const page = Math.max(0, parseInt(new URL(request.url).searchParams.get("page") ?? "0", 10));
+  const storeId = new URL(request.url).searchParams.get("storeId") ?? undefined;
   try {
-    const result = await listVendorCredits(page);
+    const result = await listVendorCredits(page, 20, storeId);
     return NextResponse.json(result);
   } catch (error) {
     console.error("[GET /api/admin/erp/vendor-credits]", error);

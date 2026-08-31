@@ -138,6 +138,7 @@ export async function listAccountTransactions(
 ): Promise<AccountTransactionRow[]> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
+  const activeStoreId = await resolveErpStoreId(options?.storeId);
 
   let query = supabase
     .from("erp_account_transactions")
@@ -149,7 +150,7 @@ export async function listAccountTransactions(
     .order("created_at", { ascending: false })
     .limit(options?.limit ?? 100);
 
-  if (options?.storeId) query = query.eq("store_id", options.storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -236,6 +237,7 @@ export async function listPaymentStatements(filters?: {
 }): Promise<{ rows: PaymentStatementRow[]; openingBalance: number; totals: { debit: number; credit: number; balance: number } }> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
+  const activeStoreId = await resolveErpStoreId(filters?.storeId);
 
   let query = supabase
     .from("erp_account_transactions")
@@ -246,7 +248,7 @@ export async function listPaymentStatements(filters?: {
     .order("created_at", { ascending: true })
     .limit(filters?.limit ?? 500);
 
-  if (filters?.storeId) query = query.eq("store_id", filters.storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
   if (filters?.accountId) query = query.eq("account_id", filters.accountId);
   if (filters?.dateFrom) query = query.gte("transaction_date", filters.dateFrom);
   if (filters?.dateTo) query = query.lte("transaction_date", filters.dateTo);
@@ -330,6 +332,7 @@ export async function listProfitWithdrawals(filters?: {
 }): Promise<ProfitWithdrawalRow[]> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
+  const activeStoreId = await resolveErpStoreId(filters?.storeId);
 
   let query = supabase
     .from("erp_account_transactions")
@@ -340,7 +343,7 @@ export async function listProfitWithdrawals(filters?: {
     .order("transaction_date", { ascending: false })
     .limit(filters?.limit ?? 200);
 
-  if (filters?.storeId) query = query.eq("store_id", filters.storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
   if (filters?.accountId) query = query.eq("account_id", filters.accountId);
   if (filters?.dateFrom) query = query.gte("transaction_date", filters.dateFrom);
   if (filters?.dateTo) query = query.lte("transaction_date", filters.dateTo);

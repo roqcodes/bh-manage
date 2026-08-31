@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Database } from "@/lib/integrations/supabase/types";
 import type {
   Order,
@@ -108,10 +109,12 @@ export async function getOrders(
   userId: string | null = null,
   page = 0,
   channel: OrderChannel = "online",
+  storeId?: string | null,
 ): Promise<Paginated<Order>> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * PAGE_SIZE;
+  const activeStoreId = await resolveErpStoreId(storeId);
 
   let query = applyOrderChannelFilter(
     supabase
@@ -127,6 +130,7 @@ export async function getOrders(
 
   if (status !== "all") query = query.eq("status", status);
   if (userId) query = query.eq("user_id", userId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
 
   const { data, count } = await query;
   const rows = (data ?? []) as unknown as OrderListRow[];
@@ -256,9 +260,17 @@ async function enrichOrderItems(
 
 export async function getOrdersCatalogStats(
   channel: OrderChannel = "online",
+  storeId?: string | null,
 ): Promise<OrderCatalogStats> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
+  const activeStoreId = await resolveErpStoreId(storeId);
+
+  const scopeOrders = (query: ReturnType<typeof supabase.from>) => {
+    let scoped = applyOrderChannelFilter(query, channel);
+    if (activeStoreId) scoped = scoped.eq("store_id", activeStoreId);
+    return scoped;
+  };
 
   const [
     totalRes,
@@ -270,55 +282,46 @@ export async function getOrdersCatalogStats(
     itemsRes,
     reversalsRes,
   ] = await Promise.all([
-    applyOrderChannelFilter(
-      supabase.from("orders").select("id", { count: "exact", head: true }),
-      channel,
-    ),
-    applyOrderChannelFilter(
+    scopeOrders(supabase.from("orders").select("id", { count: "exact", head: true })),
+    scopeOrders(
       supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("status", "pending"),
-      channel,
     ),
-    applyOrderChannelFilter(
+    scopeOrders(
       supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("status", "processing"),
-      channel,
     ),
-    applyOrderChannelFilter(
+    scopeOrders(
       supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("status", "shipped"),
-      channel,
     ),
-    applyOrderChannelFilter(
+    scopeOrders(
       supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("status", "delivered"),
-      channel,
     ),
-    applyOrderChannelFilter(
+    scopeOrders(
       supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("status", "cancelled"),
-      channel,
     ),
     applyOrderChannelFilterOnOrderItems(
       supabase.from("order_items").select("quantity, orders!inner(source)"),
       channel,
     ),
-    applyOrderChannelFilter(
+    scopeOrders(
       supabase
         .from("orders")
         .select("total_amount")
         .eq("status", "cancelled"),
-      channel,
     ),
   ]);
 

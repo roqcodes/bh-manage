@@ -8,18 +8,23 @@ import type {
 } from "@/common/erp/purchasing-types";
 import { roundMoney } from "@/common/erp/purchasing-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
-export async function listVendorCredits(page = 0, limit = 20): Promise<{
+export async function listVendorCredits(
+  page = 0,
+  limit = 20,
+  storeId?: string,
+): Promise<{
   data: ErpVendorCreditListRow[];
   total: number;
 }> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(storeId);
 
-  const { data, error, count } = await supabase
+  let query = supabase
     .from("erp_vendor_credits")
     .select(
       "id, credit_number, vendor_id, store_id, status, total_amount, balance_remaining, credit_date, vendors(name), stores(name)",
@@ -27,6 +32,9 @@ export async function listVendorCredits(page = 0, limit = 20): Promise<{
     )
     .order("credit_date", { ascending: false })
     .range(from, from + limit - 1);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
+
+  const { data, error, count } = await query;
 
   if (error) throw new Error(error.message);
 

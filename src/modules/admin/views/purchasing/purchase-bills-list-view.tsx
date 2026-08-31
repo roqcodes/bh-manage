@@ -59,6 +59,7 @@ export function PurchaseBillsListView() {
     listParams,
     isFiltering,
     clearFilters,
+    activeStoreId,
   } = useErpListState();
   const [rows, setRows] = useState<ErpPurchaseBillListRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -83,7 +84,7 @@ export function PurchaseBillsListView() {
   useEffect(() => {
     setLoading(true);
     reload().finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, dateFrom, dateTo, reloadToken]);
+  }, [page, debouncedSearch, status, dateFrom, dateTo, reloadToken, listParams, activeStoreId]);
 
   function handleCancel(id: string) {
     startCancel(async () => {

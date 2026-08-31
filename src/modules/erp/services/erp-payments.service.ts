@@ -104,6 +104,8 @@ export async function listErpPayments(filters: PaymentListFilters = {}): Promise
   const limit = filters.limit ?? 20;
   const from = page * limit;
   const search = filters.search?.trim().toLowerCase();
+  const activeStoreId = await resolveErpStoreId(filters.storeId);
+  const scopedFilters = { ...filters, storeId: activeStoreId ?? undefined };
 
   let query = applyPaymentListFilters(
     supabase
@@ -114,7 +116,7 @@ export async function listErpPayments(filters: PaymentListFilters = {}): Promise
       )
       .order("payment_date", { ascending: false })
       .range(from, from + limit - 1),
-    filters,
+    scopedFilters,
   );
 
   const { data, error, count } = await query;
@@ -158,7 +160,7 @@ export async function listErpPayments(filters: PaymentListFilters = {}): Promise
 
   let summaryQuery = applyPaymentListFilters(
     supabase.from("erp_customer_payments").select("payment_mode, total_amount"),
-    filters,
+    scopedFilters,
   );
   const { data: summaryRows, error: summaryError } = await summaryQuery;
   if (summaryError) throw new Error(summaryError.message);

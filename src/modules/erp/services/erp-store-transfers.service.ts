@@ -8,7 +8,21 @@ import type {
   TransferStatementLine,
 } from "@/common/erp/inventory-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
+import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
+
+function applyTransferStoreScope<T extends { or: (filter: string) => T; eq: (col: string, val: string) => T }>(
+  query: T,
+  activeStoreId: string | null,
+  filters?: { fromStoreId?: string; toStoreId?: string },
+): T {
+  if (filters?.fromStoreId) return query.eq("from_store_id", filters.fromStoreId);
+  if (filters?.toStoreId) return query.eq("to_store_id", filters.toStoreId);
+  if (activeStoreId) {
+    return query.or(`from_store_id.eq.${activeStoreId},to_store_id.eq.${activeStoreId}`);
+  }
+  return query;
+}
 
 export async function listStoreTransfers(
   page = 0,
@@ -21,6 +35,9 @@ export async function listStoreTransfers(
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(
+    filters?.fromStoreId ?? filters?.toStoreId ?? null,
+  );
 
   let query = supabase
     .from("erp_store_transfers")
@@ -31,8 +48,7 @@ export async function listStoreTransfers(
     .order("transfer_date", { ascending: false })
     .range(from, from + limit - 1);
 
-  if (filters?.fromStoreId) query = query.eq("from_store_id", filters.fromStoreId);
-  if (filters?.toStoreId) query = query.eq("to_store_id", filters.toStoreId);
+  query = applyTransferStoreScope(query, activeStoreId, filters);
   if (filters?.search?.trim()) {
     query = query.ilike("transfer_number", `%${filters.search.trim()}%`);
   }

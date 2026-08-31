@@ -31,7 +31,6 @@ import {
 } from "@/modules/admin/ui";
 import { CreditNoteFormView } from "@/modules/admin/views/sales/credit-note-form-view";
 import { useErpListState } from "@/modules/admin/ui/use-erp-list-state";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
@@ -42,7 +41,6 @@ const STATUS_OPTIONS = [
 ];
 
 export function CreditNotesListView() {
-  const { stores } = useErpStores();
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/credit-notes");
   const [reloadToken, setReloadToken] = useState(0);
   const {
@@ -61,6 +59,7 @@ export function CreditNotesListView() {
     listParams,
     isFiltering,
     clearFilters,
+    activeStoreId,
   } = useErpListState();
   const [rows, setRows] = useState<ErpCreditNoteListRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -82,15 +81,7 @@ export function CreditNotesListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken]);
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
+  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken, activeStoreId]);
 
   if (loading && rows.length === 0) return <AdminPageSkeleton />;
 
@@ -129,13 +120,6 @@ export function CreditNotesListView() {
             value: status,
             options: STATUS_OPTIONS,
             onChange: setStatus,
-          },
-          {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: storeOptions,
-            onChange: setStoreId,
           },
         ]}
         footer={

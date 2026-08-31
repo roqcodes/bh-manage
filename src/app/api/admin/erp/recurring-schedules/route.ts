@@ -9,11 +9,12 @@ import {
   updateRecurringSchedule,
 } from "@/modules/erp/services/erp-recurring.service";
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireAdminApiProfile();
   if (!auth.ok) return auth.response;
   try {
-    const data = await listRecurringSchedules();
+    const storeId = new URL(request.url).searchParams.get("storeId") ?? undefined;
+    const data = await listRecurringSchedules(storeId);
     return NextResponse.json({ data });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to load schedules";

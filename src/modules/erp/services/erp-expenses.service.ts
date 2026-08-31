@@ -179,6 +179,7 @@ export async function listExpenses(
   const limit = filters.limit ?? 20;
   const from = page * limit;
   const periodRange = periodToDateRange(filters.period);
+  const activeStoreId = await resolveErpStoreId(filters.storeId);
 
   let query = supabase
     .from("erp_expenses")
@@ -188,7 +189,7 @@ export async function listExpenses(
     )
     .order("expense_date", { ascending: false });
 
-  if (filters.storeId) query = query.eq("store_id", filters.storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
   if (filters.accountId) query = query.eq("account_id", filters.accountId);
   const dateFrom = periodRange.dateFrom;
   const dateTo = periodRange.dateTo;

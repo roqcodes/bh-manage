@@ -72,6 +72,7 @@ export async function listVatReturns(
   const page = filters.page ?? 0;
   const limit = filters.limit ?? 30;
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(filters.storeId);
 
   let query = supabase
     .from("erp_vat_returns")
@@ -81,7 +82,7 @@ export async function listVatReturns(
     )
     .order("period_end", { ascending: false });
 
-  if (filters.storeId) query = query.eq("store_id", filters.storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
   const term = filters.search?.trim();
   if (term) {
     query = query.or(
@@ -221,6 +222,7 @@ export async function listVatPayments(
   const page = filters.page ?? 0;
   const limit = filters.limit ?? 30;
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(filters.storeId);
 
   let query = supabase
     .from("erp_vat_payments")
@@ -230,7 +232,7 @@ export async function listVatPayments(
     )
     .order("payment_date", { ascending: false });
 
-  if (filters.storeId) query = query.eq("store_id", filters.storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
   const term = filters.search?.trim();
   if (term) {
     query = query.or(

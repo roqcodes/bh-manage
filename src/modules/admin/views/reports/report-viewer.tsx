@@ -102,8 +102,8 @@ export function ReportViewer({ report }: { report: ReportDefinition }) {
   const [accountId, setAccountId] = useState("");
 
   useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
+    if (activeStoreId) setStoreId(activeStoreId);
+  }, [activeStoreId]);
 
   useEffect(() => {
     if (!report.filters.account) return;
@@ -125,6 +125,7 @@ export function ReportViewer({ report }: { report: ReportDefinition }) {
     }
     if (report.filters.asOfDate) q.set("asOf", asOf);
     if (report.filters.store && storeId) q.set("storeId", storeId);
+    else if (report.filters.store && activeStoreId) q.set("storeId", activeStoreId);
     if (report.filters.channel) q.set("channel", channel);
     if (report.filters.account && accountId) q.set("accountId", accountId);
 
@@ -137,7 +138,7 @@ export function ReportViewer({ report }: { report: ReportDefinition }) {
   useEffect(() => {
     loadReport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report.slug]);
+  }, [report.slug, storeId, dateFrom, dateTo, asOf, channel, accountId]);
 
   const rows = useMemo(
     () => extractReportRows(rawData, report.rowsKey),

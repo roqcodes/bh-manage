@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { Json } from "@/lib/integrations/supabase/types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import { createErpInvoice } from "@/modules/erp/services/erp-invoices.service";
+import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 
 import type { RecurringScheduleRow } from "@/common/erp/types";
 
@@ -25,15 +26,18 @@ export function isMissingTableError(message: string): boolean {
   );
 }
 
-export async function listRecurringSchedules(): Promise<RecurringScheduleRow[]> {
+export async function listRecurringSchedules(storeId?: string): Promise<RecurringScheduleRow[]> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
+  const activeStoreId = await resolveErpStoreId(storeId);
+  let query = supabase
     .from("erp_recurring_schedules")
     .select(
       "*, customer:users!erp_recurring_schedules_customer_id_fkey(name), vendor:vendors!erp_recurring_schedules_vendor_id_fkey(name)",
     )
     .order("next_run_date", { ascending: true });
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => {
     const customer = row.customer as { name: string | null } | null;

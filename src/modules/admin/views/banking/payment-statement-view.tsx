@@ -20,6 +20,7 @@ import {
   SalesPageHeader,
   SalesPageLayout,
 } from "@/modules/erp/components/sales-module-ui";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 import { formatBankingType } from "@/modules/admin/views/banking/banking-ui";
 
@@ -44,20 +45,19 @@ function periodToDates(period: string) {
 }
 
 export function PaymentStatementView() {
-  const { stores, activeStoreId } = useErpStores();
+  const { stores } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const [accounts, setAccounts] = useState<BankingAccountRow[]>([]);
   const [rows, setRows] = useState<PaymentStatementRow[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
   const [totals, setTotals] = useState({ debit: 0, credit: 0, balance: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [storeId, setStoreId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [period, setPeriod] = useState("this_month");
 
   useEffect(() => {
-    const sid = storeId || activeStoreId;
-    const q = sid ? `?storeId=${encodeURIComponent(sid)}` : "";
+    const q = storeId ? `?storeId=${encodeURIComponent(storeId)}` : "";
     adminGet<{ data: BankingAccountRow[] }>(`erp/banking${q}`).then((res) =>
       setAccounts(res.data ?? []),
     );
@@ -84,10 +84,10 @@ export function PaymentStatementView() {
         setTotals(res.totals ?? { debit: 0, credit: 0, balance: 0 });
       })
       .finally(() => setLoading(false));
-  }, [storeId, accountId, period, search]);
+  }, [storeId, accountId, period, search, activeStoreId]);
 
   const selectedStoreLabel = useMemo(
-    () => stores.find((s) => s.id === storeId)?.name ?? "All stores",
+    () => stores.find((s) => s.id === storeId)?.name ?? "Selected store",
     [stores, storeId],
   );
   const selectedAccountLabel = useMemo(
@@ -125,12 +125,6 @@ export function PaymentStatementView() {
         searchPlaceholder="Search transaction, account, store…"
         filters={[
           {
-            label: "Store",
-            value: storeId,
-            options: [{ value: "", label: "All stores" }, ...stores.map((s) => ({ value: s.id, label: s.name }))],
-            onChange: setStoreId,
-          },
-          {
             label: "Account",
             value: accountId,
             options: [
@@ -148,10 +142,9 @@ export function PaymentStatementView() {
         ]}
         isEmpty={rows.length === 0}
         emptyMessage="No transactions found for this filter."
-        isFiltering={Boolean(search.trim() || storeId || accountId || period !== "all")}
+        isFiltering={Boolean(search.trim() || accountId || period !== "all")}
         onClearFilters={() => {
           setSearch("");
-          setStoreId("");
           setAccountId("");
           setPeriod("all");
         }}

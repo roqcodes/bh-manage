@@ -71,7 +71,7 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
   const [storeBalances, setStoreBalances] = useState<AccountStoreBalanceRow[]>([]);
   const [allAccounts, setAllAccounts] = useState<BankingAccountRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [storeFilter, setStoreFilter] = useState("");
+  const [storeFilter, setStoreFilter] = useState(activeStoreId ?? "");
   const [txOpen, setTxOpen] = useState(false);
   const [txKind, setTxKind] = useState<TxKind>("owner_contribution");
   const [genericDirection, setGenericDirection] = useState<"in" | "out">("in");
@@ -95,6 +95,10 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
       setAllAccounts(accountsRes.data ?? []);
     });
   }
+
+  useEffect(() => {
+    if (activeStoreId) setStoreFilter(activeStoreId);
+  }, [activeStoreId]);
 
   useEffect(() => {
     reload().finally(() => setLoading(false));

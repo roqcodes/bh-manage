@@ -31,19 +31,18 @@ import {
   useErpFormModal,
   useSortableData,
 } from "@/modules/admin/ui";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { StockAdjustmentFormView } from "@/modules/admin/views/inventory/stock-adjustment-form-view";
 
 export function StockAdjustmentsListView() {
   const searchParams = useSearchParams();
-  const { stores } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const { isOpen, modalProps, openNew } = useErpFormModal("/admin/erp/stock-adjustments");
   const [reloadToken, setReloadToken] = useState(0);
   const [rows, setRows] = useState<ErpStockAdjustmentListRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [storeId, setStoreId] = useState(searchParams.get("storeId") ?? "");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
@@ -66,15 +65,7 @@ export function StockAdjustmentsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, storeId, reloadToken]);
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
+  }, [page, debouncedSearch, storeId, reloadToken, activeStoreId]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
@@ -102,20 +93,10 @@ export function StockAdjustmentsListView() {
         searchPlaceholder="Search adjustment number…"
         isEmpty={sorted.length === 0}
         emptyMessage="No stock adjustments yet."
-        isFiltering={Boolean(debouncedSearch.trim()) || Boolean(storeId)}
+        isFiltering={Boolean(debouncedSearch.trim())}
         onClearFilters={() => {
           setSearch("");
-          setStoreId("");
         }}
-        filters={[
-          {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: storeOptions,
-            onChange: setStoreId,
-          },
-        ]}
         footer={
           <AdminListFooter total={total} label="adjustments" page={page} pageSize={PAGE_SIZE} />
         }

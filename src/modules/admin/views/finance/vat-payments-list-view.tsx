@@ -30,7 +30,7 @@ import {
   useDebouncedValue,
   useSortableData,
 } from "@/modules/admin/ui";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 
 function formatDisplayDate(value: string) {
   try {
@@ -42,13 +42,12 @@ function formatDisplayDate(value: string) {
 
 export function VatPaymentsListView() {
   const searchParams = useSearchParams();
-  const { stores } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const [rows, setRows] = useState<VatPaymentListRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [storeId, setStoreId] = useState(searchParams.get("storeId") ?? "");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
@@ -70,15 +69,7 @@ export function VatPaymentsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, debouncedSearch]);
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
+  }, [page, storeId, debouncedSearch, activeStoreId]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
@@ -121,20 +112,10 @@ export function VatPaymentsListView() {
         searchPlaceholder="Search payment number, reference…"
         emptyMessage="No VAT payments found."
         isEmpty={sorted.length === 0}
-        isFiltering={Boolean(storeId || debouncedSearch.trim())}
+        isFiltering={Boolean(debouncedSearch.trim())}
         onClearFilters={() => {
-          setStoreId("");
           setSearch("");
         }}
-        filters={[
-          {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: storeOptions,
-            onChange: setStoreId,
-          },
-        ]}
         footer={<AdminListFooter total={total} label="payments" page={page} pageSize={30} />}
       >
         <AdminDataTable>

@@ -33,7 +33,7 @@ import {
 import { RecurringScheduleFormDialog } from "@/modules/erp/components/recurring-schedule-form-dialog";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
-export type RecurringSchedulePageVariant = "invoice" | "purchase_bill";
+type RecurringSchedulePageVariant = "invoice" | "purchase_bill";
 
 const PAGE_CONFIG: Record<
   RecurringSchedulePageVariant,
@@ -152,7 +152,7 @@ export function RecurringSchedulesView({
   const config = PAGE_CONFIG[variant];
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { stores } = useErpStores();
+  const { activeStoreId } = useErpStores();
   const [rows, setRows] = useState<RecurringScheduleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -165,7 +165,6 @@ export function RecurringSchedulesView({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [frequencyFilter, setFrequencyFilter] = useState("all");
-  const [storeFilter, setStoreFilter] = useState("");
 
   const debouncedSearch = useDebouncedValue(search, 300);
 
@@ -189,7 +188,11 @@ export function RecurringSchedulesView({
   function reload() {
     setLoadError(null);
     setMigrationRequired(false);
-    return adminGet<{ data: RecurringScheduleRow[] }>("erp/recurring-schedules")
+    return adminGet<{ data: RecurringScheduleRow[] }>(
+      activeStoreId
+        ? `erp/recurring-schedules?storeId=${encodeURIComponent(activeStoreId)}`
+        : "erp/recurring-schedules",
+    )
       .then((res) => setRows(res.data))
       .catch((err: Error) => {
         const msg = err.message || "Failed to load schedules";
@@ -204,8 +207,9 @@ export function RecurringSchedulesView({
   }
 
   useEffect(() => {
+    setLoading(true);
     void reload().finally(() => setLoading(false));
-  }, []);
+  }, [activeStoreId]);
 
   const scopedRows = useMemo(
     () => rows.filter((row) => row.schedule_type === variant),
@@ -218,7 +222,6 @@ export function RecurringSchedulesView({
       if (statusFilter === "active" && !row.is_active) return false;
       if (statusFilter === "paused" && row.is_active) return false;
       if (frequencyFilter !== "all" && row.frequency !== frequencyFilter) return false;
-      if (storeFilter && row.store_id !== storeFilter) return false;
       if (!q) return true;
       const haystack = [
         row.name,
@@ -230,7 +233,7 @@ export function RecurringSchedulesView({
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [scopedRows, debouncedSearch, statusFilter, frequencyFilter, storeFilter, variant]);
+  }, [scopedRows, debouncedSearch, statusFilter, frequencyFilter, variant]);
 
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     filtered,
@@ -240,19 +243,10 @@ export function RecurringSchedulesView({
 
   const stats = useMemo(() => computeRecurringScheduleStats(scopedRows), [scopedRows]);
 
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
-
   const isFiltering =
     Boolean(debouncedSearch.trim()) ||
     statusFilter !== "all" ||
-    frequencyFilter !== "all" ||
-    Boolean(storeFilter);
+    frequencyFilter !== "all";
 
   function runSchedule(row: RecurringScheduleRow) {
     setActionError(null);
@@ -364,7 +358,6 @@ export function RecurringSchedulesView({
             setSearch("");
             setStatusFilter("all");
             setFrequencyFilter("all");
-            setStoreFilter("");
           }}
           filters={[
             {
@@ -380,13 +373,6 @@ export function RecurringSchedulesView({
               value: frequencyFilter,
               options: FREQUENCY_OPTIONS,
               onChange: setFrequencyFilter,
-            },
-            {
-              id: "store",
-              label: "Store",
-              value: storeFilter,
-              options: storeOptions,
-              onChange: setStoreFilter,
             },
           ]}
           footer={

@@ -3,7 +3,7 @@ import "server-only";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ItemTransactionRow } from "@/common/erp/inventory-types";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 
 export interface ItemTransactionFilters {
   storeId?: string;
@@ -20,11 +20,10 @@ export async function listItemTransactions(
 ): Promise<{ data: ItemTransactionRow[]; total: number }> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
   const page = filters.page ?? 0;
   const limit = filters.limit ?? 50;
   const from = page * limit;
-  const storeId = filters.storeId ?? ctx?.store_id;
+  const storeId = await resolveErpStoreId(filters.storeId);
 
   let query = supabase
     .from("stock_movements")

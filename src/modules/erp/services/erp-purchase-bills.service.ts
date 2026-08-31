@@ -9,7 +9,7 @@ import type {
 } from "@/common/erp/purchasing-types";
 import { derivePurchaseBillDisplayStatus, roundMoney } from "@/common/erp/purchasing-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 function linesToJson(lines: ErpPurchaseLineInput[]): Json {
@@ -54,6 +54,7 @@ export async function listPurchaseBills(options: {
   const page = options.page ?? 0;
   const limit = options.limit ?? 20;
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(options.storeId);
 
   let query = supabase
     .from("erp_purchase_bills")
@@ -73,7 +74,7 @@ export async function listPurchaseBills(options: {
       query = query.eq("status", options.status);
     }
   }
-  if (options.storeId) query = query.eq("store_id", options.storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
   if (options.vendorId) query = query.eq("vendor_id", options.vendorId);
   if (options.dateFrom) query = query.gte("purchase_date", options.dateFrom);
   if (options.dateTo) query = query.lte("purchase_date", options.dateTo);

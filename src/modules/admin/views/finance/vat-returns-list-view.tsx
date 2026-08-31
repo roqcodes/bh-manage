@@ -32,7 +32,7 @@ import {
   useErpFormModal,
   useSortableData,
 } from "@/modules/admin/ui";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { VatReturnFormView } from "@/modules/admin/views/finance/vat-return-form-view";
 import { VatPaymentFormView } from "@/modules/admin/views/finance/vat-payment-form-view";
 import { cn } from "@/lib/utils";
@@ -67,7 +67,7 @@ function statusBadge(status: string) {
 
 export function VatReturnsListView() {
   const searchParams = useSearchParams();
-  const { stores } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const { isOpen, formMode, modalProps, openNew } = useErpFormModal("/admin/erp/vat-returns");
   const vatReturnIdForPayment = searchParams.get("vatReturnId");
   const showReturnForm =
@@ -79,7 +79,6 @@ export function VatReturnsListView() {
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [storeId, setStoreId] = useState(searchParams.get("storeId") ?? "");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
@@ -101,15 +100,7 @@ export function VatReturnsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, debouncedSearch, reloadToken]);
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
+  }, [page, storeId, debouncedSearch, reloadToken, activeStoreId]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
@@ -179,20 +170,10 @@ export function VatReturnsListView() {
         searchPlaceholder="Search return number…"
         emptyMessage="No VAT returns found."
         isEmpty={sorted.length === 0}
-        isFiltering={Boolean(storeId || debouncedSearch.trim())}
+        isFiltering={Boolean(debouncedSearch.trim())}
         onClearFilters={() => {
-          setStoreId("");
           setSearch("");
         }}
-        filters={[
-          {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: storeOptions,
-            onChange: setStoreId,
-          },
-        ]}
         footer={<AdminListFooter total={total} label="returns" page={page} pageSize={30} />}
       >
         <AdminDataTable>

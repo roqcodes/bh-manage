@@ -7,7 +7,7 @@ import {
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { FixedAssetDetail, FixedAssetListRow } from "@/common/erp/finance-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -36,6 +36,7 @@ export async function listFixedAssets(
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(storeId);
 
   let query = supabase
     .from("erp_fixed_assets")
@@ -45,7 +46,7 @@ export async function listFixedAssets(
     )
     .order("purchase_date", { ascending: false });
 
-  if (storeId) query = query.eq("store_id", storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
 
   const q = search?.trim();
   if (q) {

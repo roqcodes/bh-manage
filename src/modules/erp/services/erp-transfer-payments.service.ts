@@ -9,6 +9,7 @@ import type {
   PendingTransferPaymentRow,
 } from "@/common/erp/inventory-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
+import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import { getTransferStatement } from "@/modules/erp/services/erp-store-transfers.service";
 import type { TransferStatementSummary } from "@/common/erp/inventory-types";
 
@@ -28,6 +29,9 @@ export async function listTransferPayments(options?: {
   const page = options?.page ?? 0;
   const limit = options?.limit ?? 50;
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(
+    options?.fromStoreId ?? options?.toStoreId ?? null,
+  );
 
   let query = supabase
     .from("erp_transfer_payments")
@@ -39,7 +43,10 @@ export async function listTransferPayments(options?: {
     .range(from, from + limit - 1);
 
   if (options?.fromStoreId) query = query.eq("from_store_id", options.fromStoreId);
-  if (options?.toStoreId) query = query.eq("to_store_id", options.toStoreId);
+  else if (options?.toStoreId) query = query.eq("to_store_id", options.toStoreId);
+  else if (activeStoreId) {
+    query = query.or(`from_store_id.eq.${activeStoreId},to_store_id.eq.${activeStoreId}`);
+  }
   if (options?.dateFrom) query = query.gte("payment_date", options.dateFrom);
   if (options?.dateTo) query = query.lte("payment_date", options.dateTo);
   if (options?.search?.trim()) {

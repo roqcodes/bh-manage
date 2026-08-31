@@ -20,6 +20,7 @@ import {
   useDebouncedValue,
   useSortableData,
 } from "@/modules/admin/ui";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
 function StockBadge({ value }: { value: number }) {
@@ -32,11 +33,11 @@ function StockBadge({ value }: { value: number }) {
 }
 
 export function StockDetailsListView() {
-  const { stores, activeStoreId } = useErpStores();
+  const { stores } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const [rows, setRows] = useState<StockDetailRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [storeId, setStoreId] = useState("");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 350);
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
@@ -46,11 +47,7 @@ export function StockDetailsListView() {
   );
 
   const activeStoreName =
-    stores.find((s) => s.id === (storeId || activeStoreId))?.name ?? stores[0]?.name ?? "—";
-
-  useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
+    stores.find((s) => s.id === storeId)?.name ?? stores[0]?.name ?? "—";
 
   useEffect(() => {
     setLoading(true);
@@ -62,15 +59,7 @@ export function StockDetailsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [storeId]);
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
+  }, [storeId, activeStoreId]);
 
   const filtered = useMemo(() => {
     if (!debouncedSearch.trim()) return sorted;
@@ -103,20 +92,10 @@ export function StockDetailsListView() {
         searchPlaceholder="Search product or barcode…"
         isEmpty={filtered.length === 0}
         emptyMessage="No stock records found."
-        isFiltering={Boolean(debouncedSearch.trim()) || Boolean(storeId)}
+        isFiltering={Boolean(debouncedSearch.trim())}
         onClearFilters={() => {
           setSearch("");
-          setStoreId(activeStoreId ?? "");
         }}
-        filters={[
-          {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: storeOptions,
-            onChange: setStoreId,
-          },
-        ]}
         footer={<span>{total} items</span>}
       >
         <AdminDataTable>

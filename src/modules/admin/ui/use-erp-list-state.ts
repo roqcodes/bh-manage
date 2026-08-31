@@ -1,48 +1,62 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { useDebouncedValue } from "@/modules/admin/ui/use-debounced-value";
+import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
 export function useErpListState(options?: {
   defaultStatus?: string;
-  defaultStoreId?: string;
+  /** When true, allow clearing store filter to show all stores (default false). */
+  allowAllStores?: boolean;
 }) {
   const searchParams = useSearchParams();
+  const { activeStoreId } = useErpStores();
+  const allowAllStores = options?.allowAllStores ?? false;
+
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [status, setStatus] = useState(
     searchParams.get("status") ?? options?.defaultStatus ?? "all",
   );
   const [storeId, setStoreId] = useState(
-    searchParams.get("storeId") ?? options?.defaultStoreId ?? "",
+    searchParams.get("storeId") ?? activeStoreId ?? "",
   );
   const [dateFrom, setDateFrom] = useState(searchParams.get("dateFrom") ?? "");
   const [dateTo, setDateTo] = useState(searchParams.get("dateTo") ?? "");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
 
+  useEffect(() => {
+    if (activeStoreId) {
+      setStoreId(activeStoreId);
+    }
+  }, [activeStoreId]);
+
+  const effectiveStoreId =
+    allowAllStores && !storeId ? "" : storeId || activeStoreId;
+
   const listParams = useMemo(() => {
     const params: Record<string, string> = {};
     if (status !== "all") params.status = status;
-    if (storeId) params.storeId = storeId;
+    if (effectiveStoreId) params.storeId = effectiveStoreId;
     if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
     if (dateFrom) params.dateFrom = dateFrom;
     if (dateTo) params.dateTo = dateTo;
     return params;
-  }, [status, storeId, debouncedSearch, dateFrom, dateTo]);
+  }, [status, effectiveStoreId, debouncedSearch, dateFrom, dateTo]);
 
   const isFiltering =
     Boolean(debouncedSearch.trim()) ||
     status !== "all" ||
-    Boolean(storeId) ||
     Boolean(dateFrom) ||
-    Boolean(dateTo);
+    Boolean(dateTo) ||
+    (allowAllStores && Boolean(storeId) && storeId !== activeStoreId);
 
   function clearFilters() {
     setSearch("");
     setStatus(options?.defaultStatus ?? "all");
-    setStoreId(options?.defaultStoreId ?? "");
+    setStoreId(activeStoreId ?? "");
     setDateFrom("");
     setDateTo("");
   }
@@ -53,7 +67,7 @@ export function useErpListState(options?: {
     debouncedSearch,
     status,
     setStatus,
-    storeId,
+    storeId: effectiveStoreId,
     setStoreId,
     dateFrom,
     setDateFrom,
@@ -63,5 +77,7 @@ export function useErpListState(options?: {
     listParams,
     isFiltering,
     clearFilters,
+    activeStoreId,
+    allowAllStores,
   };
 }

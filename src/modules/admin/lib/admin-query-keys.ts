@@ -3,7 +3,8 @@ export const fixedAssetsListQueryKey = (
   page: number,
   storeId: string,
   search: string,
-) => ["admin", "fixed-assets", page, storeId || "all", search || ""] as const;
+  activeStoreId?: string,
+) => ["admin", "fixed-assets", page, storeId || activeStoreId || "all", search || ""] as const;
 
 export const fixedAssetDetailQueryKey = (id: string) =>
   ["admin", "fixed-asset", id] as const;
@@ -19,8 +20,8 @@ export const adminQueryKeys = {
   inventory: (page: number) => ["admin", "inventory", page] as const,
   orders: (status: string, userId: string | null, page: number) =>
     ["admin", "orders", status, userId ?? "", page] as const,
-  salesOrders: (status: string, userId: string | null, page: number) =>
-    ["admin", "sales-orders", status, userId ?? "", page] as const,
+  salesOrders: (status: string, userId: string | null, page: number, storeId?: string | null) =>
+    ["admin", "sales-orders", status, userId ?? "", page, storeId ?? "active"] as const,
   purchaseOrders: (status: string, vendorId: string | null, page: number) =>
     ["admin", "purchase-orders", status, vendorId ?? "", page] as const,
   users: (tab: string, segment: string, page: number) =>

@@ -7,6 +7,7 @@ import type {
   TransferRequestLineInput,
 } from "@/common/erp/inventory-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
+import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 export async function listTransferRequests(
@@ -20,6 +21,9 @@ export async function listTransferRequests(
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(
+    filters?.fromStoreId ?? filters?.toStoreId ?? null,
+  );
 
   let query = supabase
     .from("erp_transfer_requests")
@@ -28,7 +32,10 @@ export async function listTransferRequests(
     .range(from, from + limit - 1);
 
   if (filters?.fromStoreId) query = query.eq("from_store_id", filters.fromStoreId);
-  if (filters?.toStoreId) query = query.eq("to_store_id", filters.toStoreId);
+  else if (filters?.toStoreId) query = query.eq("to_store_id", filters.toStoreId);
+  else if (activeStoreId) {
+    query = query.or(`from_store_id.eq.${activeStoreId},to_store_id.eq.${activeStoreId}`);
+  }
   if (filters?.status) query = query.eq("status", filters.status);
   if (filters?.search?.trim()) {
     query = query.ilike("request_number", `%${filters.search.trim()}%`);

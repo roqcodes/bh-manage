@@ -4,7 +4,7 @@ import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.serv
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpEstimateListRow, ErpLineInput } from "@/common/erp/sales-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 function linesToJson(lines: ErpLineInput[]): Json {
@@ -19,15 +19,20 @@ function linesToJson(lines: ErpLineInput[]): Json {
   })) as Json;
 }
 
-export async function listEstimates(page = 0, limit = 20): Promise<{
+export async function listEstimates(
+  page = 0,
+  limit = 20,
+  storeId?: string,
+): Promise<{
   data: ErpEstimateListRow[];
   total: number;
 }> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(storeId);
 
-  const { data, error, count } = await supabase
+  let query = supabase
     .from("erp_estimates")
     .select(
       "id, estimate_number, user_id, store_id, status, total_amount, estimate_date, valid_until, users:users!erp_estimates_user_id_fkey(name), stores(name)",
@@ -35,6 +40,9 @@ export async function listEstimates(page = 0, limit = 20): Promise<{
     )
     .order("created_at", { ascending: false })
     .range(from, from + limit - 1);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
+
+  const { data, error, count } = await query;
 
   if (error) throw new Error(error.message);
 

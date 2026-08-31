@@ -3,7 +3,7 @@ import "server-only";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { StockDetailRow } from "@/common/erp/inventory-types";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 
 export async function getStockDetails(input?: {
   storeId?: string;
@@ -12,8 +12,7 @@ export async function getStockDetails(input?: {
 }): Promise<{ data: StockDetailRow[]; total: number }> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input?.storeId ?? ctx?.store_id;
+  const storeId = await resolveErpStoreId(input?.storeId);
   const page = input?.page ?? 0;
   const limit = input?.limit ?? 50;
   const from = page * limit;

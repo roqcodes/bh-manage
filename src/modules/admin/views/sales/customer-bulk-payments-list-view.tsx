@@ -32,7 +32,7 @@ import {
   useErpFormModal,
   useSortableData,
 } from "@/modules/admin/ui";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { CustomerBulkPaymentFormView } from "@/modules/admin/views/sales/customer-bulk-payment-form-view";
 
 const PERIOD_OPTIONS = [
@@ -51,7 +51,7 @@ function formatDisplayDate(value: string) {
 
 export function CustomerBulkPaymentsListView() {
   const searchParams = useSearchParams();
-  const { stores } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const { isOpen, modalProps, openNew } = useErpFormModal("/admin/erp/customer-bulk-payments");
   const [reloadToken, setReloadToken] = useState(0);
   const [rows, setRows] = useState<BulkCustomerPaymentBatchRow[]>([]);
@@ -60,7 +60,6 @@ export function CustomerBulkPaymentsListView() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [storeId, setStoreId] = useState(searchParams.get("storeId") ?? "");
   const [period, setPeriod] = useState(searchParams.get("period") ?? "this_month");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
@@ -89,15 +88,7 @@ export function CustomerBulkPaymentsListView() {
         setTotalAmount(res.totalAmount);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, period, debouncedSearch, reloadToken]);
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
+  }, [page, storeId, period, debouncedSearch, reloadToken, activeStoreId]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
@@ -140,20 +131,12 @@ export function CustomerBulkPaymentsListView() {
         searchPlaceholder="Search store, account, receipt…"
         isEmpty={sorted.length === 0}
         emptyMessage="No bulk payments found."
-        isFiltering={Boolean(debouncedSearch.trim()) || Boolean(storeId) || period !== "all"}
+        isFiltering={Boolean(debouncedSearch.trim()) || period !== "all"}
         onClearFilters={() => {
           setSearch("");
-          setStoreId("");
           setPeriod("all");
         }}
         filters={[
-          {
-            id: "store",
-            label: "Store",
-            value: storeId,
-            options: storeOptions,
-            onChange: setStoreId,
-          },
           {
             id: "period",
             label: "Period",

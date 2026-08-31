@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpCreditNoteListRow, ErpLineInput } from "@/common/erp/sales-types";
 import { roundMoney } from "@/common/erp/purchasing-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 function linesToJson(lines: ErpLineInput[]): Json {
@@ -29,6 +29,7 @@ export async function listCreditNotes(
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(filters?.storeId);
 
   let query = supabase
     .from("erp_credit_notes")
@@ -39,7 +40,7 @@ export async function listCreditNotes(
     .order("created_at", { ascending: false })
     .range(from, from + limit - 1);
 
-  if (filters?.storeId) query = query.eq("store_id", filters.storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
   if (filters?.status && filters.status !== "all") query = query.eq("status", filters.status);
   if (filters?.search?.trim()) {
     query = query.ilike("credit_note_number", `%${filters.search.trim()}%`);

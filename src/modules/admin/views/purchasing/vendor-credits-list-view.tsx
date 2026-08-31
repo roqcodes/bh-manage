@@ -47,6 +47,7 @@ export function VendorCreditsListView() {
     listParams,
     isFiltering,
     clearFilters,
+    activeStoreId,
   } = useErpListState();
   const [rows, setRows] = useState<ErpVendorCreditListRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -68,7 +69,7 @@ export function VendorCreditsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, dateFrom, dateTo, reloadToken]);
+  }, [page, debouncedSearch, dateFrom, dateTo, reloadToken, listParams, activeStoreId]);
 
   const filteredRows = useMemo(() => {
     if (!debouncedSearch.trim()) return sorted;

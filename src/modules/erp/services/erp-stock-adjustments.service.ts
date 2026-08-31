@@ -7,6 +7,7 @@ import type {
   StockAdjustmentLineInput,
 } from "@/common/erp/inventory-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
+import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 export async function listStockAdjustments(
@@ -20,6 +21,7 @@ export async function listStockAdjustments(
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * limit;
+  const activeStoreId = await resolveErpStoreId(filters?.storeId);
 
   let query = supabase
     .from("erp_stock_adjustments")
@@ -27,7 +29,7 @@ export async function listStockAdjustments(
     .order("adjustment_date", { ascending: false })
     .range(from, from + limit - 1);
 
-  if (filters?.storeId) query = query.eq("store_id", filters.storeId);
+  if (activeStoreId) query = query.eq("store_id", activeStoreId);
   if (filters?.search?.trim()) {
     query = query.ilike("adjustment_number", `%${filters.search.trim()}%`);
   }

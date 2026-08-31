@@ -35,15 +35,13 @@ import { TransferRequestFormView } from "@/modules/admin/views/inventory/transfe
 
 export function TransferRequestsListView() {
   const searchParams = useSearchParams();
-  const { stores } = useErpStores();
+  const { activeStoreId } = useErpStores();
   const { isOpen, modalProps, openNew } = useErpFormModal("/admin/erp/transfer-requests");
   const [reloadToken, setReloadToken] = useState(0);
   const [rows, setRows] = useState<ErpTransferRequestListRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [fromStoreId, setFromStoreId] = useState("");
-  const [toStoreId, setToStoreId] = useState("");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
@@ -57,8 +55,6 @@ export function TransferRequestsListView() {
     const q = new URLSearchParams();
     q.set("page", String(page));
     if (debouncedSearch.trim()) q.set("search", debouncedSearch.trim());
-    if (fromStoreId) q.set("fromStoreId", fromStoreId);
-    if (toStoreId) q.set("toStoreId", toStoreId);
     adminGet<{ data: ErpTransferRequestListRow[]; total: number }>(
       `erp/transfer-requests?${q.toString()}`,
     )
@@ -67,19 +63,9 @@ export function TransferRequestsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, fromStoreId, toStoreId, reloadToken]);
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
+  }, [page, debouncedSearch, reloadToken, activeStoreId]);
 
   const listParams: Record<string, string> = {};
-  if (fromStoreId) listParams.fromStoreId = fromStoreId;
-  if (toStoreId) listParams.toStoreId = toStoreId;
   if (debouncedSearch.trim()) listParams.search = debouncedSearch.trim();
 
   if (loading && rows.length === 0) return <AdminPageSkeleton />;
@@ -104,28 +90,10 @@ export function TransferRequestsListView() {
         searchPlaceholder="Search request number…"
         isEmpty={sorted.length === 0}
         emptyMessage="No transfer requests yet."
-        isFiltering={Boolean(debouncedSearch.trim()) || Boolean(fromStoreId) || Boolean(toStoreId)}
+        isFiltering={Boolean(debouncedSearch.trim())}
         onClearFilters={() => {
           setSearch("");
-          setFromStoreId("");
-          setToStoreId("");
         }}
-        filters={[
-          {
-            id: "fromStore",
-            label: "Supplying store",
-            value: fromStoreId,
-            options: storeOptions,
-            onChange: setFromStoreId,
-          },
-          {
-            id: "toStore",
-            label: "Requesting store",
-            value: toStoreId,
-            options: storeOptions,
-            onChange: setToStoreId,
-          },
-        ]}
         footer={<AdminListFooter total={total} label="requests" page={page} pageSize={PAGE_SIZE} />}
       >
         <AdminDataTable>

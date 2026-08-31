@@ -31,7 +31,7 @@ import {
   useErpFormModal,
   useSortableData,
 } from "@/modules/admin/ui";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { ExpenseFormView } from "@/modules/admin/views/purchasing/expense-form-view";
 
 const PERIOD_OPTIONS = [
@@ -50,7 +50,7 @@ function formatDisplayDate(value: string) {
 
 export function ExpensesListView() {
   const searchParams = useSearchParams();
-  const { stores } = useErpStores();
+  const { activeStoreId, storeId } = useActiveStoreScope();
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/expenses");
   const [reloadToken, setReloadToken] = useState(0);
   const [rows, setRows] = useState<ErpExpenseListRow[]>([]);
@@ -59,12 +59,12 @@ export function ExpensesListView() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [storeId, setStoreId] = useState(searchParams.get("storeId") ?? "");
   const [period, setPeriod] = useState(searchParams.get("period") ?? "this_month");
   const [accountId, setAccountId] = useState(searchParams.get("accountId") ?? "");
   const [expenseAccounts, setExpenseAccounts] = useState<Array<{ id: string; name: string }>>([]);
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
+
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "expense_date",
@@ -78,7 +78,7 @@ export function ExpensesListView() {
     adminGet<{ data: Array<{ id: string; name: string }> }>(`erp/expenses${q}`).then((res) =>
       setExpenseAccounts(res.data),
     );
-  }, [storeId]);
+  }, [storeId, activeStoreId]);
 
   useEffect(() => {
     setLoading(true);
@@ -98,15 +98,7 @@ export function ExpensesListView() {
         setTotalAmount(res.totalAmount);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, period, accountId, debouncedSearch, reloadToken]);
-
-  const storeOptions = useMemo(
-    () => [
-      { value: "", label: "All stores" },
-      ...stores.map((s) => ({ value: s.id, label: s.name })),
-    ],
-    [stores],
-  );
+  }, [page, storeId, period, accountId, debouncedSearch, reloadToken, activeStoreId]);
 
   const accountOptions = useMemo(
     () => [
@@ -159,16 +151,14 @@ export function ExpensesListView() {
         isEmpty={sorted.length === 0}
         emptyMessage="No expenses found."
         isFiltering={
-          Boolean(debouncedSearch.trim()) || Boolean(storeId) || Boolean(accountId) || period !== "all"
+          Boolean(debouncedSearch.trim()) || Boolean(accountId) || period !== "all"
         }
         onClearFilters={() => {
           setSearch("");
-          setStoreId("");
           setAccountId("");
           setPeriod("all");
         }}
         filters={[
-          { id: "store", label: "Store", value: storeId, options: storeOptions, onChange: setStoreId },
           { id: "period", label: "Period", value: period, options: PERIOD_OPTIONS, onChange: setPeriod },
           {
             id: "account",

@@ -17,6 +17,7 @@ import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { AdminPageHeader, AdminPageLayout, useErpFormModal } from "@/modules/admin/ui";
 import { SalesOrderFormView } from "@/modules/admin/views/sales/sales-order-form-view";
+import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
 function parseOrderStatus(raw: string | null): OrderStatusFilter {
   if (raw && (ORDER_STATUS_FILTERS as readonly string[]).includes(raw)) {
@@ -26,6 +27,7 @@ function parseOrderStatus(raw: string | null): OrderStatusFilter {
 }
 
 export function SalesOrdersListView() {
+  const { activeStoreId } = useErpStores();
   const { isOpen, modalProps } = useErpFormModal("/admin/erp/sales-orders");
   const searchParams = useSearchParams();
   const status = parseOrderStatus(searchParams.get("status"));
@@ -34,12 +36,13 @@ export function SalesOrdersListView() {
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
 
   const { data, isPending, isError, error } = useQuery({
-    queryKey: adminQueryKeys.salesOrders(status, userId, page),
+    queryKey: adminQueryKeys.salesOrders(status, userId, page, activeStoreId),
     queryFn: () => {
       const q = new URLSearchParams();
       if (status !== "all") q.set("status", status);
       if (userId) q.set("userId", userId);
       if (page > 0) q.set("page", String(page));
+      if (activeStoreId) q.set("storeId", activeStoreId);
       const qs = q.toString();
       return adminGet<{
         data: Order[];
