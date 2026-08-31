@@ -25,6 +25,7 @@ import {
   useSortableData,
 } from "@/modules/admin/ui";
 import { Card, CardContent } from "@/components/ui/card";
+import { TableHead } from "@/components/ui/table";
 import {
   computeRecurringScheduleStats,
   RecurringSchedulesMetricsBar,
@@ -462,8 +463,15 @@ export function RecurringSchedulesView({
                 onSort={toggleSort}
                 className="text-right"
               />
-              <SortableTableHead label="Status" className="hidden sm:table-cell" />
-              <SortableTableHead label="" className="w-[140px] md:w-[156px]" />
+              <SortableTableHead
+                label="Status"
+                sortKey="is_active"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+                className="hidden sm:table-cell"
+              />
+              <TableHead className="w-[140px] md:w-[156px]" />
             </AdminTableHeader>
             <AdminTableBody>
               {sorted.map((row) => (
