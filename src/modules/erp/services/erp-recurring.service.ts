@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import type { Json } from "@/lib/integrations/supabase/types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import { createErpInvoice } from "@/modules/erp/services/erp-invoices.service";
 
@@ -68,7 +69,7 @@ export async function createRecurringSchedule(input: {
       vendor_id: input.vendorId ?? null,
       frequency: input.frequency,
       next_run_date: input.nextRunDate,
-      payload: input.payload ?? {},
+      payload: (input.payload ?? {}) as Json,
       is_active: true,
     })
     .select("id")
@@ -103,7 +104,7 @@ export async function updateRecurringSchedule(
       ...(input.vendorId !== undefined ? { vendor_id: input.vendorId } : {}),
       ...(input.frequency !== undefined ? { frequency: input.frequency } : {}),
       ...(input.nextRunDate !== undefined ? { next_run_date: input.nextRunDate } : {}),
-      ...(input.payload !== undefined ? { payload: input.payload } : {}),
+      ...(input.payload !== undefined ? { payload: input.payload as Json } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", scheduleId);

@@ -96,7 +96,6 @@ async function importProducts(rows: Record<string, string>[]): Promise<ImportRes
           category_id: categoryId,
           brand_id: brandId,
           is_active: isActive,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", productId);
       if (error) {
@@ -319,7 +318,7 @@ async function importPurchaseBills(rows: Record<string, string>[], storeId?: str
       const lines = billRows.map((r) => ({
         productName: r.product_name?.trim() || "Imported item",
         quantity: parseFloat(r.quantity) || 1,
-        unitPrice: parseFloat(r.unit_price) || 0,
+        purchasePrice: parseFloat(r.unit_price) || 0,
         taxRatePercent: parseFloat(r.tax_rate) || 0,
       }));
 

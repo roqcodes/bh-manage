@@ -8,7 +8,9 @@ import type { Database } from "@/lib/integrations/supabase/types";
 import type { AdminUser, DBUser, Paginated } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
 
-const STAFF_ROLES = ["admin", "manager", "vendor", "delivery"];
+type UserRole = Database["public"]["Enums"]["user_role"];
+
+const STAFF_ROLES: UserRole[] = ["admin", "manager", "vendor", "delivery"];
 
 /** Portal staff lists (verified users by role). */
 export type PortalStaffSegment = "vendor" | "delivery" | "admin";
@@ -69,7 +71,7 @@ export async function getPortalStaffUsers(
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * PAGE_SIZE;
-  const roles =
+  const roles: UserRole[] =
     segment === "delivery"
       ? ["delivery"]
       : segment === "vendor"

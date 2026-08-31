@@ -6,6 +6,7 @@ import {
   requireAdminOrManagerProfile,
 } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import type { Database } from "@/lib/integrations/supabase/types";
 import {
   deactivateVendorRowForUser,
   deleteVendorRowForUser,
@@ -72,7 +73,7 @@ export async function updateUserRoleById(
 
   const { error } = await supabase
     .from("users")
-    .update({ role: newRole })
+    .update({ role: newRole as Database["public"]["Enums"]["user_role"] })
     .eq("id", userId);
 
   if (error) throw new Error(error.message);

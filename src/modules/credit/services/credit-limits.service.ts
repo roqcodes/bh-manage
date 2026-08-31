@@ -138,7 +138,7 @@ export async function getMyLedger(
 
   const entries: LedgerEntry[] = (transactions ?? []).map((tx) => ({
     id: tx.id,
-    type: tx.type,
+    type: tx.type ?? "",
     amount: tx.amount ?? 0,
     balance_after: wallet?.balance ?? null,
     reference: tx.reference,
@@ -176,7 +176,7 @@ export async function getCustomerLedger(
 
   const entries: LedgerEntry[] = (transactions ?? []).map((tx) => ({
     id: tx.id,
-    type: tx.type,
+    type: tx.type ?? "",
     amount: tx.amount ?? 0,
     balance_after: wallet?.balance ?? null,
     reference: tx.reference,

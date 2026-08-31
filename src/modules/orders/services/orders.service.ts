@@ -6,6 +6,7 @@ import type { Database } from "@/lib/integrations/supabase/types";
 import type {
   Order,
   OrderCatalogStats,
+  OrderInventoryFulfillmentStatus,
   OrderItem,
   OrderItemPreview,
   OrderStatusFilter,
@@ -95,7 +96,8 @@ function mapOrderListRow(
     store_name: row.stores?.name ?? null,
     source: (row as { source?: string | null }).source ?? null,
     fulfillment_status:
-      (row as { fulfillment_status?: string | null }).fulfillment_status ?? null,
+      ((row as { fulfillment_status?: string | null }).fulfillment_status ??
+        null) as OrderInventoryFulfillmentStatus | null,
     inventory_reserved:
       (row as { inventory_reserved?: boolean | null }).inventory_reserved ?? null,
   };

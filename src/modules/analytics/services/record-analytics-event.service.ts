@@ -10,7 +10,7 @@ export async function recordProductView(input: {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("record_product_view", {
     p_product_id: input.productId,
-    p_variant_id: input.variantId ?? null,
+    p_variant_id: input.variantId ?? undefined,
   });
 
   if (error) {

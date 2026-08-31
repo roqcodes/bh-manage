@@ -105,7 +105,10 @@ export async function resolveDocumentRecipientEmail(
       .select("invoice_number, users:users!invoices_user_id_fkey(email, name)")
       .eq("id", documentId)
       .single();
-    const user = data?.users as { email: string | null; name: string | null } | null;
+    const user = data?.users as unknown as {
+      email: string | null;
+      name: string | null;
+    } | null;
     return {
       email: user?.email ?? null,
       name: user?.name ?? null,
@@ -119,7 +122,10 @@ export async function resolveDocumentRecipientEmail(
       .select("estimate_number, users:users!erp_estimates_user_id_fkey(email, name)")
       .eq("id", documentId)
       .single();
-    const user = data?.users as { email: string | null; name: string | null } | null;
+    const user = data?.users as unknown as {
+      email: string | null;
+      name: string | null;
+    } | null;
     return {
       email: user?.email ?? null,
       name: user?.name ?? null,
@@ -133,7 +139,10 @@ export async function resolveDocumentRecipientEmail(
       .select("credit_note_number, users:users!erp_credit_notes_user_id_fkey(email, name)")
       .eq("id", documentId)
       .single();
-    const user = data?.users as { email: string | null; name: string | null } | null;
+    const user = data?.users as unknown as {
+      email: string | null;
+      name: string | null;
+    } | null;
     return {
       email: user?.email ?? null,
       name: user?.name ?? null,
@@ -147,7 +156,10 @@ export async function resolveDocumentRecipientEmail(
       .select("payment_number, total_amount, users:users!erp_customer_payments_user_id_fkey(email, name)")
       .eq("id", documentId)
       .single();
-    const user = data?.users as { email: string | null; name: string | null } | null;
+    const user = data?.users as unknown as {
+      email: string | null;
+      name: string | null;
+    } | null;
     return {
       email: user?.email ?? null,
       name: user?.name ?? null,

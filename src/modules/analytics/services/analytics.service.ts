@@ -206,7 +206,7 @@ export async function getAnalyticsPayload(
   );
 
   const productFilter =
-    filters.productId && filters.productId !== "all" ? filters.productId : null;
+    filters.productId && filters.productId !== "all" ? filters.productId : undefined;
 
   const fromIso = fromDate.toISOString();
   const toIso = toDate.toISOString();
