@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { PAGE_SIZE } from "@/common/admin/types";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface PaginationProps {
   total: number;
@@ -12,6 +14,8 @@ interface PaginationProps {
   extraParams?: Record<string, string>;
   listParams?: Record<string, string>;
   pageParam?: string;
+  pageSize?: number;
+  className?: string;
 }
 
 export function Pagination({
@@ -21,9 +25,11 @@ export function Pagination({
   extraParams = {},
   listParams,
   pageParam = "page",
+  pageSize = PAGE_SIZE,
+  className,
 }: PaginationProps) {
   const router = useRouter();
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const totalPages = Math.ceil(total / pageSize);
 
   if (totalPages <= 1) return null;
 
@@ -32,32 +38,43 @@ export function Pagination({
     return `${basePath}?${params.toString()}`;
   }
 
-  const start = page * PAGE_SIZE + 1;
-  const end = Math.min((page + 1) * PAGE_SIZE, total);
+  const start = page * pageSize + 1;
+  const end = Math.min((page + 1) * pageSize, total);
 
   return (
-    <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2">
-      <p className="text-[13px] text-slate-500">
-        <span className="font-bold text-slate-900">
+    <div
+      className={cn(
+        "flex items-center justify-between rounded-lg border bg-card px-3 py-2",
+        className,
+      )}
+    >
+      <p className="text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">
           {start}–{end}
         </span>{" "}
-        of {total}
+        of {total.toLocaleString()}
       </p>
-      <div className="flex gap-1.5">
-        <button
+      <div className="flex gap-1">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
           disabled={page === 0}
           onClick={() => router.push(buildUrl(page - 1))}
-          className="flex size-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
+          aria-label="Previous page"
         >
-          <ChevronLeft size={14} />
-        </button>
-        <button
+          <ChevronLeft className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
           disabled={page >= totalPages - 1}
           onClick={() => router.push(buildUrl(page + 1))}
-          className="flex size-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
+          aria-label="Next page"
         >
-          <ChevronRight size={14} />
-        </button>
+          <ChevronRight className="size-4" />
+        </Button>
       </div>
     </div>
   );

@@ -25,9 +25,19 @@ export const ERP_DOCUMENT_TYPES = [
   "payment_made",
   "stock_adjustment",
   "stock_transfer",
+  "transfer_request",
+  "transfer_payment",
 ] as const;
 
 export type ErpDocumentType = (typeof ERP_DOCUMENT_TYPES)[number];
+
+export type ErpEmailDocumentType =
+  | "invoice"
+  | "estimate"
+  | "credit_note"
+  | "payment"
+  | "purchase_bill"
+  | "payment_receipt";
 
 /** Winner ERP activity-log action labels observed in dashboard screenshots. */
 export const AUDIT_ACTIONS = [
@@ -38,7 +48,12 @@ export const AUDIT_ACTIONS = [
   "edit_invoice",
   "payment_received",
   "create_bulk_customer_payment",
+  "create_bulk_customer_payment",
   "create_purchase_bill",
+  "finalize_purchase_bill",
+  "supplier_payment",
+  "create_bulk_supplier_payment",
+  "vendor_credit",
   "create_expense",
   "stock_adjustment",
   "stock_transfer",
@@ -59,6 +74,25 @@ export interface Company {
   updated_at: string;
 }
 
+export type RecurringScheduleFrequency = "weekly" | "monthly" | "quarterly" | "yearly";
+
+export type RecurringScheduleRow = {
+  id: string;
+  schedule_type: "invoice" | "purchase_bill";
+  name: string;
+  store_id: string | null;
+  customer_id: string | null;
+  vendor_id: string | null;
+  frequency: RecurringScheduleFrequency;
+  next_run_date: string;
+  last_run_date: string | null;
+  is_active: boolean;
+  payload: Record<string, unknown>;
+  created_at: string;
+  customer_name?: string | null;
+  vendor_name?: string | null;
+};
+
 export interface Store {
   id: string;
   company_id: string;
@@ -74,6 +108,14 @@ export interface Store {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+  description?: string | null;
+  store_type?: string | null;
+  markup_percent?: number;
+  country?: string | null;
+  currency?: string | null;
+  trn?: string | null;
+  tax_template?: string | null;
+  logo_url?: string | null;
 }
 
 export interface UserStoreAccess {
@@ -120,6 +162,9 @@ export interface Account {
 export interface AuditLogEntry {
   id: string;
   user_id: string | null;
+  user_name?: string | null;
+  user_email?: string | null;
+  user_role?: string | null;
   store_id: string | null;
   action: string;
   entity_type: string;

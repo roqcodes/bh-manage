@@ -5,23 +5,23 @@ import { Package, DollarSign, TrendingUp, ClipboardList } from "lucide-react";
 import { currencyLabel, formatCurrencyAmount } from "@/lib/format-currency";
 
 interface FinanceSummary {
-  total_revenue: number;
-  total_orders: number;
-  avg_order_value: number;
-  total_customers: number;
+  totalRevenue: number;
+  totalOutstanding: number;
+  walletLiability: number;
+  pendingPayments: number;
 }
 
 interface TransactionSummary {
-  total_credits: number;
-  total_debits: number;
-  net_flow: number;
+  totalIn: number;
+  totalOut: number;
+  net: number;
 }
 
 interface Receivable {
-  id: string;
-  order_id: string;
+  invoice_id: string;
+  invoice_number: string;
   customer_name: string | null;
-  total_amount: number;
+  total_amount: number | null;
   outstanding_amount: number;
   due_date: string | null;
   status: string;
@@ -125,9 +125,13 @@ export default function AdminFinancePage() {
     <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Finance Dashboard</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Online Store Analytics</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Financial overview, receivables, and profit analysis
+          BuyHub online orders, wallet, and margin — separate from ERP store reports at{" "}
+          <a href="/admin/erp/reports" className="text-primary hover:underline">
+            Reports
+          </a>
+          .
         </p>
       </div>
 
@@ -173,9 +177,9 @@ export default function AdminFinancePage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500">{currencyLabel("Total Revenue (30d)")}</p>
+                  <p className="text-xs text-slate-500">{currencyLabel("Online revenue")}</p>
                   <p className="mt-1 text-2xl font-bold text-slate-900">
-                    {formatMoney(financeData.summary.total_revenue)}
+                    {formatMoney(financeData.summary.totalRevenue)}
                   </p>
                 </div>
                 <div className="rounded-full bg-emerald-100 p-3">
@@ -186,9 +190,9 @@ export default function AdminFinancePage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500">Total Orders</p>
+                  <p className="text-xs text-slate-500">Outstanding invoices</p>
                   <p className="mt-1 text-2xl font-bold text-slate-900">
-                    {financeData.summary.total_orders}
+                    {formatMoney(financeData.summary.totalOutstanding)}
                   </p>
                 </div>
                 <div className="rounded-full bg-blue-100 p-3">
@@ -199,9 +203,9 @@ export default function AdminFinancePage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500">{currencyLabel("Avg order value")}</p>
+                  <p className="text-xs text-slate-500">Wallet liability</p>
                   <p className="mt-1 text-2xl font-bold text-slate-900">
-                    {formatMoney(financeData.summary.avg_order_value)}
+                    {formatMoney(financeData.summary.walletLiability)}
                   </p>
                 </div>
                 <div className="rounded-full bg-purple-100 p-3">
@@ -212,9 +216,9 @@ export default function AdminFinancePage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500">Total Customers</p>
+                  <p className="text-xs text-slate-500">Pending payments</p>
                   <p className="mt-1 text-2xl font-bold text-slate-900">
-                    {financeData.summary.total_customers}
+                    {formatMoney(financeData.summary.pendingPayments)}
                   </p>
                 </div>
                 <div className="rounded-full bg-slate-100 p-3">
@@ -226,30 +230,30 @@ export default function AdminFinancePage() {
 
           {/* Transaction Summary */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h2 className="mb-4 text-lg font-bold text-slate-900">Transaction Summary</h2>
+            <h2 className="mb-4 text-lg font-bold text-slate-900">Wallet flow ({financeData.period})</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-lg bg-emerald-50 p-4">
-                <p className="text-xs text-emerald-700">{currencyLabel("Total credits")}</p>
+                <p className="text-xs text-emerald-700">{currencyLabel("Credits in")}</p>
                 <p className="mt-1 text-xl font-bold text-emerald-900">
-                  {formatMoney(financeData.transactions.total_credits)}
+                  {formatMoney(financeData.transactions.totalIn)}
                 </p>
               </div>
               <div className="rounded-lg bg-red-50 p-4">
-                <p className="text-xs text-red-700">{currencyLabel("Total debits")}</p>
+                <p className="text-xs text-red-700">{currencyLabel("Debits out")}</p>
                 <p className="mt-1 text-xl font-bold text-red-900">
-                  {formatMoney(financeData.transactions.total_debits)}
+                  {formatMoney(financeData.transactions.totalOut)}
                 </p>
               </div>
               <div className="rounded-lg bg-slate-50 p-4">
-                <p className="text-xs text-slate-700">{currencyLabel("Net cash flow")}</p>
+                <p className="text-xs text-slate-700">{currencyLabel("Net flow")}</p>
                 <p
                   className={`mt-1 text-xl font-bold ${
-                    financeData.transactions.net_flow >= 0
+                    financeData.transactions.net >= 0
                       ? "text-emerald-900"
                       : "text-red-900"
                   }`}
                 >
-                  {formatMoney(financeData.transactions.net_flow)}
+                  {formatMoney(financeData.transactions.net)}
                 </p>
               </div>
             </div>
@@ -280,7 +284,7 @@ export default function AdminFinancePage() {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Order</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Invoice</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Customer</th>
                       <th className="px-4 py-3 text-right font-semibold text-slate-700">{currencyLabel("Total")}</th>
                       <th className="px-4 py-3 text-right font-semibold text-slate-700">{currencyLabel("Outstanding")}</th>
@@ -290,15 +294,15 @@ export default function AdminFinancePage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {receivablesData.receivables.map((rec) => (
-                      <tr key={rec.id} className="hover:bg-slate-50">
+                      <tr key={rec.invoice_id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                          {rec.order_id.slice(0, 8)}...
+                          {rec.invoice_number}
                         </td>
                         <td className="px-4 py-3 text-slate-700">
                           {rec.customer_name || "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                          {formatMoney(rec.total_amount)}
+                          {formatMoney(rec.total_amount ?? 0)}
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-red-600">
                           {formatMoney(rec.outstanding_amount)}

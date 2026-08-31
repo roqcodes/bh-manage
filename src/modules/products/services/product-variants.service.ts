@@ -20,6 +20,12 @@ export async function insertVariantWithInventory(input: {
   mrp: number;
   stock?: number;
   variantGroupId?: string | null;
+  barcode?: string | null;
+  productCode?: string | null;
+  purchasePrice?: number | null;
+  taxRatePercent?: number | null;
+  unitId?: string | null;
+  markupPercent?: number | null;
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -32,6 +38,12 @@ export async function insertVariantWithInventory(input: {
       price: input.price,
       mrp: input.mrp,
       variant_group_id: input.variantGroupId ?? null,
+      barcode: input.barcode ?? null,
+      product_code: input.productCode ?? null,
+      purchase_price: input.purchasePrice ?? null,
+      tax_rate_percent: input.taxRatePercent ?? null,
+      unit_id: input.unitId ?? null,
+      markup_percent: input.markupPercent ?? null,
     })
     .select("id")
     .single();
@@ -53,7 +65,17 @@ export async function insertVariantWithInventory(input: {
 
 export async function updateVariantById(
   id: string,
-  input: { name: string; price: number; mrp: number },
+  input: {
+    name: string;
+    price: number;
+    mrp: number;
+    barcode?: string | null;
+    productCode?: string | null;
+    purchasePrice?: number | null;
+    taxRatePercent?: number | null;
+    unitId?: string | null;
+    markupPercent?: number | null;
+  },
 ): Promise<void> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -63,6 +85,12 @@ export async function updateVariantById(
       name: input.name,
       price: input.price,
       mrp: input.mrp,
+      barcode: input.barcode ?? null,
+      product_code: input.productCode ?? null,
+      purchase_price: input.purchasePrice ?? null,
+      tax_rate_percent: input.taxRatePercent ?? null,
+      unit_id: input.unitId ?? null,
+      markup_percent: input.markupPercent ?? null,
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

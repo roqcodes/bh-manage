@@ -15,6 +15,10 @@ import type {
 } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
 import { normalizeOrderAddress } from "@/modules/orders/lib/order-address";
+import { shipOrderFulfillments } from "@/modules/orders/services/order-wallet-inventory.service";
+import { fetchOrderFulfillments } from "@/modules/orders/services/order-fulfillment.service";
+
+export type OrderChannel = "online" | "erp";
 
 export interface OrderFilterUserRow {
   id: string;
@@ -22,8 +26,27 @@ export interface OrderFilterUserRow {
   email: string | null;
 }
 
-type OrderListRow = Omit<Order, "item_count" | "order_items_preview" | "customer_order_count"> & {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyOrderChannelFilter(query: any, channel: OrderChannel) {
+  if (channel === "erp") {
+    return query.eq("source", "sales_order");
+  }
+  return query.or("source.is.null,source.eq.online,source.eq.manual");
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyOrderChannelFilterOnOrderItems(query: any, channel: OrderChannel) {
+  if (channel === "erp") {
+    return query.eq("orders.source", "sales_order");
+  }
+  return query.or("source.is.null,source.eq.online,source.eq.manual", {
+    foreignTable: "orders",
+  });
+}
+
+type OrderListRow = Omit<Order, "item_count" | "order_items_preview" | "customer_order_count" | "store_name"> & {
   order_items?: OrderItemPreview[] | null;
+  stores?: { name: string } | null;
 };
 
 async function customerOrderCounts(
@@ -65,6 +88,16 @@ function mapOrderListRow(
     item_count: preview.length,
     order_items_preview: preview,
     customer_order_count: userId ? (customerCounts[userId] ?? 0) : 0,
+    sales_order_number: row.sales_order_number ?? null,
+    reference_number: row.reference_number ?? null,
+    shipment_date: row.shipment_date ?? null,
+    delivery_method: row.delivery_method ?? null,
+    store_name: row.stores?.name ?? null,
+    source: (row as { source?: string | null }).source ?? null,
+    fulfillment_status:
+      (row as { fulfillment_status?: string | null }).fulfillment_status ?? null,
+    inventory_reserved:
+      (row as { inventory_reserved?: boolean | null }).inventory_reserved ?? null,
   };
 }
 
@@ -72,19 +105,23 @@ export async function getOrders(
   status: OrderStatusFilter = "all",
   userId: string | null = null,
   page = 0,
+  channel: OrderChannel = "online",
 ): Promise<Paginated<Order>> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const from = page * PAGE_SIZE;
 
-  let query = supabase
-    .from("orders")
-    .select(
-      "id,created_at,status,payment_status,total_amount,merchant_note,customer_edited_at,users:users!orders_user_fkey(id,name,email,phone),order_items(id,product_name,quantity)",
-      { count: "exact" },
-    )
-    .order("created_at", { ascending: false })
-    .range(from, from + PAGE_SIZE - 1);
+  let query = applyOrderChannelFilter(
+    supabase
+      .from("orders")
+      .select(
+        "id,created_at,status,payment_status,total_amount,merchant_note,customer_edited_at,source,fulfillment_status,inventory_reserved,sales_order_number,reference_number,shipment_date,delivery_method,users:users!orders_user_fkey(id,name,email,phone),stores(name),order_items(id,product_name,quantity)",
+        { count: "exact" },
+      )
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1),
+    channel,
+  );
 
   if (status !== "all") query = query.eq("status", status);
   if (userId) query = query.eq("user_id", userId);
@@ -215,7 +252,9 @@ async function enrichOrderItems(
   return { items: enrichedItems, variant_groups };
 }
 
-export async function getOrdersCatalogStats(): Promise<OrderCatalogStats> {
+export async function getOrdersCatalogStats(
+  channel: OrderChannel = "online",
+): Promise<OrderCatalogStats> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
 
@@ -229,41 +268,67 @@ export async function getOrdersCatalogStats(): Promise<OrderCatalogStats> {
     itemsRes,
     reversalsRes,
   ] = await Promise.all([
-    supabase.from("orders").select("id", { count: "exact", head: true }),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "processing"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "shipped"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "delivered"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "cancelled"),
-    supabase.from("order_items").select("quantity"),
-    supabase
-      .from("orders")
-      .select("total_amount")
-      .eq("status", "cancelled"),
+    applyOrderChannelFilter(
+      supabase.from("orders").select("id", { count: "exact", head: true }),
+      channel,
+    ),
+    applyOrderChannelFilter(
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
+      channel,
+    ),
+    applyOrderChannelFilter(
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "processing"),
+      channel,
+    ),
+    applyOrderChannelFilter(
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "shipped"),
+      channel,
+    ),
+    applyOrderChannelFilter(
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "delivered"),
+      channel,
+    ),
+    applyOrderChannelFilter(
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "cancelled"),
+      channel,
+    ),
+    applyOrderChannelFilterOnOrderItems(
+      supabase.from("order_items").select("quantity, orders!inner(source)"),
+      channel,
+    ),
+    applyOrderChannelFilter(
+      supabase
+        .from("orders")
+        .select("total_amount")
+        .eq("status", "cancelled"),
+      channel,
+    ),
   ]);
 
   const itemsOrdered = (itemsRes.data ?? []).reduce(
-    (sum, row) => sum + Number(row.quantity ?? 0),
+    (sum: number, row: { quantity: number | null }) =>
+      sum + Number(row.quantity ?? 0),
     0,
   );
 
   const salesReversals = (reversalsRes.data ?? []).reduce(
-    (sum, row) => sum + Number(row.total_amount ?? 0),
+    (sum: number, row: { total_amount: number | null }) =>
+      sum + Number(row.total_amount ?? 0),
     0,
   );
 
@@ -289,7 +354,7 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id,created_at,status,payment_status,total_amount,subtotal,tax,discount,merchant_note,customer_edited_at,address_id,users:users!orders_user_fkey(id,name,email,phone),order_items(id,order_id,variant_id,quantity,price,product_name,vendor_id,base_price,final_price,margin_amount,customer_edit_flag,created_at)",
+      "id,created_at,status,payment_status,total_amount,subtotal,tax,discount,merchant_note,customer_edited_at,address_id,source,fulfillment_status,inventory_reserved,inventory_committed,preferred_delivery_date,shipment_date,users:users!orders_user_fkey(id,name,email,phone),order_items(id,order_id,variant_id,quantity,price,product_name,vendor_id,base_price,final_price,margin_amount,customer_edit_flag,created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -328,12 +393,18 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
     row.order_items ?? [],
   );
 
+  const isOnline = !row.source || row.source === "online";
+  const fulfillments = isOnline
+    ? await fetchOrderFulfillments(id)
+    : [];
+
   return {
     ...row,
     order_items: enrichedItems,
     variant_groups,
     addresses,
     customer_order_count,
+    fulfillments,
   };
 }
 
@@ -358,7 +429,7 @@ export async function updateOrderStatusById(
 
   const { data: existing, error: readErr } = await supabase
     .from("orders")
-    .select("status")
+    .select("status, source, inventory_committed")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -366,6 +437,18 @@ export async function updateOrderStatusById(
   if (!existing) throw new Error("Order not found");
   if (existing.status === "cancelled") {
     throw new Error("Cannot update a cancelled order.");
+  }
+
+  const isOnline =
+    !existing.source || existing.source === "online";
+
+  if (
+    status === "shipped" &&
+    isOnline &&
+    !existing.inventory_committed
+  ) {
+    await shipOrderFulfillments(orderId);
+    return;
   }
 
   const { error } = await supabase
@@ -384,6 +467,7 @@ export async function updateOrderDetailsById(
     status?: string;
     paymentStatus?: string;
     merchantNote?: string | null;
+    shipmentDate?: string | null;
   },
 ): Promise<void> {
   await requireAdminOrManagerProfile();
@@ -408,6 +492,9 @@ export async function updateOrderDetailsById(
   }
   if (input.merchantNote !== undefined) {
     updateData.merchant_note = input.merchantNote;
+  }
+  if (input.shipmentDate !== undefined) {
+    updateData.shipment_date = input.shipmentDate;
   }
 
   if (Object.keys(updateData).length === 0) return;

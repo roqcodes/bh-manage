@@ -37,6 +37,12 @@ export interface DBUser {
 
 export interface AdminUser extends DBUser {
   order_count?: number;
+  customer_number?: string | null;
+  company_name?: string | null;
+  location?: string | null;
+  opening_balance?: number | null;
+  receivables?: number | null;
+  credit_limit?: number | null;
 }
 
 export interface Vendor {
@@ -83,6 +89,8 @@ export interface Brand {
   updated_at?: string | null;
 }
 
+export type ProductItemType = "goods" | "service";
+
 export interface Product {
   id: string;
   name: string | null;
@@ -94,6 +102,8 @@ export interface Product {
   use_smart_pricing: boolean | null;
   specs: Record<string, string> | null;
   variant_layout?: "flat" | "grouped" | null;
+  item_type?: ProductItemType | null;
+  hsn_sac?: string | null;
   created_at: string | null;
 }
 
@@ -109,6 +119,14 @@ export interface ProductListSummary {
   mrp_min: number | null;
   variant_count: number;
   sku_label: string | null;
+  /** Primary variant barcode (first SKU). */
+  barcode: string | null;
+  product_code: string | null;
+  purchase_price: number | null;
+  tax_rate_percent: number | null;
+  /** Store-scoped stock when a store filter is active. */
+  store_stock: number | null;
+  store_name: string | null;
 }
 
 export type ProductWithCategoryListItem = ProductWithCategory & ProductListSummary;
@@ -158,6 +176,12 @@ export interface ProductVariant {
   price: number | null;
   mrp: number | null;
   variant_group_id?: string | null;
+  barcode?: string | null;
+  product_code?: string | null;
+  purchase_price?: number | null;
+  tax_rate_percent?: number | null;
+  unit_id?: string | null;
+  markup_percent?: number | null;
   created_at: string | null;
   /** Ordered images for this variant; preview first. Empty when none. */
   images: VariantImage[];
@@ -256,6 +280,14 @@ export interface Order {
   item_count: number;
   order_items_preview: OrderItemPreview[];
   customer_order_count: number;
+  sales_order_number?: string | null;
+  reference_number?: string | null;
+  shipment_date?: string | null;
+  delivery_method?: string | null;
+  store_name?: string | null;
+  source?: string | null;
+  fulfillment_status?: OrderInventoryFulfillmentStatus | null;
+  inventory_reserved?: boolean | null;
 }
 
 /** Admin orders list summary (server-computed, all orders). */
@@ -314,6 +346,48 @@ export interface OrderAddress {
   longitude?: number | null;
 }
 
+export type OrderInventoryFulfillmentStatus =
+  | "none"
+  | "pending_assignment"
+  | "reserved"
+  | "multi_shipment"
+  | "partially_shipped"
+  | "shipped"
+  | "cancelled";
+
+export interface OrderFulfillmentItem {
+  id: string;
+  variant_id: string;
+  product_name: string | null;
+  quantity: number;
+  reserved_quantity: number;
+  shipped_quantity: number;
+}
+
+export interface OrderFulfillment {
+  id: string;
+  status: string;
+  store_id: string | null;
+  store_name: string | null;
+  shipment_number: string | null;
+  reserved_at: string | null;
+  shipped_at: string | null;
+  inventory_committed: boolean;
+  items: OrderFulfillmentItem[];
+}
+
+export interface FulfillmentQueueRow {
+  id: string;
+  created_at: string | null;
+  status: string;
+  fulfillment_status: OrderInventoryFulfillmentStatus;
+  total_amount: number | null;
+  customer_name: string | null;
+  item_count: number;
+  fulfillment_count: number;
+  pending_assignment_count: number;
+}
+
 export interface OrderWithItems {
   id: string;
   created_at: string | null;
@@ -326,9 +400,16 @@ export interface OrderWithItems {
   merchant_note: string | null;
   address_id: string | null;
   customer_edited_at: string | null;
+  source?: string | null;
+  fulfillment_status?: OrderInventoryFulfillmentStatus | null;
+  inventory_reserved?: boolean | null;
+  inventory_committed?: boolean | null;
+  preferred_delivery_date?: string | null;
+  shipment_date?: string | null;
   users: OrderUser | null;
   addresses: OrderAddress | null;
   order_items: OrderItem[];
+  fulfillments?: OrderFulfillment[];
   /** Variant groups keyed by product id (order detail enrichment). */
   variant_groups?: Record<string, VariantGroup[]>;
   customer_order_count: number;
@@ -353,6 +434,7 @@ export interface AdminPurchaseOrderListRow {
   status: string | null;
   total_amount: number | null;
   created_at: string | null;
+  po_number?: string | null;
   vendors: { name: string | null } | null;
 }
 
@@ -473,6 +555,31 @@ export interface CatalogInventoryCoverage {
   totalProducts: number;
 }
 
+export interface DashboardErpInvoiceRow {
+  id: string;
+  invoice_number: string;
+  total_amount: number;
+  created_at: string;
+  customer_name: string | null;
+  status: string;
+}
+
+export interface DashboardMonthlySeriesPoint {
+  month: string;
+  monthNum: number;
+  income: number;
+  cogs: number;
+  expenses: number;
+  netProfit: number;
+}
+
+export interface DashboardFulfillmentCounts {
+  needsAssignment: number;
+  readyToShip: number;
+  shipped: number;
+  delivered: number;
+}
+
 export interface AdminDashboardPayload {
   metrics: DashboardMetrics;
   alerts: DashboardAlert[];
@@ -482,4 +589,10 @@ export interface AdminDashboardPayload {
   catalogCoverage: CatalogInventoryCoverage;
   vendors: VendorSnapshot;
   recentOrders: Order[];
+  erpFinancial: import("@/common/erp/finance-types").ErpFinancialDashboard | null;
+  erpActivity: import("@/common/erp/types").AuditLogEntry[];
+  erpMonthlySeries: DashboardMonthlySeriesPoint[];
+  recentErpInvoices: DashboardErpInvoiceRow[];
+  erpInvoicesToday: number;
+  fulfillmentCounts: DashboardFulfillmentCounts;
 }

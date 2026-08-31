@@ -26,6 +26,8 @@ export async function createProductAction(data: {
   variantLayout?: "flat" | "grouped";
   imageUrls?: string[];
   videoUrls?: string[];
+  itemType?: "goods" | "service";
+  hsnSac?: string | null;
 }): Promise<string> {
   const id = await insertProduct({
     name: data.name,
@@ -34,6 +36,8 @@ export async function createProductAction(data: {
     brandId: data.brandId || null,
     imageUrl: data.imageUrl,
     variantLayout: data.variantLayout,
+    itemType: data.itemType,
+    hsnSac: data.hsnSac,
   });
   if (data.imageUrls && data.imageUrls.length > 0) {
     await addProductImages(id, data.imageUrls);
@@ -56,6 +60,8 @@ export async function updateProductAction(
     imageUrls?: string[];
     videoUrls?: string[];
     imagePreviewIndex?: number;
+    itemType?: "goods" | "service";
+    hsnSac?: string | null;
   },
 ): Promise<void> {
   await updateProductById(id, {
@@ -64,6 +70,8 @@ export async function updateProductAction(
     categoryId: data.categoryId || null,
     brandId: data.brandId || null,
     imageUrl: data.imageUrl,
+    itemType: data.itemType,
+    hsnSac: data.hsnSac,
   });
   if (data.imageUrls !== undefined) {
     await syncProductImages(id, data.imageUrls, data.imagePreviewIndex ?? 0);

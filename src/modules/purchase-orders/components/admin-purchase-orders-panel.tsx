@@ -17,6 +17,7 @@ import {
   PurchaseOrdersDataTable,
 } from "@/modules/purchase-orders/components/purchase-orders-data-table";
 import { PurchaseOrdersMetricsBar } from "@/modules/purchase-orders/components/purchase-orders-metrics-bar";
+import Link from "next/link";
 import {
   matchesPoViewFilter,
   PO_ACCENT,
@@ -24,7 +25,7 @@ import {
   shortPoRef,
   type PurchaseOrdersViewFilter,
 } from "@/modules/purchase-orders/components/purchase-orders-ui";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -105,6 +106,13 @@ export function AdminPurchaseOrdersPanel({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <h1 className="text-lg font-semibold">Purchase orders</h1>
+        <Link href="/admin/purchase-orders?form=new" className={buttonVariants()}>
+          Create purchase order
+        </Link>
+      </div>
+
       <PurchaseOrdersMetricsBar
         stats={stats}
         onExport={() => exportPurchaseOrdersCsv(filtered)}

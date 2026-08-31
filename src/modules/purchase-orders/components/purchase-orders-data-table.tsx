@@ -40,11 +40,11 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { currencyLabel } from "@/lib/format-currency";
+import { displayErpDocumentNumber } from "@/lib/erp-document-ref";
 import {
   formatInr,
   PO_ACCENT,
   PoStatusPill,
-  shortPoRef,
 } from "@/modules/purchase-orders/components/purchase-orders-ui";
 
 function exportPurchaseOrdersCsv(orders: AdminPurchaseOrderListRow[]) {
@@ -57,7 +57,7 @@ function exportPurchaseOrdersCsv(orders: AdminPurchaseOrderListRow[]) {
   ];
 
   const rows = orders.map((po) => [
-    shortPoRef(po.id),
+    displayErpDocumentNumber(po.po_number, "PO", po.id),
     po.vendors?.name ?? "—",
     po.created_at
       ? format(new Date(po.created_at), "yyyy-MM-dd HH:mm")
@@ -266,7 +266,7 @@ export function PurchaseOrdersDataTable({
             >
               <TableCell>
                 <Checkbox
-                  aria-label={`Select PO ${shortPoRef(po.id)}`}
+                  aria-label={`Select PO ${displayErpDocumentNumber(po.po_number, "PO", po.id)}`}
                   checked={isSelected}
                   onCheckedChange={(checked) =>
                     toggleRow(po.id, checked === true)
@@ -278,7 +278,7 @@ export function PurchaseOrdersDataTable({
                   href={`/admin/purchase-orders/${po.id}`}
                   className="font-mono text-[13px] font-medium leading-snug text-foreground hover:text-primary hover:underline"
                 >
-                  #{shortPoRef(po.id)}
+                  {displayErpDocumentNumber(po.po_number, "PO", po.id)}
                 </Link>
               </TableCell>
               <TableCell>

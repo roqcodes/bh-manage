@@ -14,7 +14,7 @@ export async function cancelOrderAndRefund(orderId: string): Promise<void> {
 
   const { data: order, error } = await supabase
     .from("orders")
-    .select("id, status, payment_status, total_amount, user_id")
+    .select("id, status, payment_status, total_amount, user_id, inventory_committed, source")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -22,6 +22,9 @@ export async function cancelOrderAndRefund(orderId: string): Promise<void> {
   if (!order) throw new Error("Order not found");
   if (order.status === "cancelled") {
     throw new Error("Order is already cancelled.");
+  }
+  if (order.status === "shipped" || order.status === "delivered") {
+    throw new Error("Cannot cancel an order that has been shipped.");
   }
   if (order.payment_status === "refunded") {
     throw new Error("Order has already been refunded.");

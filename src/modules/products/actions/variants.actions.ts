@@ -131,6 +131,12 @@ export async function createVariantAction(
     stock?: number;
     variantGroupId?: string | null;
     imageUrls?: string[];
+    barcode?: string | null;
+    productCode?: string | null;
+    purchasePrice?: number | null;
+    taxRatePercent?: number | null;
+    unitId?: string | null;
+    markupPercent?: number | null;
   },
 ): Promise<string> {
   const variantId = await insertVariantWithInventory({
@@ -140,6 +146,12 @@ export async function createVariantAction(
     mrp: roundMoney2(data.mrp),
     stock: data.stock,
     variantGroupId: data.variantGroupId,
+    barcode: data.barcode,
+    productCode: data.productCode,
+    purchasePrice: data.purchasePrice,
+    taxRatePercent: data.taxRatePercent,
+    unitId: data.unitId,
+    markupPercent: data.markupPercent,
   });
   if (data.imageUrls && data.imageUrls.length > 0) {
     await addVariantImages(variantId, data.imageUrls);
@@ -151,12 +163,28 @@ export async function createVariantAction(
 export async function updateVariantAction(
   id: string,
   productId: string,
-  data: { name: string; price: number; mrp: number },
+  data: {
+    name: string;
+    price: number;
+    mrp: number;
+    barcode?: string | null;
+    productCode?: string | null;
+    purchasePrice?: number | null;
+    taxRatePercent?: number | null;
+    unitId?: string | null;
+    markupPercent?: number | null;
+  },
 ): Promise<void> {
   await updateVariantById(id, {
     name: data.name,
     price: roundMoney2(data.price),
     mrp: roundMoney2(data.mrp),
+    barcode: data.barcode,
+    productCode: data.productCode,
+    purchasePrice: data.purchasePrice,
+    taxRatePercent: data.taxRatePercent,
+    unitId: data.unitId,
+    markupPercent: data.markupPercent,
   });
   revalidatePath(`/admin/products/${productId}`);
 }

@@ -1,6 +1,6 @@
 /**
  * Shared admin layout classes — tuned for desktop ERP density at 100% browser zoom.
- * Sidebar (~260px) leaves ~960–1180px content; stat grids use md (768px) not lg (1024px).
+ * Sidebar (~232px) leaves more room for content at 100% browser zoom.
  */
 
 export const adminPageClass =

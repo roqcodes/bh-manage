@@ -35,8 +35,8 @@ function ProductDetailNav({ productName }: { productName?: string | null }) {
     <AdminBreadcrumb
       backHref="/admin/products"
       items={[
-        { label: "Products", href: "/admin/products" },
-        { label: productName?.trim() || "Product" },
+        { label: "Inventory Items", href: "/admin/products" },
+        { label: productName?.trim() || "Item" },
       ]}
     />
   );

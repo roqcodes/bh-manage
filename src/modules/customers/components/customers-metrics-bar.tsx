@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import { Plus } from "lucide-react";
+
 import type { CustomerStats } from "@/modules/customers/services/customers.service";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   MiniSparkline,
@@ -44,9 +47,11 @@ function MetricSegment({
 export function CustomersMetricsBar({
   stats,
   onExport,
+  onAddCustomer,
 }: {
   stats: CustomerStats;
   onExport: () => void;
+  onAddCustomer?: () => void;
 }) {
   const activePct =
     stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0;
@@ -58,10 +63,21 @@ export function CustomersMetricsBar({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Customers</h1>
           <p className="text-sm text-muted-foreground">
-            Registered retail customers and account activity.
+            Customer accounts, receivables, and billing.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {onAddCustomer ? (
+            <Button size="sm" onClick={onAddCustomer}>
+              <Plus data-icon="inline-start" />
+              Add customer
+            </Button>
+          ) : (
+            <Link href="/admin/customers/new" className={buttonVariants({ size: "sm" })}>
+              <Plus data-icon="inline-start" />
+              Add customer
+            </Link>
+          )}
           <Button variant="outline" size="sm" onClick={onExport}>
             Export
           </Button>

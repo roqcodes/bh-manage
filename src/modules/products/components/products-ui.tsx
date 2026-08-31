@@ -104,7 +104,25 @@ export function StockBadge({ stock }: { stock: number }) {
         out ? "bg-rose-100 text-rose-800" : "bg-muted text-foreground",
       )}
     >
-      {stock.toLocaleString("en-IN")} in stock
+      {stock.toLocaleString("en-IN", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      })}
+    </span>
+  );
+}
+
+export function EnabledBadge({ enabled }: { enabled: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
+        enabled
+          ? "bg-emerald-100 text-emerald-800"
+          : "bg-muted text-muted-foreground",
+      )}
+    >
+      {enabled ? "Yes" : "No"}
     </span>
   );
 }

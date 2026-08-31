@@ -7,7 +7,10 @@ import type {
   AdminDashboardPayload,
   CatalogInventoryCoverage,
   DashboardAlert,
+  DashboardErpInvoiceRow,
+  DashboardFulfillmentCounts,
   DashboardMetrics,
+  DashboardMonthlySeriesPoint,
   Order,
   VendorSnapshotEntry,
 } from "@/common/admin/types";
@@ -18,6 +21,10 @@ import {
   getProcurementDefaults,
 } from "@/modules/procurement/services/procurement.service";
 import { computeReorderNeeds } from "@/modules/procurement/procurement.allocate";
+import { listRecentAuditLogs } from "@/modules/erp/services/audit-log.service";
+import { getFinancialDashboard } from "@/modules/erp/services/erp-finance-dashboard.service";
+import type { ErpFinancialDashboard } from "@/common/erp/finance-types";
+import type { AuditLogEntry } from "@/common/erp/types";
 
 function sortAlertsBySeverity(alerts: DashboardAlert[]): DashboardAlert[] {
   const rank: Record<string, number> = { critical: 0, warning: 1, attention: 2 };
@@ -57,6 +64,77 @@ function buildCatalogCoverage(
   };
 }
 
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+function buildMonthlySeries(
+  invoices: { created_at: string; total_amount: number | null }[],
+  bills: { purchase_date: string; total_amount: number | null }[],
+  expenses: { expense_date: string; total_amount: number | null }[],
+): DashboardMonthlySeriesPoint[] {
+  const year = new Date().getFullYear();
+  const buckets: DashboardMonthlySeriesPoint[] = MONTH_LABELS.map((month, i) => ({
+    month,
+    monthNum: i + 1,
+    income: 0,
+    cogs: 0,
+    expenses: 0,
+    netProfit: 0,
+  }));
+
+  for (const inv of invoices) {
+    const d = new Date(inv.created_at);
+    if (d.getFullYear() !== year) continue;
+    buckets[d.getMonth()].income += Number(inv.total_amount ?? 0);
+  }
+  for (const bill of bills) {
+    const d = new Date(bill.purchase_date);
+    if (d.getFullYear() !== year) continue;
+    buckets[d.getMonth()].cogs += Number(bill.total_amount ?? 0);
+  }
+  for (const exp of expenses) {
+    const d = new Date(exp.expense_date);
+    if (d.getFullYear() !== year) continue;
+    buckets[d.getMonth()].expenses += Number(exp.total_amount ?? 0);
+  }
+  for (const bucket of buckets) {
+    bucket.netProfit = bucket.income - bucket.cogs - bucket.expenses;
+  }
+  return buckets;
+}
+
+async function loadInvoiceCustomerNames(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userIds: string[],
+): Promise<Map<string, string | null>> {
+  const uniqueIds = [...new Set(userIds.filter(Boolean))];
+  const nameById = new Map<string, string | null>();
+  if (uniqueIds.length === 0) return nameById;
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, name")
+    .in("id", uniqueIds);
+  if (error) return nameById;
+
+  for (const user of data ?? []) {
+    nameById.set(user.id, user.name);
+  }
+  return nameById;
+}
+
 /** One Supabase client + parallel queries for dashboard API (avoids duplicate SSR client setup). */
 export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload> {
   const supabase = await createSupabaseServerClient();
@@ -65,6 +143,7 @@ export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload>
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const startOfDay = today.toISOString();
+  const yearStart = `${today.getFullYear()}-01-01`;
 
   const snapshotSince = new Date(today);
   snapshotSince.setDate(snapshotSince.getDate() - 45);
@@ -135,7 +214,7 @@ export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload>
     supabase
       .from("orders")
       .select(
-        "id,created_at,status,total_amount,users:users!orders_user_fkey(name,phone)",
+        "id,created_at,status,total_amount,fulfillment_status,source,users:users!orders_user_fkey(name,phone)",
       )
       .order("created_at", { ascending: false })
       .limit(8),
@@ -428,6 +507,119 @@ export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload>
     reliabilityEntries,
   );
 
+  let erpFinancial: ErpFinancialDashboard | null = null;
+  let erpActivity: AuditLogEntry[] = [];
+  let erpMonthlySeries: DashboardMonthlySeriesPoint[] = MONTH_LABELS.map(
+    (month, i) => ({
+      month,
+      monthNum: i + 1,
+      income: 0,
+      cogs: 0,
+      expenses: 0,
+      netProfit: 0,
+    }),
+  );
+  let recentErpInvoices: DashboardErpInvoiceRow[] = [];
+  let erpInvoicesToday = 0;
+  let fulfillmentCounts: DashboardFulfillmentCounts = {
+    needsAssignment: 0,
+    readyToShip: 0,
+    shipped: 0,
+    delivered: deliveredPipe.count ?? 0,
+  };
+
+  try {
+    const [
+      financial,
+      activity,
+      yearInvoices,
+      yearBills,
+      yearExpenses,
+      recentInvoicesRaw,
+      erpInvoicesTodayResult,
+      fulfillPending,
+      fulfillReady,
+      fulfillShipped,
+    ] = await Promise.all([
+      getFinancialDashboard(),
+      listRecentAuditLogs(15),
+      supabase
+        .from("invoices")
+        .select("created_at, total_amount")
+        .gte("created_at", `${yearStart}T00:00:00`)
+        .in("status", ["issued", "partial", "paid"]),
+      supabase
+        .from("erp_purchase_bills")
+        .select("purchase_date, total_amount")
+        .gte("purchase_date", yearStart)
+        .in("status", ["finalized", "partial", "paid"]),
+      supabase
+        .from("erp_expenses")
+        .select("expense_date, total_amount")
+        .gte("expense_date", yearStart),
+      supabase
+        .from("invoices")
+        .select("id, invoice_number, user_id, total_amount, created_at, status")
+        .order("created_at", { ascending: false })
+        .limit(8),
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", startOfDay)
+        .in("status", ["issued", "partial", "paid"]),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("fulfillment_status", "pending_assignment")
+        .not("status", "eq", "cancelled"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .in("fulfillment_status", [
+          "reserved",
+          "multi_shipment",
+          "partially_shipped",
+        ])
+        .not("status", "eq", "cancelled"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "shipped"),
+    ]);
+
+    erpFinancial = financial;
+    erpActivity = activity;
+    erpMonthlySeries = buildMonthlySeries(
+      yearInvoices.data ?? [],
+      yearBills.data ?? [],
+      yearExpenses.data ?? [],
+    );
+    erpInvoicesToday = erpInvoicesTodayResult.count ?? 0;
+    fulfillmentCounts = {
+      needsAssignment: fulfillPending.count ?? 0,
+      readyToShip: fulfillReady.count ?? 0,
+      shipped: fulfillShipped.count ?? 0,
+      delivered: deliveredPipe.count ?? 0,
+    };
+
+    const invoiceRows = recentInvoicesRaw.data ?? [];
+    const customerNames = await loadInvoiceCustomerNames(
+      supabase,
+      invoiceRows.map((row) => row.user_id),
+    );
+    recentErpInvoices = invoiceRows.map((row) => ({
+      id: row.id,
+      invoice_number: row.invoice_number,
+      total_amount: Number(row.total_amount ?? 0),
+      created_at: row.created_at,
+      customer_name: customerNames.get(row.user_id) ?? null,
+      status: row.status,
+    }));
+  } catch {
+    erpFinancial = null;
+    erpActivity = [];
+  }
+
   return {
     metrics,
     alerts,
@@ -437,5 +629,11 @@ export async function getAdminDashboardPayload(): Promise<AdminDashboardPayload>
     catalogCoverage,
     vendors,
     recentOrders: (recentResult.data ?? []) as unknown as Order[],
+    erpFinancial,
+    erpActivity,
+    erpMonthlySeries,
+    recentErpInvoices,
+    erpInvoicesToday,
+    fulfillmentCounts,
   };
 }

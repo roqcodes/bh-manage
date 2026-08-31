@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
@@ -15,6 +16,8 @@ import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleto
 import { AdminPurchaseOrdersPanel } from "@/modules/purchase-orders/components/admin-purchase-orders-panel";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { useErpFormModal } from "@/modules/admin/ui";
+import { PurchaseOrderFormView } from "@/modules/admin/views/purchasing/purchase-order-form-view";
 
 function parsePoStatus(raw: string | null | undefined): PurchaseOrderStatusFilter {
   const t = raw?.trim();
@@ -25,6 +28,8 @@ function parsePoStatus(raw: string | null | undefined): PurchaseOrderStatusFilte
 }
 
 export function AdminPurchaseOrdersView() {
+  const { isOpen, mode, editId, modalProps } = useErpFormModal("/admin/purchase-orders");
+  const [reloadToken, setReloadToken] = useState(0);
   const searchParams = useSearchParams();
   const status = parsePoStatus(searchParams.get("status"));
   const rawVendor = searchParams.get("vendorId")?.trim();
@@ -32,7 +37,7 @@ export function AdminPurchaseOrdersView() {
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
 
   const { data, isPending, isError, error } = useQuery({
-    queryKey: adminQueryKeys.purchaseOrders(status, vendorId, page),
+    queryKey: [...adminQueryKeys.purchaseOrders(status, vendorId, page), reloadToken],
     queryFn: () => {
       const q = new URLSearchParams();
       if (status !== "all") q.set("status", status);
@@ -83,6 +88,17 @@ export function AdminPurchaseOrdersView() {
         selectedVendorId={data.vendorId}
         stats={data.stats}
       />
+
+      {isOpen ? (
+        <PurchaseOrderFormView
+          variant="modal"
+          mode={mode}
+          poId={editId ?? undefined}
+          open={modalProps.open}
+          onOpenChange={modalProps.onOpenChange}
+          onSuccess={() => setReloadToken((t) => t + 1)}
+        />
+      ) : null}
     </div>
   );
 }

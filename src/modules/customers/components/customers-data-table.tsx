@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import type { AdminUser } from "@/common/admin/types";
+import { formatCurrencyAmount } from "@/lib/format-currency";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -41,19 +42,36 @@ import {
 } from "@/modules/users/actions/users.actions";
 import {
   CustomerStatusBadge,
+  formatCreditLimit,
   formatCustomerId,
   isCustomerBlocked,
 } from "@/modules/customers/components/customers-ui";
 import { useAdminAction } from "@/modules/admin/hooks/use-admin-action";
 
 export function exportCustomersCsv(users: AdminUser[]) {
-  const headers = ["Name", "ID", "Email", "Phone", "Orders", "Status", "Joined"];
+  const headers = [
+    "Number",
+    "Name",
+    "Company",
+    "Email",
+    "Mobile",
+    "Location",
+    "Receivables",
+    "Credit Limit",
+    "Orders",
+    "Status",
+    "Joined",
+  ];
 
   const rows = users.map((u) => [
-    u.name ?? "",
     formatCustomerId(u),
+    u.name ?? "",
+    u.company_name ?? "",
     u.email ?? "",
     u.phone ?? "",
+    u.location ?? "",
+    String(u.receivables ?? 0),
+    u.credit_limit != null ? String(u.credit_limit) : "",
     String(u.order_count ?? 0),
     isCustomerBlocked(u) ? "Blocked" : "Active",
     u.created_at ? format(new Date(u.created_at), "yyyy-MM-dd") : "",
@@ -223,10 +241,14 @@ export function CustomersDataTable({
               onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
             />
           </TableHead>
+          <TableHead className="w-20">Number</TableHead>
           <TableHead>Customer</TableHead>
+          <TableHead className="hidden md:table-cell">Company</TableHead>
           <TableHead>Email</TableHead>
-          <TableHead>Phone</TableHead>
-          <TableHead>Orders</TableHead>
+          <TableHead className="hidden sm:table-cell">Mobile</TableHead>
+          <TableHead className="hidden lg:table-cell">Location</TableHead>
+          <TableHead className="hidden md:table-cell text-right">Receivables</TableHead>
+          <TableHead className="hidden xl:table-cell text-right">Credit limit</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="w-24 text-right">Actions</TableHead>
         </TableRow>
@@ -251,30 +273,36 @@ export function CustomersDataTable({
                   }
                 />
               </TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">
+                {formatCustomerId(user)}
+              </TableCell>
               <TableCell>
                 <div className="min-w-0">
                   <Link
                     href={`/admin/customers/${user.id}`}
                     className="text-[13px] font-medium leading-snug text-foreground hover:text-primary hover:underline"
                   >
-                    {user.name ?? "Unnamed customer"}
+                    {user.name ?? user.company_name ?? "Unnamed customer"}
                   </Link>
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    {formatCustomerId(user)}
-                    {user.created_at
-                      ? ` · Joined ${format(new Date(user.created_at), "MMM d, yyyy")}`
-                      : ""}
-                  </p>
                 </div>
+              </TableCell>
+              <TableCell className="hidden max-w-[160px] truncate text-sm text-muted-foreground md:table-cell">
+                {user.company_name?.trim() ? user.company_name : "—"}
               </TableCell>
               <TableCell className="max-w-[220px]">
                 <EmailCell email={user.email} userId={user.id} />
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
+              <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
                 {user.phone?.trim() ? user.phone : "—"}
               </TableCell>
-              <TableCell className="text-sm tabular-nums">
-                {(user.order_count ?? 0).toLocaleString("en-IN")}
+              <TableCell className="hidden max-w-[140px] truncate text-sm text-muted-foreground lg:table-cell">
+                {user.location?.trim() ? user.location : "—"}
+              </TableCell>
+              <TableCell className="hidden text-right text-sm tabular-nums md:table-cell">
+                {formatCurrencyAmount(user.receivables ?? 0)}
+              </TableCell>
+              <TableCell className="hidden text-right text-sm xl:table-cell">
+                {formatCreditLimit(user.credit_limit)}
               </TableCell>
               <TableCell>
                 <CustomerStatusBadge user={user} />
@@ -311,6 +339,20 @@ export function CustomersDataTable({
                       </DropdownMenuGroup>
                       <DropdownMenuSeparator />
                       <DropdownMenuGroup>
+                        <DropdownMenuItem
+                          nativeButton={false}
+                          render={<Link href={`/admin/customers?form=edit&id=${user.id}`} />}
+                        >
+                          Edit customer
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          nativeButton={false}
+                          render={
+                            <Link href={`/admin/erp/invoices?form=new&customerId=${user.id}`} />
+                          }
+                        >
+                          New invoice
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           nativeButton={false}
                           render={

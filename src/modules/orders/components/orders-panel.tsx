@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, isAfter, isBefore, startOfDay, endOfDay, subDays } from "date-fns";
 import { Ban, ChevronDown, Columns3, Search } from "lucide-react";
@@ -67,6 +68,8 @@ export function OrdersPanel({
   filterUsers: _filterUsers,
   selectedUserId,
   stats,
+  channel = "online",
+  basePath = "/admin/orders",
 }: {
   orders: Order[];
   total: number;
@@ -75,6 +78,8 @@ export function OrdersPanel({
   filterUsers: OrderFilterUserRow[];
   selectedUserId: string | null;
   stats: OrderCatalogStats;
+  channel?: "online" | "erp";
+  basePath?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -96,7 +101,7 @@ export function OrdersPanel({
     if (userId) params.set("userId", userId);
     else params.delete("userId");
     params.delete("page");
-    router.push(`/admin/orders?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   }
 
   const filtered = useMemo(() => {
@@ -139,7 +144,19 @@ export function OrdersPanel({
         onDateFromChange={setDateFrom}
         onDateToChange={setDateTo}
         onExport={() => exportOrdersCsv(filtered)}
+        variant={channel}
       />
+
+      {channel === "online" ? (
+        <div className="flex justify-end">
+          <Link
+            href="/admin/erp/fulfillment-queue"
+            className={`text-sm font-medium hover:underline ${ORDERS_ACCENT.link}`}
+          >
+            Open fulfillment queue →
+          </Link>
+        </div>
+      ) : null}
 
       <Card className="overflow-hidden border border-border py-0 ring-0">
         <CardContent className="flex flex-col gap-0 p-0">
@@ -237,6 +254,7 @@ export function OrdersPanel({
               orders={filtered}
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
+              variant={channel}
             />
           )}
 
@@ -263,7 +281,7 @@ export function OrdersPanel({
         <Pagination
           total={total}
           page={page}
-          basePath="/admin/orders"
+          basePath={basePath}
           extraParams={listParams}
         />
       ) : null}

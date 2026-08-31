@@ -50,6 +50,8 @@ export async function getReceivables(
       status,
       due_date,
       created_at,
+      amount_paid,
+      balance_due,
       users (name, email)
     `,
     )
@@ -66,9 +68,8 @@ export async function getReceivables(
   const receivables: ReceivableRow[] = (data ?? []).map((inv) => {
     const user = inv.users as { name: string | null; email: string | null } | null;
     const total = inv.total_amount ?? 0;
-    // For simplicity, assume pending = full outstanding
-    // In production, track partial payments separately
-    const outstanding = inv.status === "partial" ? total * 0.5 : total;
+    const paid = Number((inv as { amount_paid?: number }).amount_paid ?? 0);
+    const outstanding = Number((inv as { balance_due?: number }).balance_due ?? total);
     const dueDate = inv.due_date ? new Date(inv.due_date) : new Date(inv.created_at);
     const now = new Date();
     const daysOverdue = dueDate < now ? Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
@@ -79,7 +80,7 @@ export async function getReceivables(
       customer_name: user?.name ?? null,
       customer_email: user?.email ?? null,
       total_amount: total,
-      paid_amount: inv.status === "partial" ? total * 0.5 : 0,
+      paid_amount: paid,
       outstanding_amount: outstanding,
       status: inv.status,
       due_date: inv.due_date,

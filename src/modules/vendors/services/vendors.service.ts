@@ -13,27 +13,98 @@ import type {
   VariantWithProduct,
 } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
+import type { VendorErpListRow } from "@/common/erp/purchasing-types";
+import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 
-export async function getVendors(page = 0): Promise<Paginated<Vendor>> {
+export async function getVendors(
+  page = 0,
+  options?: { search?: string; vendorType?: string; limit?: number },
+): Promise<Paginated<Vendor>> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const from = page * PAGE_SIZE;
+  const limit = options?.limit ?? PAGE_SIZE;
+  const from = page * limit;
 
-  const [dataResult, countResult] = await Promise.all([
-    supabase
-      .from("vendors")
-      .select("id,name,contact,is_active,created_at")
-      .order("created_at", { ascending: false })
-      .range(from, from + PAGE_SIZE - 1),
-    supabase
-      .from("vendors")
-      .select("id", { count: "exact", head: true }),
-  ]);
+  let dataQuery = supabase
+    .from("vendors")
+    .select("id,name,contact,is_active,created_at")
+    .order("created_at", { ascending: false })
+    .range(from, from + limit - 1);
+
+  let countQuery = supabase.from("vendors").select("id", { count: "exact", head: true });
+
+  if (options?.search?.trim()) {
+    const s = options.search.trim();
+    const filter = `name.ilike.%${s}%,contact.ilike.%${s}%,email.ilike.%${s}%,trn.ilike.%${s}%`;
+    dataQuery = dataQuery.or(filter);
+    countQuery = countQuery.or(filter);
+  }
+
+  const [dataResult, countResult] = await Promise.all([dataQuery, countQuery]);
 
   return {
     data: (dataResult.data ?? []) as Vendor[],
     total: countResult.count ?? 0,
   };
+}
+
+export async function getVendorsErp(
+  page = 0,
+  options?: { search?: string; vendorType?: string; limit?: number },
+): Promise<Paginated<VendorErpListRow>> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+  const limit = options?.limit ?? PAGE_SIZE;
+  const from = page * limit;
+
+  let dataQuery = supabase
+    .from("vendors")
+    .select(
+      "id, name, address, trn, phone, fax, po_box, email, vendor_type, is_active",
+    )
+    .order("name", { ascending: true })
+    .range(from, from + limit - 1);
+
+  let countQuery = supabase.from("vendors").select("id", { count: "exact", head: true });
+
+  if (options?.vendorType && options.vendorType !== "all") {
+    dataQuery = dataQuery.eq("vendor_type", options.vendorType);
+    countQuery = countQuery.eq("vendor_type", options.vendorType);
+  }
+  if (options?.search?.trim()) {
+    const s = options.search.trim();
+    const filter = `name.ilike.%${s}%,address.ilike.%${s}%,email.ilike.%${s}%,trn.ilike.%${s}%,phone.ilike.%${s}%`;
+    dataQuery = dataQuery.or(filter);
+    countQuery = countQuery.or(filter);
+  }
+
+  const [dataResult, countResult] = await Promise.all([dataQuery, countQuery]);
+  if (dataResult.error) throw new Error(dataResult.error.message);
+
+  return {
+    data: (dataResult.data ?? []) as VendorErpListRow[],
+    total: countResult.count ?? 0,
+  };
+}
+
+export async function searchActiveVendors(query: string, limit = 20): Promise<
+  Pick<Vendor, "id" | "name">[]
+> {
+  await requireAdminOrManagerProfile();
+  const q = query.trim();
+  if (!q) return listVendorsForPurchaseOrderFilter();
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("vendors")
+    .select("id, name")
+    .eq("is_active", true)
+    .ilike("name", `%${q}%`)
+    .order("name")
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Pick<Vendor, "id" | "name">[];
 }
 
 export async function getVendorCatalogStats(): Promise<VendorCatalogStats> {
@@ -140,14 +211,59 @@ export async function countVendorProductsForVendor(
 
 export async function insertVendor(input: {
   name: string;
-  contact: string;
-}): Promise<void> {
+  contact?: string;
+  vendorType?: string;
+  trn?: string;
+  phone?: string;
+  fax?: string;
+  email?: string;
+  address?: string;
+  poBox?: string;
+  notes?: string;
+  openingBalance?: number;
+  openingBalanceDate?: string | null;
+  isActive?: boolean;
+}): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
+
+  if (
+    input.openingBalance !== undefined &&
+    input.openingBalance !== 0 &&
+    !input.openingBalanceDate
+  ) {
+    throw new Error("Opening balance date is required when opening balance is set");
+  }
+
+  const { data, error } = await supabase
     .from("vendors")
-    .insert({ name: input.name, contact: input.contact, is_active: true });
+    .insert({
+      name: input.name,
+      contact: input.contact ?? null,
+      vendor_type: input.vendorType ?? null,
+      trn: input.trn ?? null,
+      phone: input.phone ?? null,
+      fax: input.fax ?? null,
+      email: input.email ?? null,
+      address: input.address ?? null,
+      po_box: input.poBox ?? null,
+      notes: input.notes ?? null,
+      opening_balance: input.openingBalance ?? 0,
+      opening_balance_date: input.openingBalanceDate ?? null,
+      is_active: input.isActive ?? true,
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
+
+  await logAuditEvent({
+    action: "create",
+    entityType: "vendor",
+    entityId: data.id,
+    description: `Vendor created: ${input.name}`,
+  });
+
+  return data.id;
 }
 
 export async function updateVendorById(

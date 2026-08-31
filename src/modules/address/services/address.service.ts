@@ -130,14 +130,14 @@ export async function createAddress(
     p_user_id: user.id,
     p_label: input.label.trim(),
     p_line1: input.line1.trim(),
-    p_line2: input.line2?.trim() || undefined,
+    p_line2: input.line2?.trim() ?? "",
     p_city: input.city.trim(),
     p_state: input.state.trim(),
     p_pincode: input.pincode.trim(),
     p_phone: input.phone.trim(),
     p_is_default: input.is_default ?? false,
-    p_latitude: input.latitude ?? null,
-    p_longitude: input.longitude ?? null,
+    p_latitude: input.latitude ?? undefined,
+    p_longitude: input.longitude ?? undefined,
   });
 
   if (error) {
@@ -166,14 +166,14 @@ export async function updateAddress(
     p_address_id: addressId,
     p_label: input.label?.trim() ?? "",
     p_line1: input.line1?.trim() ?? "",
-    p_line2: input.line2?.trim() ?? undefined,
+    p_line2: input.line2?.trim() ?? "",
     p_city: input.city?.trim() ?? "",
     p_state: input.state?.trim() ?? "",
     p_pincode: input.pincode?.trim() ?? "",
     p_phone: input.phone?.trim() ?? "",
     p_is_default: input.is_default ?? false,
-    p_latitude: input.latitude ?? null,
-    p_longitude: input.longitude ?? null,
+    p_latitude: input.latitude ?? undefined,
+    p_longitude: input.longitude ?? undefined,
   });
 
   if (error) {

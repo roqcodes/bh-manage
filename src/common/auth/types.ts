@@ -53,6 +53,8 @@ export interface UserProfile {
   phone: string | null;
   role: UserRole | null;
   is_verified: boolean | null;
+  /** From Supabase Auth metadata when signed in via OAuth (e.g. Google). */
+  avatar_url?: string | null;
 }
 
 export const ALLOWED_PORTAL_ROLES: readonly UserRole[] = [

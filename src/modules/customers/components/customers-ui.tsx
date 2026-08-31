@@ -1,6 +1,7 @@
 "use client";
 
 import type { AdminUser } from "@/common/admin/types";
+import { formatCurrencyAmount } from "@/lib/format-currency";
 import { cn } from "@/lib/utils";
 
 export type CustomerStatusFilter = "all" | "active" | "blocked";
@@ -15,8 +16,14 @@ export const CUSTOMER_STATUS_FILTERS: {
 ];
 
 export function formatCustomerId(user: AdminUser) {
+  if (user.customer_number?.trim()) return user.customer_number;
   const shortId = user.id.split("-")[0]?.slice(0, 4).toUpperCase() ?? "0000";
   return `CUS-${shortId}`;
+}
+
+export function formatCreditLimit(limit: number | null | undefined) {
+  if (limit == null || limit <= 0) return "No credit limit";
+  return formatCurrencyAmount(limit);
 }
 
 export function isCustomerBlocked(user: AdminUser) {

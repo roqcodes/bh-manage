@@ -12,6 +12,7 @@ import type {
 } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
 import { DEFAULT_REORDER_POINT, getProcurementDefaults } from "@/modules/procurement/services/procurement.service";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 
 export async function getInventory(
   page = 0,
@@ -83,12 +84,31 @@ export async function insertInventoryRow(
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const defaults = await getProcurementDefaults();
-  const { error } = await supabase.from("inventory").insert({
-    variant_id: variantId,
-    stock,
-    reorder_point: defaults.default_reorder_point,
-  });
-  if (error) throw new Error(error.message);
+
+  const { data: settings, error: storeErr } = await supabase
+    .from("app_settings")
+    .select("default_store_id")
+    .eq("id", 1)
+    .maybeSingle();
+  if (storeErr) throw new Error(storeErr.message);
+
+  const defaultStoreId = settings?.default_store_id;
+
+  if (defaultStoreId) {
+    const { error: siErr } = await invokeRpc(supabase, "set_store_inventory_stock", {
+      p_store_id: defaultStoreId,
+      p_variant_id: variantId,
+      p_stock: stock,
+    });
+    if (siErr) throw new Error(siErr.message);
+  } else {
+    const { error } = await supabase.from("inventory").insert({
+      variant_id: variantId,
+      stock,
+      reorder_point: defaults.default_reorder_point,
+    });
+    if (error) throw new Error(error.message);
+  }
 }
 
 export async function deleteInventoryRowForVariant(
@@ -109,9 +129,24 @@ export async function upsertInventoryStock(
 ): Promise<void> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("inventory")
-    .upsert({ variant_id: variantId, stock });
+
+  const { data: settings, error: storeErr } = await supabase
+    .from("app_settings")
+    .select("default_store_id")
+    .eq("id", 1)
+    .maybeSingle();
+  if (storeErr) throw new Error(storeErr.message);
+
+  const defaultStoreId = settings?.default_store_id;
+  if (!defaultStoreId) {
+    throw new Error("No default store configured");
+  }
+
+  const { error } = await invokeRpc(supabase, "set_store_inventory_stock", {
+    p_store_id: defaultStoreId,
+    p_variant_id: variantId,
+    p_stock: stock,
+  });
   if (error) throw new Error(error.message);
 }
 
@@ -130,48 +165,10 @@ export async function updateInventoryReorderSettings(
 }
 
 /**
- * Adds quantities to central `inventory` (inbound receipt). Used when a vendor PO is marked delivered.
- * Server-only; call only from trusted server code after PO ownership checks.
+ * @deprecated PO delivery does not increase stock. Use ERP purchase bill finalize.
  */
 export async function incrementCentralInventoryByLines(
-  lines: { variantId: string; quantity: number }[],
+  _lines: { variantId: string; quantity: number }[],
 ): Promise<void> {
-  if (lines.length === 0) return;
-
-  const supabase = await createSupabaseServerClient();
-  const merged = new Map<string, number>();
-  for (const line of lines) {
-    merged.set(
-      line.variantId,
-      (merged.get(line.variantId) ?? 0) + line.quantity,
-    );
-  }
-
-  const variantIds = [...merged.keys()];
-  const { data: rows, error: readErr } = await supabase
-    .from("inventory")
-    .select("variant_id,stock")
-    .in("variant_id", variantIds);
-
-  if (readErr) throw new Error(readErr.message);
-
-  const stockByVariant = new Map<string, number>();
-  for (const r of rows ?? []) {
-    const vid = r.variant_id as string;
-    stockByVariant.set(
-      vid,
-      Math.max(0, Math.floor(Number((r as { stock?: number }).stock ?? 0))),
-    );
-  }
-
-  const upserts = variantIds.map((variantId) => ({
-    variant_id: variantId,
-    stock: (stockByVariant.get(variantId) ?? 0) + (merged.get(variantId) ?? 0),
-  }));
-
-  const { error: writeErr } = await supabase
-    .from("inventory")
-    .upsert(upserts, { onConflict: "variant_id" });
-
-  if (writeErr) throw new Error(writeErr.message);
+  return;
 }

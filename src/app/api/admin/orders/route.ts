@@ -6,7 +6,12 @@ import {
   getOrders,
   getOrdersCatalogStats,
   listUsersForOrderFilter,
+  type OrderChannel,
 } from "@/modules/orders/services/orders.service";
+
+function parseChannel(raw: string | null): OrderChannel {
+  return raw === "erp" ? "erp" : "online";
+}
 
 const STATUSES: OrderStatusFilter[] = [
   "all",
@@ -31,11 +36,12 @@ export async function GET(request: Request) {
   const rawUser = searchParams.get("userId")?.trim();
   const userId = rawUser && rawUser.length > 0 ? rawUser : null;
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
+  const channel = parseChannel(searchParams.get("channel"));
 
   const [{ data, total }, filterUsers, stats] = await Promise.all([
-    getOrders(status, userId, page),
+    getOrders(status, userId, page, channel),
     listUsersForOrderFilter(),
-    getOrdersCatalogStats(),
+    getOrdersCatalogStats(channel),
   ]);
 
   return NextResponse.json({

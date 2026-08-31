@@ -1,0 +1,441 @@
+"use client";
+
+import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Search, Trash2 } from "lucide-react";
+
+import type { ErpVariantSearchRow } from "@/common/erp/purchasing-types";
+import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
+import {
+  AdminFormColumns,
+  AdminFormField,
+  AdminFormGrid,
+  AdminFormSection,
+  AdminFormShell,
+  type ErpFormViewBaseProps,
+} from "@/modules/admin/ui";
+import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { formatCurrencyAmount } from "@/lib/format-currency";
+
+type TransferLine = {
+  key: string;
+  variantId: string;
+  productName: string;
+  quantity: number;
+  available: number;
+  purchasePrice: number;
+  salesPrice: number;
+  transferPrice: number;
+};
+
+function newKey() {
+  return `tr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+type TransferRequestLine = {
+  id: string;
+  variant_id: string;
+  quantity: number;
+  source_available: number;
+  transfer_price: number;
+  sales_price: number;
+  average_purchase_cost: number;
+  product_variants: {
+    id: string;
+    name: string | null;
+    barcode: string | null;
+    products: { name: string } | null;
+  } | null;
+};
+
+type TransferRequestDetail = {
+  id: string;
+  request_number: string;
+  request_date: string;
+  status: string;
+  note: string | null;
+  from_store_id: string;
+  to_store_id: string;
+  erp_transfer_request_lines: TransferRequestLine[];
+};
+
+function productLabel(line: TransferRequestLine): string {
+  const pv = line.product_variants;
+  if (!pv) return line.variant_id;
+  const base = pv.products?.name ?? pv.name ?? "Product";
+  return pv.barcode ? `${base} (${pv.barcode})` : base;
+}
+
+export type StoreTransferFormViewProps = ErpFormViewBaseProps & {
+  requestId?: string;
+};
+
+export function StoreTransferFormView({
+  requestId,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onSuccess,
+}: StoreTransferFormViewProps) {
+  const router = useRouter();
+  const { stores } = useErpStores();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const isModal = variant === "modal";
+
+  const [fromStoreId, setFromStoreId] = useState("");
+  const [toStoreId, setToStoreId] = useState("");
+  const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState("");
+  const [lines, setLines] = useState<TransferLine[]>([]);
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<ErpVariantSearchRow[]>([]);
+  const [linkedRequestId, setLinkedRequestId] = useState<string | null>(null);
+  const [loadingRequest, setLoadingRequest] = useState(Boolean(requestId));
+
+  useEffect(() => {
+    if (!requestId) return;
+
+    let cancelled = false;
+    setLoadingRequest(true);
+    setError(null);
+
+    adminGet<TransferRequestDetail>(`erp/transfer-requests/${requestId}`)
+      .then(async (request) => {
+        if (cancelled) return;
+
+        if (!["draft", "submitted"].includes(request.status)) {
+          setError("This transfer request is no longer available for creating a transfer.");
+          return;
+        }
+
+        setFromStoreId(request.from_store_id);
+        setToStoreId(request.to_store_id);
+        if (request.note) setNote(request.note);
+        setLinkedRequestId(request.id);
+
+        const transferLines: TransferLine[] = [];
+        for (const line of request.erp_transfer_request_lines ?? []) {
+          let available = Number(line.source_available ?? 0);
+          try {
+            const stockRes = await adminGet<{ stock: number }>(
+              `erp/store-stock?storeId=${request.from_store_id}&variantId=${line.variant_id}`,
+            );
+            available = stockRes.stock;
+          } catch {
+            // keep request snapshot if live stock lookup fails
+          }
+
+          transferLines.push({
+            key: newKey(),
+            variantId: line.variant_id,
+            productName: productLabel(line),
+            quantity: Number(line.quantity),
+            available,
+            purchasePrice: Number(line.average_purchase_cost ?? 0),
+            salesPrice: Number(line.sales_price ?? 0),
+            transferPrice: Number(line.transfer_price ?? 0),
+          });
+        }
+
+        setLines(transferLines);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load transfer request");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRequest(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [requestId]);
+
+  function handleCancel() {
+    if (isModal) {
+      onOpenChange?.(false);
+    } else {
+      router.push("/admin/erp/store-transfers");
+    }
+  }
+
+  function handleSuccessNavigate(id: string) {
+    if (isModal) {
+      onOpenChange?.(false);
+      onSuccess?.(id);
+      return;
+    }
+    router.push(`/admin/erp/store-transfers/${id}`);
+  }
+
+  async function runSearch() {
+    const q = search.trim();
+    if (q.length < 2) return;
+    const res = await adminGet<{ data: ErpVariantSearchRow[] }>(
+      `erp/purchase-catalog?q=${encodeURIComponent(q)}`,
+    );
+    setResults(res.data);
+  }
+
+  async function addLine(row: ErpVariantSearchRow) {
+    let available = 0;
+    if (fromStoreId) {
+      const stockRes = await adminGet<{ stock: number }>(
+        `erp/store-stock?storeId=${fromStoreId}&variantId=${row.id}`,
+      );
+      available = stockRes.stock;
+    }
+    setLines([
+      ...lines,
+      {
+        key: newKey(),
+        variantId: row.id,
+        productName: row.product_name,
+        quantity: 1,
+        available,
+        purchasePrice: row.purchase_price ?? 0,
+        salesPrice: 0,
+        transferPrice: row.purchase_price ?? 0,
+      },
+    ]);
+    setResults([]);
+    setSearch("");
+  }
+
+  function handleSubmit() {
+    setError(null);
+    if (!fromStoreId || !toStoreId) {
+      setError("From and To stores are required");
+      return;
+    }
+    if (fromStoreId === toStoreId) {
+      setError("From and To stores must be different");
+      return;
+    }
+    if (lines.length === 0) {
+      setError("Add at least one item");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const res = await adminPost<{ id: string }>("erp/store-transfers", {
+          fromStoreId,
+          toStoreId,
+          transferDate,
+          note: note || undefined,
+          requestId: linkedRequestId ?? undefined,
+          lines: lines.map((l) => ({
+            variantId: l.variantId,
+            quantity: l.quantity,
+            purchasePrice: l.purchasePrice,
+            salesPrice: l.salesPrice,
+            transferPrice: l.transferPrice,
+          })),
+        });
+        handleSuccessNavigate(res.id);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Save failed");
+      }
+    });
+  }
+
+  if (isModal && !open) return null;
+
+  const title = linkedRequestId ? "From request" : "New transfer";
+  const totalQty = lines.reduce((s, l) => s + l.quantity, 0);
+
+  if (loadingRequest) {
+    return (
+      <AdminFormShell
+        variant={variant}
+        open={open}
+        onOpenChange={onOpenChange}
+        title={title}
+        size="landscape"
+        loading
+        loadingFallback={<AdminPageSkeleton />}
+      >
+        {null}
+      </AdminFormShell>
+    );
+  }
+
+  const footer = isModal ? (
+    <>
+      <Button type="button" variant="outline" onClick={handleCancel}>
+        Cancel
+      </Button>
+      <Button type="button" disabled={pending || loadingRequest} onClick={handleSubmit}>
+        {pending ? "Saving…" : "Save transfer"}
+      </Button>
+    </>
+  ) : undefined;
+
+  const sections = (
+    <AdminFormColumns cols={2}>
+      <AdminFormSection title="Transfer details">
+        <AdminFormGrid cols={2}>
+          <AdminFormField label="From store" required>
+            <StoreSelect value={fromStoreId} onChange={setFromStoreId} stores={stores} label="" />
+          </AdminFormField>
+          <AdminFormField label="To store" required>
+            <StoreSelect value={toStoreId} onChange={setToStoreId} stores={stores} label="" />
+          </AdminFormField>
+          <AdminFormField label="Transfer date">
+            <Input
+              type="date"
+              value={transferDate}
+              onChange={(e) => setTransferDate(e.target.value)}
+            />
+          </AdminFormField>
+          <AdminFormField label="Note" className="sm:col-span-2">
+            <Input value={note} onChange={(e) => setNote(e.target.value)} />
+          </AdminFormField>
+        </AdminFormGrid>
+      </AdminFormSection>
+
+      <AdminFormSection title="Items">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Search product…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), runSearch())}
+            disabled={!fromStoreId}
+          />
+          <Button type="button" variant="outline" onClick={runSearch} disabled={!fromStoreId}>
+            <Search className="h-4 w-4" />
+          </Button>
+        </div>
+        {!fromStoreId ? (
+          <p className="text-sm text-muted-foreground">Select a source store to search products.</p>
+        ) : null}
+        {results.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            className="block w-full rounded border p-2 text-left text-sm hover:bg-muted/50"
+            onClick={() => addLine(r)}
+          >
+            {r.product_name} {r.barcode ? `(${r.barcode})` : ""}
+          </button>
+        ))}
+
+        {lines.length > 0 ? (
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2">Product</th>
+                  <th className="px-3 py-2">Available</th>
+                  <th className="px-3 py-2">Qty</th>
+                  <th className="px-3 py-2">Transfer price</th>
+                  <th className="px-3 py-2">Total</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line) => (
+                  <tr key={line.key} className="border-t">
+                    <td className="px-3 py-2">{line.productName}</td>
+                    <td className="px-3 py-2 tabular-nums">{line.available}</td>
+                    <td className="px-3 py-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={line.quantity}
+                        onChange={(e) =>
+                          setLines(
+                            lines.map((l) =>
+                              l.key === line.key
+                                ? { ...l, quantity: parseFloat(e.target.value) || 0 }
+                                : l,
+                            ),
+                          )
+                        }
+                        className="w-20"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={line.transferPrice}
+                        onChange={(e) =>
+                          setLines(
+                            lines.map((l) =>
+                              l.key === line.key
+                                ? { ...l, transferPrice: parseFloat(e.target.value) || 0 }
+                                : l,
+                            ),
+                          )
+                        }
+                        className="w-24"
+                      />
+                    </td>
+                    <td className="px-3 py-2 tabular-nums">
+                      {formatCurrencyAmount(line.quantity * line.transferPrice)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setLines(lines.filter((l) => l.key !== line.key))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+        <p className="text-sm text-muted-foreground">Total quantity: {totalQty}</p>
+      </AdminFormSection>
+    </AdminFormColumns>
+  );
+
+  return (
+    <AdminFormShell
+      variant={variant}
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description="Move stock between stores with transfer pricing and quantities."
+      backHref="/admin/erp/store-transfers"
+      breadcrumb={[
+        { label: "Store transfers", href: "/admin/erp/store-transfers" },
+        { label: title },
+      ]}
+      size="landscape"
+      footer={footer}
+    >
+      <div className="space-y-4">
+        {sections}
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {!isModal ? (
+          <div className="flex flex-wrap justify-end gap-2">
+            <Link href="/admin/erp/store-transfers" className={buttonVariants({ variant: "outline" })}>
+              Cancel
+            </Link>
+            <Button type="button" disabled={pending || loadingRequest} onClick={handleSubmit}>
+              {pending ? "Saving…" : "Save transfer"}
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    </AdminFormShell>
+  );
+}

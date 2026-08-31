@@ -22,6 +22,7 @@ import { PAGE_SIZE } from "@/common/admin/types";
 export async function getProducts(
   page = 0,
   categoryId: string | null = null,
+  storeId: string | null = null,
 ): Promise<Paginated<ProductWithCategoryListItem>> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -30,7 +31,7 @@ export async function getProducts(
   let query = supabase
     .from("products")
     .select(
-      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,variant_layout,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
+      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,variant_layout,item_type,hsn_sac,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
     );
 
   let countQuery = supabase
@@ -51,7 +52,7 @@ export async function getProducts(
 
   const [dataResult, countResult] = await Promise.all([query, countQuery]);
   const rows = (dataResult.data ?? []) as unknown as ProductWithCategory[];
-  const enriched = await enrichProductsList(supabase, rows);
+  const enriched = await enrichProductsList(supabase, rows, storeId);
 
   return {
     data: enriched,
@@ -62,14 +63,18 @@ export async function getProducts(
 async function enrichProductsList(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   products: ProductWithCategory[],
+  storeId: string | null = null,
 ): Promise<ProductWithCategoryListItem[]> {
   if (products.length === 0) return [];
 
   const productIds = products.map((p) => p.id);
   const { data: variantRows } = await supabase
     .from("product_variants")
-    .select("id,product_id,name,price,mrp")
-    .in("product_id", productIds);
+    .select(
+      "id,product_id,name,price,mrp,barcode,product_code,purchase_price,tax_rate_percent",
+    )
+    .in("product_id", productIds)
+    .order("created_at", { ascending: true });
 
   const variants = variantRows ?? [];
   const variantIds = variants.map((v) => v.id);
@@ -86,14 +91,36 @@ async function enrichProductsList(
     }
   }
 
+  const storeStockByVariant = new Map<string, number>();
+  let storeName: string | null = null;
+  if (storeId && variantIds.length > 0) {
+    const [{ data: storeRow }, { data: storeInventoryRows }] = await Promise.all([
+      supabase.from("stores").select("name").eq("id", storeId).maybeSingle(),
+      supabase
+        .from("store_inventory")
+        .select("variant_id,stock,sales_price")
+        .eq("store_id", storeId)
+        .in("variant_id", variantIds),
+    ]);
+    storeName = storeRow?.name ?? null;
+    for (const row of storeInventoryRows ?? []) {
+      storeStockByVariant.set(row.variant_id, Number(row.stock ?? 0));
+    }
+  }
+
   const summaryByProduct = new Map<
     string,
     {
       stock: number;
+      storeStock: number;
       priceMin: number | null;
       mrpMin: number | null;
       count: number;
       firstSku: string | null;
+      barcode: string | null;
+      productCode: string | null;
+      purchasePrice: number | null;
+      taxRatePercent: number | null;
     }
   >();
 
@@ -101,23 +128,39 @@ async function enrichProductsList(
     const pid = v.product_id as string | null;
     if (!pid) continue;
 
-    const stock = stockByVariant.get(v.id) ?? 0;
+    const centralStock = stockByVariant.get(v.id) ?? 0;
+    const storeStock = storeId ? (storeStockByVariant.get(v.id) ?? 0) : 0;
+    const stock = storeId ? storeStock : centralStock;
     const price = v.price != null ? Number(v.price) : null;
     const mrp = v.mrp != null ? Number(v.mrp) : null;
+    const purchasePrice =
+      v.purchase_price != null ? Number(v.purchase_price) : null;
+    const taxRate =
+      v.tax_rate_percent != null ? Number(v.tax_rate_percent) : null;
     const existing = summaryByProduct.get(pid) ?? {
       stock: 0,
+      storeStock: 0,
       priceMin: null,
       mrpMin: null,
       count: 0,
       firstSku: null,
+      barcode: null,
+      productCode: null,
+      purchasePrice: null,
+      taxRatePercent: null,
     };
 
     existing.stock += stock;
+    if (storeId) existing.storeStock += storeStock;
     existing.count += 1;
     if (existing.firstSku == null) {
       existing.firstSku =
         v.name?.trim() ||
         `PRD-${v.id.split("-")[0]?.slice(0, 4).toUpperCase() ?? v.id.slice(0, 8)}`;
+      existing.barcode = v.barcode ?? null;
+      existing.productCode = v.product_code ?? null;
+      existing.purchasePrice = purchasePrice;
+      existing.taxRatePercent = taxRate;
     }
     if (price != null && Number.isFinite(price)) {
       existing.priceMin =
@@ -134,10 +177,15 @@ async function enrichProductsList(
   return products.map((product) => {
     const summary = summaryByProduct.get(product.id) ?? {
       stock: 0,
+      storeStock: 0,
       priceMin: null,
       mrpMin: null,
       count: 0,
       firstSku: null,
+      barcode: null,
+      productCode: null,
+      purchasePrice: null,
+      taxRatePercent: null,
     };
 
     return {
@@ -147,6 +195,12 @@ async function enrichProductsList(
       mrp_min: summary.mrpMin,
       variant_count: summary.count,
       sku_label: summary.firstSku,
+      barcode: summary.barcode,
+      product_code: summary.productCode,
+      purchase_price: summary.purchasePrice,
+      tax_rate_percent: summary.taxRatePercent,
+      store_stock: storeId ? summary.storeStock : null,
+      store_name: storeId ? storeName : null,
     };
   });
 }
@@ -237,7 +291,7 @@ export async function getProductById(
   const { data } = await supabase
     .from("products")
     .select(
-      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,variant_layout,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
+      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,variant_layout,item_type,hsn_sac,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -252,7 +306,7 @@ export async function getProductVariants(
   const { data, error } = await supabase
     .from("product_variants")
     .select(
-      "id,product_id,name,price,mrp,variant_group_id,created_at,variant_images(id,variant_id,url,is_preview,sort_order,created_at)",
+      "id,product_id,name,price,mrp,variant_group_id,barcode,product_code,purchase_price,tax_rate_percent,unit_id,markup_percent,created_at,variant_images(id,variant_id,url,is_preview,sort_order,created_at)",
     )
     .eq("product_id", productId)
     .order("created_at", { ascending: true });
@@ -262,7 +316,9 @@ export async function getProductVariants(
   if (error) {
     const { data: plain } = await supabase
       .from("product_variants")
-      .select("id,product_id,name,price,mrp,variant_group_id,created_at")
+      .select(
+        "id,product_id,name,price,mrp,variant_group_id,barcode,product_code,purchase_price,tax_rate_percent,unit_id,markup_percent,created_at",
+      )
       .eq("product_id", productId)
       .order("created_at", { ascending: true });
     const plainVariants = ((plain ?? []) as Omit<ProductVariant, "images">[]).map(
@@ -335,6 +391,8 @@ export async function insertProduct(input: {
   brandId: string | null;
   imageUrl: string | null;
   variantLayout?: "flat" | "grouped";
+  itemType?: "goods" | "service";
+  hsnSac?: string | null;
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -347,6 +405,8 @@ export async function insertProduct(input: {
       brand_id: input.brandId,
       image_url: input.imageUrl,
       variant_layout: input.variantLayout ?? "flat",
+      item_type: input.itemType ?? "goods",
+      hsn_sac: input.hsnSac ?? null,
       is_active: true,
     })
     .select("id")
@@ -363,6 +423,8 @@ export async function updateProductById(
     categoryId: string | null;
     brandId: string | null;
     imageUrl: string | null;
+    itemType?: "goods" | "service";
+    hsnSac?: string | null;
   },
 ): Promise<void> {
   await requireAdminOrManagerProfile();
@@ -375,6 +437,8 @@ export async function updateProductById(
       category_id: input.categoryId,
       brand_id: input.brandId,
       image_url: input.imageUrl,
+      ...(input.itemType !== undefined ? { item_type: input.itemType } : {}),
+      ...(input.hsnSac !== undefined ? { hsn_sac: input.hsnSac } : {}),
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

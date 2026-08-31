@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -28,10 +29,12 @@ import {
 } from "@/modules/orders/actions/orders.actions";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
 import { OrderEditModal } from "@/modules/orders/components/order-edit-modal";
+import { OrderFulfillmentPanel } from "@/modules/orders/components/order-fulfillment-panel";
 import { OrderLineItemsList } from "@/modules/orders/components/order-line-items-list";
 import { AddressMapEmbed } from "@/modules/admin/components/address-map-embed";
 import { textareaCls } from "@/modules/admin/components/modal";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { adminPost } from "@/modules/admin/lib/admin-api-client";
 import {
   customerInitials,
   CustomerEditedPill,
@@ -40,6 +43,7 @@ import {
   fulfillmentActionLabel,
   FulfillmentPill,
   getNextFulfillmentStatus,
+  InventoryFulfillmentStatusPill,
   isCancelled,
   isCustomerEditedOrder,
   isPaid,
@@ -293,7 +297,126 @@ function MerchantNoteSection({
   );
 }
 
+function ExpectedDeliverySection({
+  orderId,
+  preferredDate,
+  expectedDate,
+  onSaved,
+}: {
+  orderId: string;
+  preferredDate: string | null | undefined;
+  expectedDate: string | null | undefined;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(expectedDate ?? "");
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const preferredLabel = preferredDate
+    ? format(new Date(`${preferredDate}T12:00:00`), "EEE, d MMM yyyy")
+    : null;
+  const expectedLabel = expectedDate
+    ? format(new Date(`${expectedDate}T12:00:00`), "EEE, d MMM yyyy")
+    : null;
+
+  function startEdit() {
+    setDraft(expectedDate ?? "");
+    setError(null);
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setDraft(expectedDate ?? "");
+    setError(null);
+    setEditing(false);
+  }
+
+  function handleSave() {
+    setError(null);
+    const trimmed = draft.trim();
+    startTransition(async () => {
+      try {
+        await updateOrderDetailsAction(orderId, {
+          shipmentDate: trimmed || null,
+        });
+        onSaved();
+        setEditing(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save delivery date.");
+      }
+    });
+  }
+
+  return (
+    <Card className="border border-border ring-0">
+      <CardHeader className="flex flex-row items-start justify-between gap-2 border-b">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Truck className="size-4" />
+            Delivery dates
+          </CardTitle>
+          <CardDescription>
+            Customer preference and your promised delivery date
+          </CardDescription>
+        </div>
+        {!editing ? (
+          <Button type="button" variant="outline" size="sm" onClick={startEdit}>
+            <Pencil data-icon="inline-start" />
+            {expectedLabel ? "Edit expected" : "Set expected"}
+          </Button>
+        ) : null}
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 pt-4">
+        <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Customer preferred
+          </p>
+          <p className="mt-1 font-medium">
+            {preferredLabel ?? "No preference at checkout"}
+          </p>
+        </div>
+
+        {editing ? (
+          <div className="flex flex-col gap-3">
+            <label className="text-sm font-medium" htmlFor="expected-delivery-date">
+              Expected delivery
+            </label>
+            <input
+              id="expected-delivery-date"
+              type="date"
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={isPending}
+            />
+            {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={cancelEdit} disabled={isPending}>
+                Cancel
+              </Button>
+              <Button type="button" size="sm" onClick={handleSave} disabled={isPending}>
+                {isPending ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-lg border bg-background p-3 text-sm">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Expected delivery
+            </p>
+            <p className="mt-1 font-medium">
+              {expectedLabel ?? "Not set — customer sees a pending message in the app"}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [showEdit, setShowEdit] = useState(false);
@@ -305,6 +428,10 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
   const paymentNotRequired = isPaymentNotRequired(order.payment_status);
   const nextStatus = getNextFulfillmentStatus(order.status);
   const nextActionLabel = fulfillmentActionLabel(order.status);
+  const needsStoreAssignment =
+    order.fulfillment_status === "pending_assignment";
+  const canAdvanceFulfillment =
+    nextStatus && !(nextStatus === "shipped" && needsStoreAssignment);
 
   const paymentSummary = useMemo(
     () => computeOrderPaymentSummary(order),
@@ -327,6 +454,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
     () => buildTimeline(order, total),
     [order, total],
   );
+  const isSalesOrder = order.source === "sales_order";
 
   async function invalidate() {
     await queryClient.invalidateQueries({
@@ -407,6 +535,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
           <div className="flex flex-wrap items-center gap-2">
             <PaymentPill paymentStatus={order.payment_status} />
             <FulfillmentPill status={order.status} />
+            <InventoryFulfillmentStatusPill status={order.fulfillment_status} />
             {isCustomerEditedOrder(order.customer_edited_at) ? (
               <CustomerEditedPill />
             ) : null}
@@ -418,6 +547,30 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {isSalesOrder && !cancelled ? (
+            <Button
+              size="sm"
+              disabled={isPending}
+              onClick={() => {
+                setActionError(null);
+                startTransition(async () => {
+                  try {
+                    const res = await adminPost<{ invoiceId: string }>(
+                      `erp/sales-orders/${order.id}/convert-to-invoice`,
+                      {},
+                    );
+                    router.push(`/admin/erp/invoices/${res.invoiceId}`);
+                  } catch (err) {
+                    setActionError(
+                      err instanceof Error ? err.message : "Conversion failed",
+                    );
+                  }
+                });
+              }}
+            >
+              Create invoice
+            </Button>
+          ) : null}
           {!cancelled ? (
             <Button
               variant="outline"
@@ -476,11 +629,11 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-          {nextStatus && nextActionLabel ? (
+          {canAdvanceFulfillment && nextActionLabel ? (
             <Button
               size="sm"
               disabled={isPending}
-              onClick={() => handleStatusChange(nextStatus)}
+              onClick={() => handleStatusChange(nextStatus!)}
             >
               {nextActionLabel}
             </Button>
@@ -490,18 +643,23 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
+          <OrderFulfillmentPanel
+            order={order}
+            onUpdated={invalidate}
+          />
+
           <Card className="border border-border ring-0">
             <CardHeader className="border-b">
-              <CardTitle>Fulfillment</CardTitle>
+              <CardTitle>Line items</CardTitle>
               <CardDescription>
                 {cancelled
                   ? "This order was cancelled."
-                  : `Status: ${order.status}`}
+                  : `Order status: ${order.status}`}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 pt-4">
               <OrderLineItemsList order={order} />
-              {!cancelled && nextStatus ? (
+              {!cancelled && canAdvanceFulfillment && nextStatus ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
                   <p className="text-sm text-muted-foreground">
                     <Truck className="mr-1 inline" />
@@ -516,6 +674,11 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                     {nextActionLabel}
                   </Button>
                 </div>
+              ) : needsStoreAssignment ? (
+                <p className="border-t pt-3 text-sm text-amber-800">
+                  Assign a fulfilling store above before marking this order as
+                  shipped.
+                </p>
               ) : null}
             </CardContent>
           </Card>
@@ -633,6 +796,13 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
           <MerchantNoteSection
             orderId={order.id}
             note={order.merchant_note}
+            onSaved={() => void invalidate()}
+          />
+
+          <ExpectedDeliverySection
+            orderId={order.id}
+            preferredDate={order.preferred_delivery_date}
+            expectedDate={order.shipment_date}
             onSaved={() => void invalidate()}
           />
 

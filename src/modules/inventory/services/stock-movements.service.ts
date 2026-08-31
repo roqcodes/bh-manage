@@ -76,119 +76,35 @@ export async function logStockMovement(input: LogMovementInput): Promise<string>
 }
 
 /**
- * Adjust stock level (manual correction).
- * Creates movement log + updates inventory.
+ * @deprecated Use ERP stock adjustments.
  */
 export async function adjustStock(
-  variantId: string,
-  quantityDelta: number,
-  reason: string,
+  _variantId: string,
+  _quantityDelta: number,
+  _reason: string,
 ): Promise<{
   movementId: string;
   newStock: number;
 }> {
-  const { user } = await getCurrentSessionProfile();
-  if (!user) {
-    throw new Error("Unauthorized: User not authenticated");
-  }
-
-  const supabase = await createSupabaseServerClient();
-
-  // Get current stock
-  const { data: invData, error: invError } = await supabase
-    .from("inventory")
-    .select("stock")
-    .eq("variant_id", variantId)
-    .maybeSingle();
-
-  if (invError) {
-    throw new Error(invError.message);
-  }
-
-  const currentStock = invData?.stock ?? 0;
-  const newStock = Math.max(0, currentStock + quantityDelta);
-
-  // Log movement
-  const movementId = await logStockMovement({
-    variantId,
-    quantity: quantityDelta,
-    type: "adjustment",
-    reason,
-  });
-
-  // Update inventory
-  const { error: updateError } = await supabase
-    .from("inventory")
-    .update({ stock: newStock } as any)
-    .eq("variant_id", variantId);
-
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-
-  return { movementId, newStock };
+  throw new Error(
+    "Direct stock adjustment is deprecated. Use ERP stock adjustments.",
+  );
 }
 
 /**
- * Mark stock as damaged (write-off).
- * Creates movement log + reduces inventory.
+ * @deprecated Use ERP stock adjustments.
  */
 export async function markDamaged(
-  variantId: string,
-  quantity: number,
-  reason: string,
+  _variantId: string,
+  _quantity: number,
+  _reason: string,
 ): Promise<{
   movementId: string;
   newStock: number;
 }> {
-  const { user } = await getCurrentSessionProfile();
-  if (!user) {
-    throw new Error("Unauthorized: User not authenticated");
-  }
-
-  if (quantity <= 0) {
-    throw new Error("Quantity must be greater than 0");
-  }
-
-  const supabase = await createSupabaseServerClient();
-
-  // Get current stock
-  const { data: invData, error: invError } = await supabase
-    .from("inventory")
-    .select("stock")
-    .eq("variant_id", variantId)
-    .maybeSingle();
-
-  if (invError) {
-    throw new Error(invError.message);
-  }
-
-  const currentStock = invData?.stock ?? 0;
-  if (currentStock < quantity) {
-    throw new Error(`Insufficient stock: ${currentStock} available, ${quantity} requested`);
-  }
-
-  const newStock = currentStock - quantity;
-
-  // Log movement
-  const movementId = await logStockMovement({
-    variantId,
-    quantity: -quantity, // negative = out
-    type: "damaged",
-    reason,
-  });
-
-  // Update inventory
-  const { error: updateError } = await supabase
-    .from("inventory")
-    .update({ stock: newStock } as any)
-    .eq("variant_id", variantId);
-
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-
-  return { movementId, newStock };
+  throw new Error(
+    "Direct damaged stock write-off is deprecated. Use ERP stock adjustments.",
+  );
 }
 
 /**

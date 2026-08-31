@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 
 export interface Invoice {
   id: string;
-  order_id: string;
+  order_id: string | null;
   user_id: string;
   invoice_number: string;
   gst_number: string | null;
@@ -35,7 +35,7 @@ export interface InvoiceItem {
 
 export interface InvoiceSummary {
   id: string;
-  order_id: string;
+  order_id: string | null;
   invoice_number: string;
   subtotal: number | null;
   gst_amount: number | null;

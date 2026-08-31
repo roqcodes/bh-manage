@@ -61,9 +61,9 @@ export function ProductsMetricsBar({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Products</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Inventory Items</h1>
           <p className="text-sm text-muted-foreground">
-            Manage catalog listings, inventory, and pricing.
+            Manage items, pricing, stock, and store inventory.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -74,7 +74,7 @@ export function ProductsMetricsBar({
             Import
           </Button>
           <Button size="sm" onClick={onCreate}>
-            New product
+            New item
           </Button>
         </div>
       </div>
@@ -82,7 +82,7 @@ export function ProductsMetricsBar({
       <Card className="overflow-hidden border border-border py-0 ring-0">
         <div className="flex flex-col divide-y divide-border lg:flex-row lg:divide-x lg:divide-y-0">
           <MetricSegment
-            label="Total products"
+            label="Total items"
             value={stats.total.toLocaleString("en-IN")}
             trend={`${stats.categoriesCount} categories`}
             trendTone="neutral"

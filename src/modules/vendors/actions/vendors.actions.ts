@@ -12,10 +12,22 @@ import {
 
 export async function createVendorAction(data: {
   name: string;
-  contact: string;
-}): Promise<void> {
-  await insertVendor({ name: data.name, contact: data.contact });
+  contact?: string;
+  vendorType?: string;
+  trn?: string;
+  phone?: string;
+  fax?: string;
+  email?: string;
+  address?: string;
+  poBox?: string;
+  notes?: string;
+  openingBalance?: number;
+  openingBalanceDate?: string | null;
+  isActive?: boolean;
+}): Promise<string> {
+  const id = await insertVendor(data);
   revalidatePath("/admin/vendors");
+  return id;
 }
 
 export async function updateVendorAction(

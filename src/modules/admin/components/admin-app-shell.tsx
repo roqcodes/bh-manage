@@ -20,7 +20,7 @@ import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 function AdminRootSkeleton() {
   return (
     <div className="flex h-full overflow-hidden bg-slate-50">
-      <div className="w-64 shrink-0 animate-pulse border-r border-slate-100 bg-white" />
+      <div className="w-[232px] shrink-0 animate-pulse border-r border-slate-100 bg-white" />
       <div className="min-h-0 flex-1 animate-pulse bg-slate-100 p-8">
         <div className="h-8 w-48 rounded-lg bg-slate-200" />
       </div>
@@ -45,12 +45,23 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
     retry: false,
     staleTime: 60_000,
   });
+  const [storeViewKey, setStoreViewKey] = useState("init");
 
   useEffect(() => {
     if (isError) {
       router.replace("/");
     }
   }, [isError, router]);
+
+  useEffect(() => {
+    function onStoreChanged(event: Event) {
+      const storeId = (event as CustomEvent<string>).detail;
+      setStoreViewKey(`${storeId || "store"}-${Date.now()}`);
+    }
+    window.addEventListener("buyhub:erp-store-changed", onStoreChanged);
+    return () =>
+      window.removeEventListener("buyhub:erp-store-changed", onStoreChanged);
+  }, []);
 
   if (isPending || !data?.profile) {
     return isError ? null : <AdminRootSkeleton />;
@@ -95,7 +106,6 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
           onClick={() => setMobileNavOpen(false)}
         />
         <AdminSidebar
-          profile={data.profile}
           collapsed={sidebarCollapsed}
           mobileOpen={mobileNavOpen}
           onNavigate={() => setMobileNavOpen(false)}
@@ -112,7 +122,7 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
             onToggleSidebar={handleToggleSidebar}
           />
           <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom,0.5rem)]">
-            {children}
+            <div key={storeViewKey}>{children}</div>
           </div>
         </main>
         </div>

@@ -4,7 +4,6 @@ import { requireVendorProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { Paginated } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
-import { incrementCentralInventoryByLines } from "@/modules/inventory/services/inventory.service";
 import type {
   VendorPoStatusFilter,
   VendorPurchaseOrderDetail,
@@ -113,14 +112,7 @@ export async function markMyPurchaseOrderDelivered(poId: string): Promise<void> 
 
   if (itemsErr) throw new Error(itemsErr.message);
 
-  const lines = (items ?? [])
-    .filter((r) => r.variant_id && (r.quantity ?? 0) > 0)
-    .map((r) => ({
-      variantId: r.variant_id as string,
-      quantity: r.quantity as number,
-    }));
-
-  await incrementCentralInventoryByLines(lines);
+  // Stock increases only via ERP purchase bill finalize, not vendor PO delivery.
 
   const { data: updated, error: updErr } = await supabase
     .from("purchase_orders")

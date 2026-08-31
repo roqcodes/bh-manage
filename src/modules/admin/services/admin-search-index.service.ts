@@ -3,6 +3,7 @@ import "server-only";
 import { format } from "date-fns";
 
 import { formatCurrency } from "@/lib/format-currency";
+import { erpShortCode, formatErpDocRef } from "@/lib/erp-document-ref";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { getAppSettings } from "@/modules/settings/services/app-settings.service";
@@ -14,11 +15,6 @@ import type {
 } from "@/modules/admin/types/admin-search";
 
 const FETCH_LIMIT = 5000;
-
-function shortRef(id: string): string {
-  const segment = id.split("-")[0]?.toUpperCase() ?? id.slice(0, 8);
-  return segment.slice(0, 4);
-}
 
 function formatMoney(n: number | null | undefined, settings: Parameters<typeof formatCurrency>[2]) {
   return formatCurrency(Number(n ?? 0), { maximumFractionDigits: 0 }, settings);
@@ -141,7 +137,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
     supabase
       .from("users")
       .select("id,name,email,phone,role,is_verified,created_at")
-      .in("role", ["admin", "manager", "vendor", "delivery"])
+      .or("role.eq.admin,role.eq.manager,role.eq.vendor,role.eq.delivery")
       .order("created_at", { ascending: false })
       .limit(FETCH_LIMIT),
     supabase
@@ -171,7 +167,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
       phone?: string | null;
     } | null;
     const customer = row.customer_name ?? users?.name ?? users?.email ?? "Guest";
-    const ref = shortRef(row.id as string);
+    const ref = erpShortCode(row.id as string);
     const lineItems = orderProductNames.get(row.id as string) ?? [];
     const status = row.status as string;
     const paymentStatus = row.payment_status as string | null;
@@ -218,20 +214,20 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
 
   for (const row of purchaseOrdersRes.data ?? []) {
     const vendor = (row.vendors as { name?: string | null } | null)?.name ?? "Unknown vendor";
-    const ref = shortRef(row.id as string);
+    const poRef = formatErpDocRef("PO", row.id as string);
     const status = row.status as string;
 
     pushItem(items, {
       id: row.id as string,
       group: "purchase_orders",
-      ref: `PO #${ref}`,
+      ref: poRef,
       title: vendor,
       subtitle: [formatMoney(row.total_amount as number, currencySettings), formatDate(row.created_at as string)]
         .filter(Boolean)
         .join(" · "),
       badges: [{ label: titleCaseStatus(status), tone: fulfillmentBadgeTone(status) }],
       href: `/admin/purchase-orders/${row.id}`,
-      searchText: buildSearchText(ref, row.id, vendor, row.status, "purchase order", "po"),
+      searchText: buildSearchText(poRef, row.id, vendor, row.status, "purchase order", "po"),
     });
   }
 
@@ -253,7 +249,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
       href: `/admin/products/${row.id}`,
       searchText: buildSearchText(
         row.id,
-        shortRef(row.id as string),
+        erpShortCode(row.id as string),
         name,
         row.description,
         category,
@@ -267,7 +263,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
     const variantName = (row.name as string | null) ?? "Default";
     const stockRow = Array.isArray(row.inventory) ? row.inventory[0] : row.inventory;
     const stock = (stockRow as { stock?: number | null } | null)?.stock ?? 0;
-    const sku = shortRef(row.id as string);
+    const sku = erpShortCode(row.id as string);
 
     pushItem(items, {
       id: row.id as string,
@@ -309,7 +305,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
       href: `/admin/customers/${row.id}`,
       searchText: buildSearchText(
         row.id,
-        shortRef(row.id as string),
+        erpShortCode(row.id as string),
         row.name,
         row.email,
         row.phone,
@@ -330,7 +326,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
       href: `/admin/vendors/${row.id}`,
       searchText: buildSearchText(
         row.id,
-        shortRef(row.id as string),
+        erpShortCode(row.id as string),
         row.name,
         row.contact,
         "vendor",

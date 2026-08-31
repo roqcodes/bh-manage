@@ -78,6 +78,7 @@ export function OrdersMetricsBar({
   onDateFromChange,
   onDateToChange,
   onExport,
+  variant = "online",
 }: {
   stats: OrderCatalogStats;
   datePreset: DatePreset;
@@ -87,6 +88,7 @@ export function OrdersMetricsBar({
   onDateFromChange: (value: string) => void;
   onDateToChange: (value: string) => void;
   onExport: () => void;
+  variant?: "online" | "erp";
 }) {
   const presetLabel =
     datePreset === "7"
@@ -114,9 +116,13 @@ export function OrdersMetricsBar({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Orders</h1>
+          <h1 className="text-xl font-semibold tracking-tight">
+            {variant === "online" ? "Online sales" : "Sales orders"}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Manage fulfillment, payments, and customer orders.
+            {variant === "online"
+              ? "Orders from the BuyHub app and POS billing."
+              : "Manage ERP sales orders, fulfillment, and customer deliveries."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -138,19 +144,25 @@ export function OrdersMetricsBar({
                 <DropdownMenuItem onClick={onExport}>
                   Export all on page
                 </DropdownMenuItem>
-                <DropdownMenuItem nativeButton={false} render={<Link href="/admin/returns" />}>
-                  View return requests
-                </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Link
-            href="/admin/billing"
-            className={buttonVariants({ size: "sm" })}
-          >
-            <Plus data-icon="inline-start" />
-            Create order
-          </Link>
+          {variant === "erp" ? (
+            <Link
+              href="/admin/erp/sales-orders?form=new"
+              className={buttonVariants({ size: "sm" })}
+            >
+              <Plus data-icon="inline-start" />
+              Add sales order
+            </Link>
+          ) : (
+            <Link
+              href="/admin/billing"
+              className={buttonVariants({ size: "sm" })}
+            >
+              POS billing
+            </Link>
+          )}
         </div>
       </div>
 

@@ -81,6 +81,8 @@ export function AdminOrdersView() {
         filterUsers={data.filterUsers}
         selectedUserId={data.userId}
         stats={data.stats}
+        channel="online"
+        basePath="/admin/orders"
       />
     </div>
   );

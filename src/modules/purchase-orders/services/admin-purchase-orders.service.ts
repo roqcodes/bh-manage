@@ -22,9 +22,10 @@ export async function listAdminPurchaseOrders(
 
   let query = supabase
     .from("purchase_orders")
-    .select("id,vendor_id,status,total_amount,created_at,vendors(name)", {
-      count: "exact",
-    })
+    .select(
+      "id,vendor_id,status,total_amount,created_at,po_number,store_id,reference,po_date,expected_delivery_date,vendors(name),stores(name)",
+      { count: "exact" },
+    )
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
 

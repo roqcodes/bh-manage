@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 import { buildOrderItemSnapshot } from "@/modules/orders/services/order-item-pricing.service";
 import { commitOrderInventory } from "@/modules/orders/services/order-wallet-inventory.service";
+import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
 
 export interface CreateManualOrderInput {
   customerName?: string;
@@ -36,6 +37,11 @@ export async function createManualOrder(
   const auth = await requireAdminApiProfile();
   if (!auth.ok) throw new Error("Unauthorized");
   const supabase = await createSupabaseServerClient();
+  const ctx = await getAdminErpContext();
+  const storeId = ctx?.store_id;
+  if (!storeId) {
+    throw new Error("Store context is required for manual orders");
+  }
 
   if (!input.items || input.items.length === 0) {
     throw new Error("Cannot create a manual invoice with no items");
@@ -92,6 +98,7 @@ export async function createManualOrder(
       company: input.company || null,
       gst_number: input.gstNumber || null,
       source: "manual",
+      store_id: storeId,
       subtotal: input.subtotal,
       tax: input.tax,
       discount: input.discount,

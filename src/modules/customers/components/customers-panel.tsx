@@ -14,6 +14,7 @@ import {
 import { CustomersMetricsBar } from "@/modules/customers/components/customers-metrics-bar";
 import {
   CUSTOMER_STATUS_FILTERS,
+  formatCustomerId,
   matchesCustomerStatusFilter,
   type CustomerStatusFilter,
 } from "@/modules/customers/components/customers-ui";
@@ -38,11 +39,13 @@ export function CustomersPanel({
   total,
   page,
   stats,
+  onAddCustomer,
 }: {
   users: AdminUser[];
   total: number;
   page: number;
   stats: CustomerStats;
+  onAddCustomer?: () => void;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<CustomerStatusFilter>("all");
@@ -58,11 +61,17 @@ export function CustomersPanel({
       const name = (u.name ?? "").toLowerCase();
       const email = (u.email ?? "").toLowerCase();
       const phone = (u.phone ?? "").toLowerCase();
+      const company = (u.company_name ?? "").toLowerCase();
+      const location = (u.location ?? "").toLowerCase();
+      const number = formatCustomerId(u).toLowerCase();
       const idShort = u.id.slice(0, 8).toLowerCase();
       return (
         name.includes(q) ||
         email.includes(q) ||
         phone.includes(q) ||
+        company.includes(q) ||
+        location.includes(q) ||
+        number.includes(q) ||
         idShort.includes(q)
       );
     });
@@ -79,6 +88,7 @@ export function CustomersPanel({
       <CustomersMetricsBar
         stats={stats}
         onExport={() => exportCustomersCsv(filtered)}
+        onAddCustomer={onAddCustomer}
       />
 
       <Card className="overflow-hidden border border-border py-0 ring-0">
@@ -123,7 +133,7 @@ export function CustomersPanel({
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name, email, phone..."
+                placeholder="Search name, company, number, email, mobile..."
               />
               <InputGroupAddon align="inline-end" className="gap-1 pr-1">
                 <InputGroupButton

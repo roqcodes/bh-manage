@@ -32,6 +32,8 @@ export async function getAdminNavBadges(): Promise<AdminNavBadgesPayload> {
   const [
     pendingOrdersRes,
     delayedOrdersRes,
+    pendingAssignmentRes,
+    pendingTransferRes,
     inventoryHealthRes,
     pendingPoRes,
     pendingUsersRes,
@@ -45,6 +47,16 @@ export async function getAdminNavBadges(): Promise<AdminNavBadgesPayload> {
       .select("id", { count: "exact", head: true })
       .in("status", ["pending", "processing", "shipped"])
       .lt("created_at", startOfDay),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .or("source.is.null,source.eq.online")
+      .eq("fulfillment_status", "pending_assignment")
+      .not("status", "in", "(cancelled,delivered)"),
+    supabase
+      .from("erp_transfer_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "submitted"),
     supabase.from("inventory").select("stock,reorder_point"),
     supabase
       .from("purchase_orders")
@@ -61,6 +73,20 @@ export async function getAdminNavBadges(): Promise<AdminNavBadgesPayload> {
   const ordersTone: AdminNavBadgeTone =
     delayedOrders > 0 ? "critical" : "warning";
   setBadge(badges, "/admin/orders", ordersCount, ordersTone);
+
+  setBadge(
+    badges,
+    "/admin/erp/fulfillment-queue",
+    pendingAssignmentRes.count ?? 0,
+    "critical",
+  );
+
+  setBadge(
+    badges,
+    "/admin/erp/transfer-approvals",
+    pendingTransferRes.count ?? 0,
+    "warning",
+  );
 
   const criticalSkus =
     (inventoryHealthRes.data ?? []).filter((row) => {

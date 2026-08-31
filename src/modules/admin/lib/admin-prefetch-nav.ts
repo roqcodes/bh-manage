@@ -61,7 +61,15 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
   if (p === "/admin/orders") {
     return qc.prefetchQuery({
       queryKey: adminQueryKeys.orders("all", null, 0),
-      queryFn: () => adminGet("orders"),
+      queryFn: () => adminGet("orders?channel=online"),
+      staleTime: STALE,
+    });
+  }
+
+  if (p === "/admin/erp/sales-orders") {
+    return qc.prefetchQuery({
+      queryKey: adminQueryKeys.salesOrders("all", null, 0),
+      queryFn: () => adminGet("erp/sales-orders"),
       staleTime: STALE,
     });
   }

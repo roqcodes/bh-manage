@@ -28,13 +28,15 @@ export function AdminProductsView() {
   const searchParams = useSearchParams();
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
   const categoryId = searchParams.get("category_id") || null;
+  const storeId = searchParams.get("storeId") || null;
 
   const { data, isPending, isError, error } = useQuery({
-    queryKey: adminQueryKeys.products(page, categoryId),
+    queryKey: adminQueryKeys.products(page, categoryId, storeId),
     queryFn: () => {
       const q = new URLSearchParams();
       q.set("page", page.toString());
       if (categoryId) q.set("category_id", categoryId);
+      if (storeId) q.set("storeId", storeId);
       return adminGet<ProductsPayload>(`products?${q.toString()}`);
     },
     placeholderData: keepPreviousData,
@@ -48,7 +50,7 @@ export function AdminProductsView() {
           <AlertTriangle className="size-5 shrink-0 text-rose-600" />
           <div>
             <p className="text-sm font-semibold text-rose-900">
-              Failed to load products.
+              Failed to load inventory items.
             </p>
             <p className="mt-1 text-sm text-rose-700">
               {error instanceof Error ? error.message : "Unknown error."}
@@ -61,15 +63,14 @@ export function AdminProductsView() {
   if (!data) return <AdminPageSkeleton />;
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
-      <ProductsPanel
-        products={data.data}
-        categories={data.categories}
-        brands={data.brands ?? []}
-        total={data.total}
-        page={data.page}
-        stats={data.stats}
-      />
-    </div>
+    <ProductsPanel
+      products={data.data}
+      categories={data.categories}
+      brands={data.brands ?? []}
+      total={data.total}
+      page={data.page}
+      stats={data.stats}
+      storeId={storeId}
+    />
   );
 }

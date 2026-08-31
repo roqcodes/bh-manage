@@ -2,6 +2,7 @@ import "server-only";
 
 import { getCurrentSessionProfile } from "@/modules/auth/services/auth.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 import { getCart } from "@/modules/cart/services/cart.service";
 import { buildOrderItemSnapshot } from "@/modules/orders/services/order-item-pricing.service";
 import { commitOrderInventory } from "@/modules/orders/services/order-wallet-inventory.service";
@@ -49,7 +50,7 @@ export interface OrderLineItem {
  *    - Build order item snapshot
  * 5. Create order record
  * 6. Create order_items records
- * 7. Decrement inventory stock
+ * 7. Reserve inventory stock (physical deduct on ship)
  * 8. Clear cart
  * 9. Return order confirmation
  */
@@ -126,6 +127,7 @@ export async function createOrderFromCart(
       total_amount: totalAmount,
       status: "pending",
       payment_status: "pending",
+      source: "online",
     })
     .select("id")
     .single();
@@ -160,7 +162,7 @@ export async function createOrderFromCart(
     throw new Error(itemsError.message);
   }
 
-  // Step 7: Decrement inventory stock for each line (aggregated per variant)
+  // Step 7: Reserve inventory across eligible stores
   try {
     await commitOrderInventory(orderId);
   } catch (invErr) {
@@ -190,7 +192,7 @@ export async function createOrderFromCart(
 }
 
 /**
- * Check if cart items are available in central warehouse.
+ * Check if cart items are available across active stores (stock minus reserved).
  */
 export async function checkCartAvailability(): Promise<{
   available: boolean;
@@ -222,27 +224,25 @@ export async function checkCartAvailability(): Promise<{
   }[] = [];
 
   for (const cartItem of cart.items) {
-    const { data: inv } = await supabase
-      .from("inventory")
-      .select("stock")
-      .eq("variant_id", cartItem.variant_id)
-      .maybeSingle();
-
-    const centralStock = Math.max(
-      0,
-      Math.floor(Number(inv?.stock ?? 0)),
+    const { data: availableStock, error: availErr } = await invokeRpc(
+      supabase,
+      "get_variant_online_available",
+      { p_variant_id: cartItem.variant_id },
     );
+    if (availErr) throw new Error(availErr.message);
+
+    const onlineStock = Math.max(0, Math.floor(Number(availableStock ?? 0)));
 
     items.push({
       variantId: cartItem.variant_id,
       productName: cartItem.product?.name ?? "Unknown Product",
       quantity: cartItem.quantity,
-      available: centralStock >= cartItem.quantity,
+      available: onlineStock >= cartItem.quantity,
       reason:
-        centralStock === 0
-          ? "Out of stock in central warehouse"
-          : centralStock < cartItem.quantity
-            ? `Only ${centralStock} in central warehouse (requested ${cartItem.quantity})`
+        onlineStock === 0
+          ? "Out of stock"
+          : onlineStock < cartItem.quantity
+            ? `Only ${onlineStock} available (requested ${cartItem.quantity})`
             : undefined,
     });
   }

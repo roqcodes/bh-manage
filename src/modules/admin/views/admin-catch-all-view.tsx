@@ -13,14 +13,15 @@ import { AdminOrdersView } from "@/modules/admin/views/admin-orders-view";
 import { AdminProcurementView } from "@/modules/admin/views/admin-procurement-view";
 import { AdminProductDetailView } from "@/modules/admin/views/admin-product-detail-view";
 import { AdminProductsView } from "@/modules/admin/views/admin-products-view";
-import { AdminPurchaseOrderByIdView } from "@/modules/admin/views/admin-purchase-order-detail-view";
 import { AdminPurchaseOrdersView } from "@/modules/admin/views/admin-purchase-orders-view";
+import { AdminPurchaseOrderRouteView } from "@/modules/admin/views/purchasing/purchase-order-route-view";
 import { AdminUsersView } from "@/modules/admin/views/admin-users-view";
 import { AdminVendorDetailView } from "@/modules/admin/views/admin-vendor-detail-view";
 import { AdminVendorsView } from "@/modules/admin/views/admin-vendors-view";
 import { AdminBrandsView } from "@/modules/admin/views/admin-brands-view";
 import { AdminCategoriesView } from "@/modules/admin/views/admin-categories-view";
 import { AdminCustomerDetailView } from "@/modules/admin/views/admin-customer-detail-view";
+import { ErpFormRouteRedirect } from "@/modules/admin/components/erp-form-route-redirect";
 import { AdminCustomersView } from "@/modules/admin/views/admin-customers-view";
 
 function AdminNotFound() {
@@ -61,9 +62,23 @@ export function AdminCatchAllView() {
     } else if (a === "products") inner = <AdminProductDetailView />;
     else if (a === "orders") inner = <AdminOrderDetailView />;
     else if (a === "vendors") inner = <AdminVendorDetailView />;
-    else if (a === "purchase-orders") inner = <AdminPurchaseOrderByIdView />;
+    else if (a === "purchase-orders") inner = <AdminPurchaseOrderRouteView />;
+    else if (a === "customers" && b === "new") {
+      inner = <ErpFormRouteRedirect listPath="/admin/customers" form="new" />;
+    }
     else if (a === "customers") inner = <AdminCustomerDetailView />;
     else inner = <AdminNotFound />;
+  } else if (slug.length === 3) {
+    const [a, b, c] = slug;
+    if (a === "purchase-orders" && c === "edit" && b) {
+      inner = <AdminPurchaseOrderRouteView />;
+    } else if (a === "customers" && c === "edit" && b) {
+      inner = (
+        <ErpFormRouteRedirect listPath="/admin/customers" form="edit" id={b} />
+      );
+    } else {
+      inner = <AdminNotFound />;
+    }
   } else {
     inner = <AdminNotFound />;
   }

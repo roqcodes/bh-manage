@@ -131,6 +131,72 @@ export function matchesViewFilter(
   }
 }
 
+const INVENTORY_FULFILLMENT_LABELS: Record<string, string> = {
+  none: "No inventory",
+  pending_assignment: "Needs store",
+  reserved: "Reserved",
+  multi_shipment: "Multi-shipment",
+  partially_shipped: "Partial ship",
+  shipped: "Stock shipped",
+  cancelled: "Released",
+};
+
+export function inventoryFulfillmentLabel(status: string | null | undefined) {
+  if (!status || status === "none") return null;
+  return INVENTORY_FULFILLMENT_LABELS[status] ?? status.replace(/_/g, " ");
+}
+
+export function InventoryFulfillmentStatusPill({
+  status,
+}: {
+  status: string | null | undefined;
+}) {
+  const label = inventoryFulfillmentLabel(status);
+  if (!label) return null;
+
+  const tone =
+    status === "pending_assignment"
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : status === "reserved" || status === "multi_shipment"
+        ? "border-sky-200 bg-sky-50 text-sky-800"
+        : status === "partially_shipped"
+          ? "border-violet-200 bg-violet-50 text-violet-800"
+          : status === "shipped"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : "border-border bg-muted text-muted-foreground";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize",
+        tone,
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+export function FulfillmentPill({ status }: { status: string }) {
+  const fulfilled = isFulfilled(status);
+  const cancelled = status === "cancelled";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize",
+        fulfilled
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : cancelled
+            ? "border-border bg-muted text-muted-foreground"
+            : "border-amber-200 bg-amber-50 text-amber-800",
+      )}
+    >
+      {fulfilled ? "Fulfilled" : status === "pending" ? "Unfulfilled" : status}
+    </span>
+  );
+}
+
 function sparkPoints(seed: number, count = 12): number[] {
   const points: number[] = [];
   let value = 0.35 + (seed % 7) * 0.04;
@@ -246,26 +312,6 @@ export function PaymentPill({
       )}
     >
       {paymentStatusLabel(paymentStatus)}
-    </span>
-  );
-}
-
-export function FulfillmentPill({ status }: { status: string }) {
-  const fulfilled = isFulfilled(status);
-  const cancelled = status === "cancelled";
-
-  return (
-    <span
-      className={cn(
-        "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize",
-        fulfilled
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : cancelled
-            ? "border-border bg-muted text-muted-foreground"
-            : "border-amber-200 bg-amber-50 text-amber-800",
-      )}
-    >
-      {fulfilled ? "Fulfilled" : status === "pending" ? "Unfulfilled" : status}
     </span>
   );
 }

@@ -33,10 +33,7 @@ export function formatInr(n: number) {
   return formatCurrencyAmount(n);
 }
 
-export function shortPoRef(id: string) {
-  const segment = id.split("-")[0]?.toUpperCase() ?? id.slice(0, 8);
-  return segment.slice(0, 4);
-}
+export { shortPoRef } from "@/lib/erp-document-ref";
 
 export function matchesPoViewFilter(
   po: { status: string | null },

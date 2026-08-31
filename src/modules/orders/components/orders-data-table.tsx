@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { currencyLabel } from "@/lib/format-currency";
+import { formatErpDocRef } from "@/lib/erp-document-ref";
 import {
   bulkUpdateOrderStatusAction,
 } from "@/modules/orders/actions/orders.actions";
@@ -51,6 +52,7 @@ import {
   formatInr,
   CustomerEditedPill,
   FulfillmentPill,
+  InventoryFulfillmentStatusPill,
   isCustomerEditedOrder,
   ORDERS_ACCENT,
   PaymentPill,
@@ -392,10 +394,12 @@ export function OrdersDataTable({
   orders,
   selectedIds,
   onSelectedIdsChange,
+  variant = "online",
 }: {
   orders: Order[];
   selectedIds: Set<string>;
   onSelectedIdsChange: (ids: Set<string>) => void;
+  variant?: "online" | "erp";
 }) {
   const pageIds = orders.map((o) => o.id);
   const allPageSelected =
@@ -443,9 +447,16 @@ export function OrdersDataTable({
               onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
             />
           </TableHead>
-          <TableHead>Order</TableHead>
+          <TableHead>{variant === "erp" ? "SO#" : "Order"}</TableHead>
+          {variant === "erp" ? (
+            <TableHead className="hidden lg:table-cell">Reference</TableHead>
+          ) : null}
           <TableHead>Customer</TableHead>
           <TableHead>Date</TableHead>
+          {variant === "erp" ? (
+            <TableHead className="hidden xl:table-cell">Shipment</TableHead>
+          ) : null}
+          <TableHead className="hidden md:table-cell">Store</TableHead>
           <TableHead>Payment</TableHead>
           <TableHead>Fulfillment</TableHead>
           <TableHead>Items</TableHead>
@@ -482,10 +493,24 @@ export function OrdersDataTable({
                   className={cn(
                     "font-mono text-[13px] font-medium leading-snug text-foreground hover:text-primary hover:underline",
                   )}
+                  title={
+                    variant === "erp" && order.sales_order_number
+                      ? order.sales_order_number
+                      : undefined
+                  }
                 >
-                  #{shortOrderRef(order.id)}
+                  {variant === "erp"
+                    ? formatErpDocRef("SO", order.id)
+                    : order.sales_order_number
+                      ? `SO-${order.sales_order_number}`
+                      : `#${shortOrderRef(order.id)}`}
                 </Link>
               </TableCell>
+              {variant === "erp" ? (
+                <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
+                  {order.reference_number ?? "—"}
+                </TableCell>
+              ) : null}
               <TableCell>
                 <CustomerPopover order={order} />
               </TableCell>
@@ -494,12 +519,25 @@ export function OrdersDataTable({
                   ? format(new Date(order.created_at), "MMM d, yyyy")
                   : "—"}
               </TableCell>
+              {variant === "erp" ? (
+                <TableCell className="hidden text-[13px] text-muted-foreground xl:table-cell">
+                  {order.shipment_date ?? "—"}
+                </TableCell>
+              ) : null}
+              <TableCell className="hidden max-w-[120px] truncate text-sm text-muted-foreground md:table-cell">
+                {order.store_name ?? "—"}
+              </TableCell>
               <TableCell>
                 <PaymentPill paymentStatus={order.payment_status} />
               </TableCell>
               <TableCell>
                 <div className="flex flex-wrap items-center gap-1">
                   <FulfillmentPill status={order.status} />
+                  {variant !== "erp" ? (
+                    <InventoryFulfillmentStatusPill
+                      status={order.fulfillment_status}
+                    />
+                  ) : null}
                   {isCustomerEditedOrder(order.customer_edited_at) ? (
                     <CustomerEditedPill />
                   ) : null}

@@ -19,6 +19,15 @@ export interface CustomerSummary {
   role: string | null;
   is_verified: boolean;
   created_at: string;
+  customer_number?: string | null;
+  company_name?: string | null;
+  contact_display_name?: string | null;
+  location?: string | null;
+  trn?: string | null;
+  po_box?: string | null;
+  customer_notes?: string | null;
+  opening_balance?: number | null;
+  opening_balance_date?: string | null;
 }
 
 export interface WalletTransaction {
@@ -64,7 +73,9 @@ export async function getCustomerDetails(
   // 1. Get user summary
   const { data: user, error: userErr } = await supabase
     .from("users")
-    .select("id, name, email, phone, role, is_verified, created_at")
+    .select(
+      "id, name, email, phone, role, is_verified, created_at, customer_number, company_name, contact_display_name, location, trn, po_box, customer_notes, opening_balance, opening_balance_date",
+    )
     .eq("id", userId)
     .single();
 
@@ -118,6 +129,31 @@ export async function getCustomerDetails(
   };
 }
 
+export async function searchCustomers(query: string, limit = 20): Promise<
+  Pick<AdminUser, "id" | "name" | "email" | "phone" | "customer_number">[]
+> {
+  await requireAdminOrManagerProfile();
+  const q = query.trim();
+  if (!q) return [];
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, name, email, phone, customer_number")
+    .is("role", null)
+    .or(
+      `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,customer_number.ilike.%${q}%`,
+    )
+    .order("name")
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Pick<
+    AdminUser,
+    "id" | "name" | "email" | "phone" | "customer_number"
+  >[];
+}
+
 export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & { stats: CustomerStats }> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -127,7 +163,9 @@ export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & 
   const [usersResult, countResult, retailCountResult, activeCountResult] = await Promise.all([
     supabase
       .from("users")
-      .select("id,name,email,phone,role,is_verified,created_at")
+      .select(
+        "id,name,email,phone,role,is_verified,created_at,customer_number,company_name,location,opening_balance",
+      )
       .is("role", null)
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1),
@@ -166,6 +204,20 @@ export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & 
       users.map((u) => u.id),
     );
 
+  const userIds = users.map((u) => u.id);
+
+  const [{ data: invoiceRows }, { data: creditLimitRows }] = await Promise.all([
+    supabase
+      .from("invoices")
+      .select("user_id, balance_due")
+      .in("user_id", userIds)
+      .neq("status", "cancelled"),
+    supabase
+      .from("customer_credit_limits")
+      .select("user_id, credit_limit")
+      .in("user_id", userIds),
+  ]);
+
   const orderCountMap = (orderRows ?? []).reduce<Record<string, number>>(
     (acc, o) => {
       if (o.user_id) acc[o.user_id] = (acc[o.user_id] ?? 0) + 1;
@@ -174,8 +226,31 @@ export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & 
     {},
   );
 
+  const receivablesMap = (invoiceRows ?? []).reduce<Record<string, number>>(
+    (acc, inv) => {
+      if (!inv.user_id) return acc;
+      acc[inv.user_id] = (acc[inv.user_id] ?? 0) + Number(inv.balance_due ?? 0);
+      return acc;
+    },
+    {},
+  );
+
+  const creditLimitMap = (creditLimitRows ?? []).reduce<Record<string, number>>(
+    (acc, row) => {
+      acc[row.user_id] = Number(row.credit_limit ?? 0);
+      return acc;
+    },
+    {},
+  );
+
   return {
-    data: users.map((u) => ({ ...u, order_count: orderCountMap[u.id] ?? 0 })),
+    data: users.map((u) => ({
+      ...u,
+      order_count: orderCountMap[u.id] ?? 0,
+      receivables:
+        Number(u.opening_balance ?? 0) + (receivablesMap[u.id] ?? 0),
+      credit_limit: creditLimitMap[u.id] ?? null,
+    })),
     total,
     stats,
   };

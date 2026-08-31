@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import type { Brand, Category, ProductImage, ProductVariant, ProductVideo, ProductWithCategory, VariantGroup } from "@/common/admin/types";
+import type { ItemUnit } from "@/common/erp/types";
 import { formatCategoryOptionLabel } from "@/modules/products/lib/categories.utils";
 import { formatActionError } from "@/modules/admin/lib/format-action-error";
 import { useAdminAction } from "@/modules/admin/hooks/use-admin-action";
@@ -47,7 +48,7 @@ import {
   isGroupDraftsValid,
   type GroupDraft,
 } from "@/modules/products/components/group-variants-step";
-import { adminGetNullable } from "@/modules/admin/lib/admin-api-client";
+import { adminGet, adminGetNullable } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { currencyLabel, formatInr } from "@/lib/format-currency";
 import { useCurrencySettings } from "@/modules/settings/providers/currency-settings-provider";
@@ -69,6 +70,14 @@ type ProductDraft = {
   description: string;
   categoryId: string | null;
   brandId: string | null;
+  itemType: "goods" | "service";
+  hsnSac: string;
+  barcode: string;
+  productCode: string;
+  unitId: string | null;
+  purchasePrice: number;
+  taxRatePercent: number;
+  markupPercent: number;
   defaultPrice: number;
   defaultMrp: number;
   imageUrls: string[];
@@ -124,6 +133,14 @@ function emptyProductDraft(product?: ProductWithCategory): ProductDraft {
     description: product?.description ?? "",
     categoryId: product?.category_id ?? null,
     brandId: product?.brand_id ?? null,
+    itemType: product?.item_type ?? "goods",
+    hsnSac: product?.hsn_sac ?? "",
+    barcode: "",
+    productCode: "",
+    unitId: null,
+    purchasePrice: 0,
+    taxRatePercent: 0,
+    markupPercent: 0,
     defaultPrice: 0,
     defaultMrp: 0,
     imageUrls: product?.image_url ? [product.image_url] : [],
@@ -138,6 +155,14 @@ function productDraftFromProduct(product: ProductWithCategory): ProductDraft {
     description: product.description ?? "",
     categoryId: product.category_id ?? null,
     brandId: product.brand_id ?? null,
+    itemType: product.item_type ?? "goods",
+    hsnSac: product.hsn_sac ?? "",
+    barcode: "",
+    productCode: "",
+    unitId: null,
+    purchasePrice: 0,
+    taxRatePercent: 0,
+    markupPercent: 0,
     defaultPrice: 0,
     defaultMrp: 0,
     imageUrls: product.image_url ? [product.image_url] : [],
@@ -178,12 +203,21 @@ function productDraftFromDetail(
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
   );
   const { price: defaultPrice, mrp: defaultMrp } = defaultPricingFromVariants(variants);
+  const primaryVariant = variants[0];
 
   return {
     name: product.name ?? "",
     description: product.description ?? "",
     categoryId: product.category_id ?? null,
     brandId: product.brand_id ?? null,
+    itemType: product.item_type ?? "goods",
+    hsnSac: product.hsn_sac ?? "",
+    barcode: primaryVariant?.barcode ?? "",
+    productCode: primaryVariant?.product_code ?? "",
+    unitId: primaryVariant?.unit_id ?? null,
+    purchasePrice: Number(primaryVariant?.purchase_price) || 0,
+    taxRatePercent: Number(primaryVariant?.tax_rate_percent) || 0,
+    markupPercent: Number(primaryVariant?.markup_percent) || 0,
     defaultPrice,
     defaultMrp,
     imageUrls:
@@ -377,6 +411,14 @@ function productDraftsEqual(a: ProductDraft, b: ProductDraft): boolean {
     a.description.trim() === b.description.trim() &&
     a.categoryId === b.categoryId &&
     a.brandId === b.brandId &&
+    a.itemType === b.itemType &&
+    a.hsnSac.trim() === b.hsnSac.trim() &&
+    a.barcode.trim() === b.barcode.trim() &&
+    a.productCode.trim() === b.productCode.trim() &&
+    a.unitId === b.unitId &&
+    roundMoney2(a.purchasePrice) === roundMoney2(b.purchasePrice) &&
+    roundMoney2(a.taxRatePercent) === roundMoney2(b.taxRatePercent) &&
+    roundMoney2(a.markupPercent) === roundMoney2(b.markupPercent) &&
     roundMoney2(a.defaultPrice) === roundMoney2(b.defaultPrice) &&
     roundMoney2(a.defaultMrp) === roundMoney2(b.defaultMrp) &&
     a.imagePreviewIndex === b.imagePreviewIndex &&
@@ -426,19 +468,21 @@ async function syncProductCatalogImage(
     categoryId: detail.product.category_id,
     brandId: detail.product.brand_id,
     imageUrl: catalogImageFromVariantRows(detail.variants ?? []),
+    itemType: detail.product.item_type ?? "goods",
+    hsnSac: detail.product.hsn_sac ?? null,
   });
   await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
 }
 
 const CREATE_STEPS: { id: StepId; label: string; icon: ComponentType<{ className?: string }> }[] = [
-  { id: "details", label: "Details", icon: Package },
-  { id: "variants", label: "Variants", icon: Layers },
+  { id: "details", label: "Item Details", icon: Package },
+  { id: "variants", label: "Inventory", icon: Layers },
   { id: "review", label: "Preview", icon: ClipboardCheck },
 ];
 
 const EDIT_STEPS: { id: StepId; label: string; icon: ComponentType<{ className?: string }> }[] = [
-  { id: "details", label: "Details", icon: Package },
-  { id: "variants", label: "Variants", icon: Layers },
+  { id: "details", label: "Item Details", icon: Package },
+  { id: "variants", label: "Inventory", icon: Layers },
 ];
 
 function StepProgress({
@@ -1511,10 +1555,22 @@ function SkuConfigurationStep({
   );
 }
 
+function variantErpFieldsFromDraft(draft: ProductDraft) {
+  return {
+    barcode: draft.barcode.trim() || null,
+    productCode: draft.productCode.trim() || null,
+    purchasePrice: draft.purchasePrice > 0 ? roundMoney2(draft.purchasePrice) : null,
+    taxRatePercent: draft.taxRatePercent > 0 ? roundMoney2(draft.taxRatePercent) : null,
+    unitId: draft.unitId,
+    markupPercent: draft.markupPercent > 0 ? roundMoney2(draft.markupPercent) : null,
+  };
+}
+
 function DetailsStepForm({
   draft,
   categories,
   brands,
+  itemUnits,
   onDraftChange,
   error,
   showMrp,
@@ -1523,6 +1579,7 @@ function DetailsStepForm({
   draft: ProductDraft;
   categories: Category[];
   brands: Brand[];
+  itemUnits: ItemUnit[];
   onDraftChange: (next: ProductDraft) => void;
   error: string | null;
   showMrp: boolean;
@@ -1530,17 +1587,22 @@ function DetailsStepForm({
 }) {
   return (
     <div className="flex min-h-0 flex-1 gap-4 px-6 py-4">
-      {/* Left — product details */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain pr-1">
         <div className="space-y-3">
-          <CompactField label="Product name">
-            <input
-              className={compactInputCls}
-              value={draft.name}
-              onChange={(e) => onDraftChange({ ...draft, name: e.target.value })}
-              placeholder="e.g. Wireless Mouse"
-              required
-            />
+          <CompactField label="Item type">
+            <div className="flex gap-4 pt-1">
+              {(["goods", "service"] as const).map((type) => (
+                <label key={type} className="flex items-center gap-2 text-[13px] text-slate-700">
+                  <input
+                    type="radio"
+                    name="item-type"
+                    checked={draft.itemType === type}
+                    onChange={() => onDraftChange({ ...draft, itemType: type })}
+                  />
+                  {type === "goods" ? "Goods" : "Service"}
+                </label>
+              ))}
+            </div>
           </CompactField>
 
           <div className="grid grid-cols-2 gap-2">
@@ -1552,7 +1614,7 @@ function DetailsStepForm({
                   onDraftChange({ ...draft, categoryId: e.target.value || null })
                 }
               >
-                <option value="">None</option>
+                <option value="">Select</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {formatCategoryOptionLabel(c, categories)}
@@ -1561,7 +1623,65 @@ function DetailsStepForm({
               </select>
             </CompactField>
 
-            <CompactField label="Brand">
+            <CompactField label="Unit">
+              <select
+                className={compactSelectCls}
+                value={draft.unitId ?? ""}
+                onChange={(e) =>
+                  onDraftChange({ ...draft, unitId: e.target.value || null })
+                }
+              >
+                <option value="">Type to search OR add new</option>
+                {itemUnits.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.name} ({unit.abbreviation})
+                  </option>
+                ))}
+              </select>
+            </CompactField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <CompactField label="Barcode">
+              <input
+                className={compactInputCls}
+                value={draft.barcode}
+                onChange={(e) => onDraftChange({ ...draft, barcode: e.target.value })}
+                placeholder="Barcode"
+              />
+            </CompactField>
+
+            <CompactField label="HSN/SAC">
+              <input
+                className={compactInputCls}
+                value={draft.hsnSac}
+                onChange={(e) => onDraftChange({ ...draft, hsnSac: e.target.value })}
+                placeholder="Enter HSN Code"
+              />
+            </CompactField>
+          </div>
+
+          <CompactField label="Name">
+            <input
+              className={compactInputCls}
+              value={draft.name}
+              onChange={(e) => onDraftChange({ ...draft, name: e.target.value })}
+              placeholder="Name"
+              required
+            />
+          </CompactField>
+
+          <div className="grid grid-cols-2 gap-2">
+            <CompactField label="Product code">
+              <input
+                className={compactInputCls}
+                value={draft.productCode}
+                onChange={(e) => onDraftChange({ ...draft, productCode: e.target.value })}
+                placeholder="Product Code"
+              />
+            </CompactField>
+
+            <CompactField label="Manufacturer / brand">
               <select
                 className={compactSelectCls}
                 value={draft.brandId ?? ""}
@@ -1569,7 +1689,7 @@ function DetailsStepForm({
                   onDraftChange({ ...draft, brandId: e.target.value || null })
                 }
               >
-                <option value="">None</option>
+                <option value="">Select</option>
                 {brands.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name ?? "Unnamed"}
@@ -1579,12 +1699,28 @@ function DetailsStepForm({
             </CompactField>
           </div>
 
-          <div className={showMrp ? "grid grid-cols-2 gap-2" : ""}>
-            <CompactField label={currencyLabel("Default price")}>
+          <div className={`grid gap-2 ${showMrp ? "grid-cols-3" : "grid-cols-2"}`}>
+            <CompactField label="Purchase price">
               <input
                 className={compactInputCls}
                 type="number"
-                step="0.01"
+                step="0.001"
+                min="0"
+                value={draft.purchasePrice || ""}
+                onChange={(e) =>
+                  onDraftChange({
+                    ...draft,
+                    purchasePrice: parseFloat(e.target.value) || 0,
+                  })
+                }
+                placeholder="0.000"
+              />
+            </CompactField>
+            <CompactField label={currencyLabel("Sales price")}>
+              <input
+                className={compactInputCls}
+                type="number"
+                step="0.001"
                 min="0.01"
                 value={draft.defaultPrice || ""}
                 onChange={(e) =>
@@ -1593,16 +1729,16 @@ function DetailsStepForm({
                     defaultPrice: parseFloat(e.target.value) || 0,
                   })
                 }
-                placeholder="Applied to all SKUs"
+                placeholder="0.000"
                 required
               />
             </CompactField>
             {showMrp ? (
-              <CompactField label={currencyLabel("Default MRP")}>
+              <CompactField label={currencyLabel("MRP")}>
                 <input
                   className={compactInputCls}
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   min="0"
                   value={draft.defaultMrp || ""}
                   onChange={(e) =>
@@ -1616,10 +1752,46 @@ function DetailsStepForm({
               </CompactField>
             ) : null}
           </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <CompactField label="Tax %">
+              <input
+                className={compactInputCls}
+                type="number"
+                step="0.01"
+                min="0"
+                value={draft.taxRatePercent || ""}
+                onChange={(e) =>
+                  onDraftChange({
+                    ...draft,
+                    taxRatePercent: parseFloat(e.target.value) || 0,
+                  })
+                }
+                placeholder="15"
+              />
+            </CompactField>
+            <CompactField label="Markup margin %">
+              <input
+                className={compactInputCls}
+                type="number"
+                step="0.01"
+                min="0"
+                value={draft.markupPercent || ""}
+                onChange={(e) =>
+                  onDraftChange({
+                    ...draft,
+                    markupPercent: parseFloat(e.target.value) || 0,
+                  })
+                }
+                placeholder="0"
+              />
+            </CompactField>
+          </div>
+
           <p className="text-[10px] text-slate-400">
             {isGroupedLayout
-              ? "Default price fills new models on the variants step."
-              : "Default price fills new SKUs. Add product photos/videos here; each variant can have its own images on the variants step."}
+              ? "Default pricing fills new models on the inventory step."
+              : "Sales price and ERP identifiers apply to the primary SKU. Add variant-specific stock on the inventory step."}
           </p>
 
           <CompactField label="Description">
@@ -1627,8 +1799,8 @@ function DetailsStepForm({
               className={compactTextareaCls}
               value={draft.description}
               onChange={(e) => onDraftChange({ ...draft, description: e.target.value })}
-              rows={5}
-              placeholder="Product description for catalog and search"
+              rows={4}
+              placeholder="Description"
             />
           </CompactField>
 
@@ -1640,14 +1812,11 @@ function DetailsStepForm({
         </div>
       </div>
 
-      {/* Right — shared photo gallery */}
       <div className="flex min-h-0 w-[min(440px,46%)] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="border-b border-slate-100 px-4 py-3">
-          <p className="text-xs font-bold text-slate-900">Photos & videos</p>
+          <p className="text-xs font-bold text-slate-900">Images</p>
           <p className="mt-0.5 text-[10px] text-slate-400">
-            {isGroupedLayout
-              ? "Shared for all models — preview photo is the app thumbnail."
-              : "Product gallery & videos. Variants can also have their own images."}
+            Product gallery and videos for catalog display.
           </p>
         </div>
         <div className="flex min-h-0 flex-1 flex-col p-4">
@@ -1722,6 +1891,14 @@ export function ProductManageModal({
     queryFn: () => adminGetNullable<ProductDetailPayload>(`products/${productId}`),
     enabled: !isCreate && Boolean(productId),
   });
+
+  const { data: itemUnitsData } = useQuery({
+    queryKey: adminQueryKeys.itemUnits(),
+    queryFn: () => adminGet<{ data: ItemUnit[] }>("item-units"),
+  });
+  const itemUnits = Array.isArray(itemUnitsData)
+    ? itemUnitsData
+    : (itemUnitsData?.data ?? []);
 
   const variants = data?.variants ?? [];
   const currentStep = steps[stepIndex]?.id ?? "details";
@@ -1871,7 +2048,18 @@ export function ProductManageModal({
             imageUrls: orderedProductImages,
             videoUrls: productDraft.videoUrls,
             imagePreviewIndex: productDraft.imagePreviewIndex,
+            itemType: productDraft.itemType,
+            hsnSac: productDraft.hsnSac.trim() || null,
           });
+          const primaryVariant = variants[0];
+          if (primaryVariant) {
+            await updateVariantAction(primaryVariant.id, productId!, {
+              name: primaryVariant.name ?? productDraft.name.trim(),
+              price: productDraft.defaultPrice > 0 ? productDraft.defaultPrice : Number(primaryVariant.price) || 0,
+              mrp: productDraft.defaultMrp > 0 ? productDraft.defaultMrp : Number(primaryVariant.mrp) || 0,
+              ...variantErpFieldsFromDraft(productDraft),
+            });
+          }
           await queryClient.invalidateQueries({
             queryKey: adminQueryKeys.productDetail(productId!),
           });
@@ -1963,6 +2151,7 @@ export function ProductManageModal({
           productDraft.imagePreviewIndex,
         );
         const catalogImage = catalogImageFromProductDraft(productDraft);
+        const erpFields = variantErpFieldsFromDraft(productDraft);
         const id = await createProductAction({
           name: productDraft.name.trim(),
           description: productDraft.description.trim(),
@@ -1972,6 +2161,8 @@ export function ProductManageModal({
           variantLayout: layoutGrouped ? "grouped" : "flat",
           imageUrls: orderedProductImages,
           videoUrls: productDraft.videoUrls,
+          itemType: productDraft.itemType,
+          hsnSac: productDraft.hsnSac.trim() || null,
         });
 
         if (layoutGrouped) {
@@ -1981,24 +2172,28 @@ export function ProductManageModal({
               name: g.name.trim(),
               sortOrder: gi,
             });
-            for (const row of g.rows) {
+            for (let ri = 0; ri < g.rows.length; ri++) {
+              const row = g.rows[ri];
               await createVariantAction(id, {
                 name: row.name.trim(),
                 price: roundMoney2(row.price),
                 mrp: roundMoney2(row.mrp),
                 stock: row.stock,
                 variantGroupId: groupId,
+                ...(gi === 0 && ri === 0 ? erpFields : {}),
               });
             }
           }
         } else {
-          for (const v of variantDrafts) {
+          for (let i = 0; i < variantDrafts.length; i++) {
+            const v = variantDrafts[i];
             await createVariantAction(id, {
               name: v.name.trim() || DEFAULT_SKU_NAME,
               price: roundMoney2(v.price),
               mrp: roundMoney2(v.mrp),
               stock: v.stock,
               imageUrls: orderedImages(v.imageUrls, v.previewIndex),
+              ...(i === 0 ? erpFields : {}),
             });
           }
         }
@@ -2020,11 +2215,11 @@ export function ProductManageModal({
 
   return (
     <Modal
-      title={isCreate ? "New product" : "Edit product"}
+      title={isCreate ? "Inventory Item" : "Inventory Item"}
       subtitle={
         isCreate
-          ? "Build your product in steps — everything saves on the final review."
-          : (product?.name ?? "Update details and variants")
+          ? "Item Details → Inventory → Preview"
+          : (product?.name ?? "Update item details and inventory")
       }
       onClose={onClose}
       size="landscape"
@@ -2062,6 +2257,7 @@ export function ProductManageModal({
                 draft={productDraft}
                 categories={categories}
                 brands={brands}
+                itemUnits={itemUnits}
                 onDraftChange={setProductDraft}
                 error={error}
                 showMrp={showMrp}

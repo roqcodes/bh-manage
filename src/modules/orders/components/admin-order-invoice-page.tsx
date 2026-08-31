@@ -12,6 +12,7 @@ import { OrderInvoiceDocument } from "@/modules/orders/components/order-invoice-
 import { buildOrderInvoiceFilename } from "@/modules/orders/lib/invoice-filename";
 import { adminGetNullable } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { downloadElementAsPdf } from "@/lib/html2pdf-download";
 
 type OrderDetailPayload = { order: OrderWithItems };
 
@@ -30,17 +31,7 @@ function AdminOrderInvoiceContent({ order }: { order: OrderWithItems }) {
 
     setDownloading(true);
     try {
-      const html2pdf = (await import("html2pdf.js")).default;
-      await html2pdf()
-        .set({
-          margin: 10,
-          filename: buildOrderInvoiceFilename(order),
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        })
-        .from(element)
-        .save();
+      await downloadElementAsPdf(element, buildOrderInvoiceFilename(order));
     } finally {
       setDownloading(false);
     }

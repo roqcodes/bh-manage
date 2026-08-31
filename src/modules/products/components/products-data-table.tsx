@@ -6,11 +6,12 @@ import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
+  Barcode,
   Copy,
-  Download,
   MoreHorizontal,
   Package,
   Pencil,
+  Tag,
   Trash2,
   X,
 } from "lucide-react";
@@ -34,8 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { currencyLabel } from "@/lib/format-currency";
+import { formatCurrencyAmount } from "@/lib/format-currency";
 import {
   bulkDeleteProductsAction,
   bulkSetProductsActiveAction,
@@ -43,12 +43,17 @@ import {
   toggleProductAction,
 } from "@/modules/products/actions/products.actions";
 import {
+  EnabledBadge,
   formatProductPrice,
   formatSkuLabel,
-  ProductStatusBadge,
   StockBadge,
 } from "@/modules/products/components/products-ui";
 import { useAdminAction } from "@/modules/admin/hooks/use-admin-action";
+
+function formatTaxPercent(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${value.toFixed(2)}%`;
+}
 
 function ProductThumbnail({ url }: { url: string | null }) {
   const [failed, setFailed] = useState(false);
@@ -57,7 +62,7 @@ function ProductThumbnail({ url }: { url: string | null }) {
   if (!trimmed || failed) {
     return (
       <span className="flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted/40">
-        <Package />
+        <Package className="size-4 text-muted-foreground" />
       </span>
     );
   }
@@ -76,22 +81,28 @@ function ProductThumbnail({ url }: { url: string | null }) {
 export function exportProductsCsv(products: ProductWithCategoryListItem[]) {
   const headers = [
     "Name",
-    "SKU",
-    "Status",
     "Stock",
+    "Barcode",
     "Category",
-    "Price (INR)",
-    "MRP (INR)",
+    "Tax%",
+    "Purchase Price",
+    "Sales Price",
+    "Store",
+    "Enabled",
+    "SKU",
   ];
 
   const rows = products.map((p) => [
     p.name ?? "",
-    formatSkuLabel(p),
-    p.is_active ? "Active" : "Draft",
     String(p.stock_total),
+    p.barcode ?? "",
     p.categories?.name ?? "Uncategorized",
+    p.tax_rate_percent != null ? String(p.tax_rate_percent) : "",
+    p.purchase_price != null ? String(p.purchase_price) : "",
     p.price_min != null ? String(p.price_min) : "",
-    p.mrp_min != null ? String(p.mrp_min) : "",
+    p.store_name ?? "",
+    p.is_active ? "Yes" : "No",
+    formatSkuLabel(p),
   ]);
 
   const csv = [headers, ...rows]
@@ -104,7 +115,7 @@ export function exportProductsCsv(products: ProductWithCategoryListItem[]) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `products-export-${format(new Date(), "yyyy-MM-dd")}.csv`;
+  link.download = `inventory-items-export-${format(new Date(), "yyyy-MM-dd")}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -126,7 +137,7 @@ export function ProductsBulkActionBar({
   return (
     <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-accent/50 px-3 py-2 backdrop-blur-sm">
       <p className="text-sm font-medium">
-        {selectedIds.size} product{selectedIds.size === 1 ? "" : "s"} selected
+        {selectedIds.size} item{selectedIds.size === 1 ? "" : "s"} selected
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -140,7 +151,7 @@ export function ProductsBulkActionBar({
             });
           }}
         >
-          Set as Active
+          Enable
         </Button>
         <Button
           size="sm"
@@ -154,7 +165,7 @@ export function ProductsBulkActionBar({
             });
           }}
         >
-          Set as Draft
+          Disable
         </Button>
         <Button
           size="sm"
@@ -165,7 +176,7 @@ export function ProductsBulkActionBar({
               await bulkDeleteProductsAction(ids);
               void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
               onClearSelection();
-            }, { errorTitle: "Couldn't delete products" });
+            }, { errorTitle: "Couldn't delete items" });
           }}
         >
           <Trash2 data-icon="inline-start" />
@@ -184,12 +195,16 @@ export function ProductsDataTable({
   products,
   selectedIds,
   onSelectedIdsChange,
+  storeName,
   onEdit,
+  onUpdateSalesPrice,
 }: {
   products: ProductWithCategoryListItem[];
   selectedIds: Set<string>;
   onSelectedIdsChange: (ids: Set<string>) => void;
+  storeName?: string | null;
   onEdit: (product: ProductWithCategoryListItem) => void;
+  onUpdateSalesPrice: (product: ProductWithCategoryListItem) => void;
 }) {
   const queryClient = useQueryClient();
   const { runAction, isPending } = useAdminAction();
@@ -231,7 +246,7 @@ export function ProductsDataTable({
     runAction(async () => {
       await deleteProductAction(productId);
       void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-    }, { errorTitle: "Couldn't delete product" });
+    }, { errorTitle: "Couldn't delete item" });
   }
 
   if (products.length === 0) {
@@ -249,23 +264,27 @@ export function ProductsDataTable({
         <TableRow className="border-b border-border/60 hover:bg-transparent">
           <TableHead className="w-10">
             <Checkbox
-              aria-label="Select all products on this page"
+              aria-label="Select all items on this page"
               checked={allPageSelected}
               onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
             />
           </TableHead>
-          <TableHead>Product</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Inventory</TableHead>
+          <TableHead className="min-w-[200px]">Name</TableHead>
+          <TableHead>Stock</TableHead>
+          <TableHead>Barcode</TableHead>
           <TableHead>Category</TableHead>
-          <TableHead className="text-right">{currencyLabel("Price")}</TableHead>
-          <TableHead className="text-right">{currencyLabel("MRP")}</TableHead>
+          <TableHead className="text-right">Tax</TableHead>
+          <TableHead className="text-right">Purchase</TableHead>
+          <TableHead className="text-right">Sales</TableHead>
+          <TableHead className="hidden xl:table-cell">Store</TableHead>
+          <TableHead>Enabled</TableHead>
           <TableHead className="w-24 text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {products.map((product) => {
           const isSelected = selectedIds.has(product.id);
+          const displayStore = product.store_name ?? storeName ?? "—";
 
           return (
             <TableRow
@@ -275,7 +294,7 @@ export function ProductsDataTable({
             >
               <TableCell>
                 <Checkbox
-                  aria-label={`Select ${product.name ?? "product"}`}
+                  aria-label={`Select ${product.name ?? "item"}`}
                   checked={isSelected}
                   onCheckedChange={(checked) =>
                     toggleRow(product.id, checked === true)
@@ -290,28 +309,41 @@ export function ProductsDataTable({
                       href={`/admin/products/${product.id}`}
                       className="text-[13px] font-medium leading-snug text-foreground hover:text-primary hover:underline"
                     >
-                      {product.name ?? "Untitled product"}
+                      {product.name ?? "Untitled item"}
                     </Link>
                     <p className="truncate text-[11px] text-muted-foreground">
-                      {formatSkuLabel(product)}
+                      {product.product_code
+                        ? `Code: ${product.product_code}`
+                        : formatSkuLabel(product)}
                     </p>
                   </div>
                 </div>
               </TableCell>
               <TableCell>
-                <ProductStatusBadge product={product} />
-              </TableCell>
-              <TableCell>
                 <StockBadge stock={product.stock_total} />
+              </TableCell>
+              <TableCell className="font-mono text-[12px] text-muted-foreground">
+                {product.barcode ?? "—"}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {product.categories?.name ?? "Uncategorized"}
               </TableCell>
+              <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                {formatTaxPercent(product.tax_rate_percent)}
+              </TableCell>
+              <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                {product.purchase_price != null
+                  ? formatCurrencyAmount(product.purchase_price)
+                  : "—"}
+              </TableCell>
               <TableCell className="text-right text-sm font-semibold tabular-nums">
                 {formatProductPrice(product.price_min)}
               </TableCell>
-              <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                {formatProductPrice(product.mrp_min)}
+              <TableCell className="hidden max-w-[120px] truncate text-sm text-muted-foreground xl:table-cell">
+                {displayStore}
+              </TableCell>
+              <TableCell>
+                <EnabledBadge enabled={product.is_active === true} />
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1">
@@ -330,7 +362,7 @@ export function ProductsDataTable({
                         <Button
                           size="icon-sm"
                           variant="ghost"
-                          aria-label="Product actions"
+                          aria-label="More actions"
                         />
                       }
                     >
@@ -338,16 +370,24 @@ export function ProductsDataTable({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuGroup>
-                        <DropdownMenuItem onClick={() => onEdit(product)}>
-                          <Pencil />
-                          Edit product
-                        </DropdownMenuItem>
                         <DropdownMenuItem
                           nativeButton={false}
                           render={<Link href={`/admin/products/${product.id}`} />}
                         >
                           <Copy />
-                          View / duplicate
+                          View detail
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onUpdateSalesPrice(product)}>
+                          <Tag />
+                          Update sales price
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onEdit(product)}>
+                          <Pencil />
+                          Edit item
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled title="Coming soon">
+                          <Barcode />
+                          Print barcode
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={isPending}
@@ -356,7 +396,7 @@ export function ProductsDataTable({
                           }
                         >
                           <Archive />
-                          {product.is_active ? "Archive" : "Set active"}
+                          {product.is_active ? "Disable" : "Enable"}
                         </DropdownMenuItem>
                       </DropdownMenuGroup>
                       <DropdownMenuSeparator />
