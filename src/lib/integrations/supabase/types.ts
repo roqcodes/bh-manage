@@ -206,6 +206,309 @@ export interface Database {
         };
         Relationships: [];
       };
+      account_types: {
+        Row: {
+          id: string;
+          account_category: string;
+          name: string;
+          description: string;
+          is_system: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          account_category: string;
+          name: string;
+          description?: string;
+          is_system?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          account_category?: string;
+          name?: string;
+          description?: string;
+          is_system?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      accounts: {
+        Row: {
+          id: string;
+          account_type_id: string;
+          store_id: string | null;
+          name: string;
+          description: string;
+          code: string;
+          is_system: boolean;
+          is_locked: boolean;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          account_type_id: string;
+          store_id?: string | null;
+          name: string;
+          description?: string;
+          code: string;
+          is_system?: boolean;
+          is_locked?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          account_type_id?: string;
+          store_id?: string | null;
+          name?: string;
+          description?: string;
+          code?: string;
+          is_system?: boolean;
+          is_locked?: boolean;
+          is_active?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "accounts_account_type_id_fkey";
+            columns: ["account_type_id"];
+            referencedRelation: "account_types";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "accounts_store_id_fkey";
+            columns: ["store_id"];
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      audit_logs: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          store_id: string | null;
+          action: string;
+          entity_type: string;
+          entity_id: string | null;
+          description: string | null;
+          metadata: Json;
+          old_data: Json | null;
+          new_data: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          store_id?: string | null;
+          action: string;
+          entity_type: string;
+          entity_id?: string | null;
+          description?: string | null;
+          metadata?: Json;
+          old_data?: Json | null;
+          new_data?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string | null;
+          store_id?: string | null;
+          action?: string;
+          entity_type?: string;
+          entity_id?: string | null;
+          description?: string | null;
+          metadata?: Json;
+          old_data?: Json | null;
+          new_data?: Json | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "audit_logs_store_id_fkey";
+            columns: ["store_id"];
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      companies: {
+        Row: {
+          id: string;
+          name: string;
+          legal_name: string | null;
+          tax_id: string | null;
+          is_active: boolean;
+          is_default: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          legal_name?: string | null;
+          tax_id?: string | null;
+          is_active?: boolean;
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          legal_name?: string | null;
+          tax_id?: string | null;
+          is_active?: boolean;
+          is_default?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      erp_document_sequences: {
+        Row: {
+          document_type: string;
+          prefix: string;
+          next_number: number;
+          padding: number;
+          updated_at: string;
+        };
+        Insert: {
+          document_type: string;
+          prefix?: string;
+          next_number?: number;
+          padding?: number;
+          updated_at?: string;
+        };
+        Update: {
+          prefix?: string;
+          next_number?: number;
+          padding?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      item_units: {
+        Row: {
+          id: string;
+          name: string;
+          abbreviation: string;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          abbreviation: string;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          abbreviation?: string;
+          is_active?: boolean;
+          sort_order?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      stores: {
+        Row: {
+          id: string;
+          company_id: string;
+          name: string;
+          code: string | null;
+          address_line1: string | null;
+          address_line2: string | null;
+          city: string | null;
+          state: string | null;
+          pincode: string | null;
+          phone: string | null;
+          is_active: boolean;
+          is_default: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          company_id: string;
+          name: string;
+          code?: string | null;
+          address_line1?: string | null;
+          address_line2?: string | null;
+          city?: string | null;
+          state?: string | null;
+          pincode?: string | null;
+          phone?: string | null;
+          is_active?: boolean;
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          company_id?: string;
+          name?: string;
+          code?: string | null;
+          address_line1?: string | null;
+          address_line2?: string | null;
+          city?: string | null;
+          state?: string | null;
+          pincode?: string | null;
+          phone?: string | null;
+          is_active?: boolean;
+          is_default?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stores_company_id_fkey";
+            columns: ["company_id"];
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      user_store_access: {
+        Row: {
+          user_id: string;
+          store_id: string;
+          is_default: boolean;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          store_id: string;
+          is_default?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          is_default?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_store_access_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "user_store_access_store_id_fkey";
+            columns: ["store_id"];
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       inventory: {
         Row: {
           variant_id: string;
@@ -260,6 +563,8 @@ export interface Database {
           locale: string;
           show_mrp: boolean;
           capture_payments: boolean;
+          default_company_id: string | null;
+          default_store_id: string | null;
           updated_at: string | null;
         };
         Insert: {
@@ -271,6 +576,8 @@ export interface Database {
           locale?: string;
           show_mrp?: boolean;
           capture_payments?: boolean;
+          default_company_id?: string | null;
+          default_store_id?: string | null;
           updated_at?: string | null;
         };
         Update: {
@@ -281,9 +588,24 @@ export interface Database {
           locale?: string;
           show_mrp?: boolean;
           capture_payments?: boolean;
+          default_company_id?: string | null;
+          default_store_id?: string | null;
           updated_at?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "app_settings_default_company_id_fkey";
+            columns: ["default_company_id"];
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "app_settings_default_store_id_fkey";
+            columns: ["default_store_id"];
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       order_items: {
         Row: {
@@ -1580,6 +1902,32 @@ export interface Database {
           p_type_filter?: string;
         };
         Returns: Json;
+      };
+      get_erp_context: {
+        Args: { p_user_id?: string };
+        Returns: Json;
+      };
+      log_audit_event: {
+        Args: {
+          p_action: string;
+          p_entity_type: string;
+          p_entity_id?: string;
+          p_description?: string;
+          p_metadata?: Json;
+          p_old_data?: Json;
+          p_new_data?: Json;
+          p_store_id?: string;
+          p_user_id?: string;
+        };
+        Returns: string;
+      };
+      next_erp_document_number: {
+        Args: { p_document_type: string };
+        Returns: string;
+      };
+      is_staff_user: {
+        Args: { p_user_id?: string };
+        Returns: boolean;
       };
     };
     Enums: Record<string, never>;
