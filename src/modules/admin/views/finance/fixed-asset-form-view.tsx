@@ -27,7 +27,10 @@ import {
   VendorSearchSelect,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -123,10 +126,10 @@ export function FixedAssetFormView({
 }: FixedAssetFormViewProps) {
   const router = useRouter();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeRequiredMessage } = useActiveStoreFormField({ mode });
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(() => emptyForm(activeStoreId));
+  const [form, setForm] = useState<FormState>(() => emptyForm());
   const isModal = variant === "modal";
 
   const { data: asset, isPending: loadingAsset } = useQuery({
@@ -150,10 +153,10 @@ export function FixedAssetFormView({
   const accounts = accountsData?.data ?? [];
 
   useEffect(() => {
-    if (activeStoreId && mode === "create" && !form.storeId) {
+    if (mode === "create" && activeStoreId) {
       setForm((f) => ({ ...f, storeId: activeStoreId }));
     }
-  }, [activeStoreId, mode, form.storeId]);
+  }, [activeStoreId, mode]);
 
   useEffect(() => {
     if (mode === "edit" && asset?.asset) {
@@ -185,8 +188,9 @@ export function FixedAssetFormView({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const purchaseAmount = parseFloat(form.purchaseAmount);
-    if (!form.storeId) {
-      setError("Store is required.");
+    const resolvedStoreId = form.storeId || activeStoreId;
+    if (!resolvedStoreId) {
+      setError(storeRequiredMessage ?? "Store is required.");
       return;
     }
     if (!form.name.trim()) {
@@ -208,7 +212,7 @@ export function FixedAssetFormView({
     const payload = {
       name: form.name.trim(),
       purchaseAmount,
-      storeId: form.storeId,
+      storeId: resolvedStoreId,
       purchaseDate: form.purchaseDate,
       paidThroughAccountId: form.paidThroughAccountId,
       serialNumber: form.serialNumber.trim() || null,
@@ -305,10 +309,12 @@ export function FixedAssetFormView({
         <AdminFormSection title="Store">
           <AdminFormGrid cols={3}>
             <AdminFormField label="Select store" required className="sm:col-span-2">
-              <StoreSelect
-                value={form.storeId}
-                onChange={(value) => update("storeId", value)}
+              <ActiveStoreFormField
+                mode={mode}
                 stores={stores}
+                activeStoreId={activeStoreId}
+                storeId={form.storeId}
+                onStoreIdChange={(value) => update("storeId", value)}
                 label=""
               />
             </AdminFormField>

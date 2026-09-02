@@ -5,6 +5,7 @@ import {
   deleteVatReturn,
   fileVatReturn,
   getVatReturnDetail,
+  refreshVatReturn,
 } from "@/modules/erp/services/erp-vat.service";
 
 export async function GET(
@@ -37,6 +38,10 @@ export async function PATCH(
     if (body.action === "file") {
       await fileVatReturn(id);
       return NextResponse.json({ ok: true });
+    }
+    if (body.action === "refresh") {
+      const data = await refreshVatReturn(id);
+      return NextResponse.json(data);
     }
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (error) {

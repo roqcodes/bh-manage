@@ -30,6 +30,20 @@ export async function cancelOrderAndRefund(orderId: string): Promise<void> {
     throw new Error("Order has already been refunded.");
   }
 
+  const { data: activeInvoice } = await supabase
+    .from("invoices")
+    .select("id, status")
+    .eq("order_id", orderId)
+    .neq("status", "cancelled")
+    .limit(1)
+    .maybeSingle();
+
+  if (activeInvoice) {
+    throw new Error(
+      "Cannot cancel an order with an active invoice. Cancel the invoice first.",
+    );
+  }
+
   const wasPaid = order.payment_status === "paid";
   const refundAmount = Number(order.total_amount ?? 0);
 

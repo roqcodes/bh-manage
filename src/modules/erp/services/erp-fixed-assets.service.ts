@@ -7,7 +7,7 @@ import {
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { FixedAssetDetail, FixedAssetListRow } from "@/common/erp/finance-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
+import { requireErpStoreId, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -221,9 +221,7 @@ async function postFixedAssetJournal(
 export async function createFixedAsset(input: FixedAssetInput): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store is required");
+  const storeId = await requireErpStoreId(input.storeId);
 
   const { data, error } = await supabase.rpc("create_erp_fixed_asset", {
     p_name: input.name,

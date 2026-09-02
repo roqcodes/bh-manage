@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 import type { ErpVariantSearchRow } from "@/common/erp/purchasing-types";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
@@ -13,6 +13,8 @@ import {
   AdminFormGrid,
   AdminFormSection,
   AdminFormShell,
+  ErpDocumentNumberField,
+  ProductLiveSearch,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
@@ -92,8 +94,6 @@ export function StoreTransferFormView({
   const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<TransferLine[]>([]);
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<ErpVariantSearchRow[]>([]);
   const [linkedRequestId, setLinkedRequestId] = useState<string | null>(null);
   const [loadingRequest, setLoadingRequest] = useState(Boolean(requestId));
 
@@ -175,15 +175,6 @@ export function StoreTransferFormView({
     router.push(`/admin/erp/store-transfers/${id}`);
   }
 
-  async function runSearch() {
-    const q = search.trim();
-    if (q.length < 2) return;
-    const res = await adminGet<{ data: ErpVariantSearchRow[] }>(
-      `erp/purchase-catalog?q=${encodeURIComponent(q)}`,
-    );
-    setResults(res.data);
-  }
-
   async function addLine(row: ErpVariantSearchRow) {
     let available = 0;
     if (fromStoreId) {
@@ -205,8 +196,6 @@ export function StoreTransferFormView({
         transferPrice: row.purchase_price ?? 0,
       },
     ]);
-    setResults([]);
-    setSearch("");
   }
 
   function handleSubmit() {
@@ -283,6 +272,7 @@ export function StoreTransferFormView({
     <AdminFormColumns cols={2}>
       <AdminFormSection title="Transfer details">
         <AdminFormGrid cols={2}>
+          <ErpDocumentNumberField kind="ST" />
           <AdminFormField label="From store" required>
             <StoreSelect value={fromStoreId} onChange={setFromStoreId} stores={stores} label="" />
           </AdminFormField>
@@ -303,31 +293,15 @@ export function StoreTransferFormView({
       </AdminFormSection>
 
       <AdminFormSection title="Items">
-        <div className="flex gap-2">
-          <Input
-            placeholder="Search product…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), runSearch())}
-            disabled={!fromStoreId}
-          />
-          <Button type="button" variant="outline" onClick={runSearch} disabled={!fromStoreId}>
-            <Search className="h-4 w-4" />
-          </Button>
-        </div>
+        <ProductLiveSearch
+          catalog="purchase"
+          placeholder="Search product…"
+          disabled={!fromStoreId}
+          onSelect={(row) => addLine(row as ErpVariantSearchRow)}
+        />
         {!fromStoreId ? (
           <p className="text-sm text-muted-foreground">Select a source store to search products.</p>
         ) : null}
-        {results.map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            className="block w-full rounded border p-2 text-left text-sm hover:bg-muted/50"
-            onClick={() => addLine(r)}
-          >
-            {r.product_name} {r.barcode ? `(${r.barcode})` : ""}
-          </button>
-        ))}
 
         {lines.length > 0 ? (
           <div className="overflow-x-auto rounded-lg border">

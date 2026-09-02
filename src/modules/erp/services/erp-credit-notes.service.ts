@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpCreditNoteListRow, ErpLineInput } from "@/common/erp/sales-types";
 import { roundMoney } from "@/common/erp/purchasing-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
+import { requireErpStoreId, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 function linesToJson(lines: ErpLineInput[]): Json {
@@ -85,9 +85,10 @@ export async function createCreditNote(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store context is required");
+  const storeId = await requireErpStoreId(input.storeId);
+
+  const finalize = input.finalize ?? true;
+  const restoreStock = input.restoreStock ?? false;
 
   const { data, error } = await supabase.rpc("create_erp_credit_note", {
     p_user_id: input.userId,
@@ -96,23 +97,29 @@ export async function createCreditNote(input: {
     p_lines: linesToJson(input.lines),
     p_reference: input.reference ?? undefined,
     p_notes: input.notes ?? undefined,
-    p_finalize: input.finalize ?? true,
-    p_restore_stock: input.restoreStock ?? false,
+    p_finalize: false,
+    p_restore_stock: false,
     p_source_invoice_id: input.sourceInvoiceId ?? undefined,
     p_attachment_url: input.attachmentUrl ?? undefined,
   });
 
   if (error) throw new Error(error.message);
 
+  const creditNoteId = data as string;
+
+  if (finalize) {
+    await finalizeCreditNote(creditNoteId, { restoreStock });
+  }
+
   await logAuditEvent({
-    action: "create",
+    action: finalize ? "finalize_credit_note" : "create",
     entityType: "credit_note",
-    entityId: data as string,
-    description: "Credit note created",
+    entityId: creditNoteId,
+    description: finalize ? "Credit note created and finalized" : "Credit note created",
     storeId,
   });
 
-  return data as string;
+  return creditNoteId;
 }
 
 export async function applyCreditNoteToInvoice(

@@ -4,7 +4,7 @@ import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.serv
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpEstimateListRow, ErpLineInput } from "@/common/erp/sales-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
+import { requireErpStoreId, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 function linesToJson(lines: ErpLineInput[]): Json {
@@ -82,9 +82,7 @@ export async function createEstimate(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store context is required");
+  const storeId = await requireErpStoreId(input.storeId);
 
   const { data, error } = await supabase.rpc("create_erp_estimate", {
     p_user_id: input.userId,

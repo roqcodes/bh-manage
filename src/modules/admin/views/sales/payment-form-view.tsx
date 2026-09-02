@@ -15,6 +15,7 @@ import {
   AdminFormSection,
   AdminFormShell,
   CustomerSearchSelect,
+  ErpDocumentNumberField,
   InvoiceSearchSelect,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
@@ -70,7 +71,6 @@ export function PaymentFormView({
 
   const [depositAccounts, setDepositAccounts] = useState<PaidThroughAccountOption[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<PaidThroughAccountOption[]>([]);
-  const [paymentNumberPreview, setPaymentNumberPreview] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceDetail | null>(null);
 
   const [customerId, setCustomerId] = useState("");
@@ -115,10 +115,6 @@ export function PaymentFormView({
 
   useEffect(() => {
     if (!storeId) return;
-    const q = new URLSearchParams({ view: "preview" });
-    adminGet<{ paymentNumber: string }>(`erp/payments?${q.toString()}`).then((res) =>
-      setPaymentNumberPreview(res.paymentNumber ?? ""),
-    );
     adminGet<{ data: PaidThroughAccountOption[] }>(
       `erp/payments?view=accounts&storeId=${encodeURIComponent(storeId)}`,
     ).then((res) => {
@@ -246,13 +242,9 @@ export function PaymentFormView({
 
   const formContent = (
     <AdminFormModalLayout sidebar={summarySidebar}>
-      <AdminFormSection
-        title="Payment details"
-        description={
-          paymentNumberPreview ? `Payment # ${paymentNumberPreview}` : undefined
-        }
-      >
+      <AdminFormSection title="Payment details">
         <AdminFormGrid cols={3}>
+          <ErpDocumentNumberField kind="PR" />
           <AdminFormField label="Invoice" required className="sm:col-span-2">
             <InvoiceSearchSelect
               value={invoiceId || null}

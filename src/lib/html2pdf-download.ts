@@ -163,7 +163,7 @@ export async function downloadElementAsPdf(
   const html2pdf = (await import("html2pdf.js")).default;
   await html2pdf()
     .set({
-      margin: options.margin ?? 10,
+      margin: options.margin ?? 12,
       filename,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: buildHtml2CanvasOptions(element),

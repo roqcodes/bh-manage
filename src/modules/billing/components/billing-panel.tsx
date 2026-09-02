@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Package, Plus, Search, Trash2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -28,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CustomerSearchSelect } from "@/modules/admin/ui";
 import { BillingMetricsBar } from "@/modules/billing/components/billing-metrics-bar";
 import {
   formatBillingInr,
@@ -45,12 +47,15 @@ interface CartItem extends BillingVariantSearchResult {
 }
 
 export function BillingPanel() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<BillingVariantSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   const [cart, setCart] = useState<CartItem[]>([]);
 
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerLabel, setCustomerLabel] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
@@ -73,7 +78,7 @@ export function BillingPanel() {
         .catch(() => {
           setIsSearching(false);
         });
-    }, 300);
+    }, 200);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
@@ -140,6 +145,8 @@ export function BillingPanel() {
 
   function clearBill() {
     setCart([]);
+    setCustomerId(null);
+    setCustomerLabel("");
     setCustomerName("");
     setPhone("");
     setCompany("");
@@ -158,7 +165,8 @@ export function BillingPanel() {
 
     try {
       const payload = {
-        customerName,
+        userId: customerId ?? undefined,
+        customerName: customerId ? undefined : customerName || undefined,
         phone,
         company,
         gstNumber,
@@ -181,13 +189,12 @@ export function BillingPanel() {
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to save invoice");
+        throw new Error(errorData.error || "Failed to save sale");
       }
 
-      setSubmitMessage({ type: "success", text: "Invoice saved successfully." });
-      setTimeout(() => {
-        clearBill();
-      }, 2000);
+      const data = (await res.json()) as { orderId: string };
+      setSubmitMessage({ type: "success", text: "Sale recorded in Online Sales." });
+      router.push(`/admin/orders/${data.orderId}`);
     } catch (err) {
       setSubmitMessage({
         type: "error",
@@ -222,7 +229,7 @@ export function BillingPanel() {
         <Card className="border border-border ring-0 lg:sticky lg:top-20">
           <CardHeader className="border-b border-border">
             <CardTitle>Products</CardTitle>
-            <CardDescription>Search catalog variants to add to the invoice.</CardDescription>
+            <CardDescription>Search catalog variants to add to the sale.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 pt-4">
             <InputGroup className="h-9">
@@ -299,16 +306,33 @@ export function BillingPanel() {
         <div className="flex flex-col gap-4">
           <Card className="border border-border ring-0">
             <CardHeader className="border-b border-border">
-              <CardTitle>Customer details</CardTitle>
-              <CardDescription>Optional billing contact for this invoice.</CardDescription>
+              <CardTitle>Customer</CardTitle>
+              <CardDescription>
+                Link a registered customer or enter walk-in details.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 pt-4 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Registered customer</Label>
+                <CustomerSearchSelect
+                  value={customerId}
+                  selectedLabel={customerLabel || undefined}
+                  onChange={(id, option) => {
+                    setCustomerId(id);
+                    setCustomerLabel(option?.label ?? "");
+                    if (id) {
+                      setCustomerName("");
+                    }
+                  }}
+                />
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="billing-customer-name">Customer name</Label>
+                <Label htmlFor="billing-customer-name">Walk-in name</Label>
                 <Input
                   id="billing-customer-name"
-                  placeholder="Enter customer name"
+                  placeholder="Guest name"
                   value={customerName}
+                  disabled={Boolean(customerId)}
                   onChange={(e) => setCustomerName(e.target.value)}
                 />
               </div>
@@ -344,9 +368,9 @@ export function BillingPanel() {
 
           <Card className="border border-border ring-0">
             <CardHeader className="border-b border-border">
-              <CardTitle>Invoice items</CardTitle>
+              <CardTitle>Sale items</CardTitle>
               <CardDescription>
-                Adjust quantity and per-unit discount before saving.
+                Adjust quantity and per-unit discount before completing the sale.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">

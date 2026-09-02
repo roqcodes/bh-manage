@@ -221,6 +221,7 @@ export function OrdersPanel({
               selectedIds={selectedIds}
               orders={filtered}
               onClearSelection={() => setSelectedIds(new Set())}
+              variant={channel}
             />
           </div>
 
@@ -255,6 +256,7 @@ export function OrdersPanel({
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
               variant={channel}
+              detailBasePath={basePath}
             />
           )}
 

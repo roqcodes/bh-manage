@@ -13,7 +13,23 @@ export async function getAdminErpContext(): Promise<ErpContext | null> {
 export async function resolveErpStoreId(explicit?: string | null): Promise<string | null> {
   if (explicit) return explicit;
   const ctx = await getAdminErpContext();
-  return ctx?.store_id ?? null;
+  if (ctx?.store_id) return ctx.store_id;
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("get_default_store_id");
+  if (error) {
+    console.error("get_default_store_id failed:", error);
+    return null;
+  }
+  return data ?? null;
+}
+
+export async function requireErpStoreId(explicit?: string | null): Promise<string> {
+  const storeId = await resolveErpStoreId(explicit);
+  if (!storeId) {
+    throw new Error("Store context is required. Select a store using the header switcher.");
+  }
+  return storeId;
 }
 
 /** Store-owned accounts plus company-wide (null store_id) accounts. */

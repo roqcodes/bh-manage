@@ -17,7 +17,7 @@ import { ERP_SUPPLIER_PAYMENT_MODES } from "@/common/erp/purchasing-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import { formatErpDocRef } from "@/lib/erp-document-ref";
 import {
-  getAdminErpContext,
+  requireErpStoreId,
   resolveErpStoreId,
   withAccountStoreScope,
 } from "@/modules/erp/services/store-context.service";
@@ -72,8 +72,7 @@ async function applyPaymentFilters(
   options: SupplierPaymentListOptions,
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
 ) {
-  const ctx = await getAdminErpContext();
-  const storeId = options.storeId ?? ctx?.store_id;
+  const storeId = await resolveErpStoreId(options.storeId);
 
   if (options.isBulk === true) {
     query = query.eq("is_bulk", true).like("reference", `${BULK_REF_PREFIX}%`);
@@ -300,8 +299,7 @@ export async function listPayableBillsForVendor(
 ): Promise<PayablePurchaseBillRow[]> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const activeStoreId = storeId ?? ctx?.store_id;
+  const activeStoreId = await resolveErpStoreId(storeId);
 
   let query = supabase
     .from("erp_purchase_bills")
@@ -363,9 +361,7 @@ export async function recordSupplierPayment(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store context is required");
+  const storeId = await requireErpStoreId(input.storeId);
 
   if (!ERP_SUPPLIER_PAYMENT_MODES.includes(input.paymentMode as never)) {
     throw new Error("Invalid payment mode");
@@ -437,9 +433,7 @@ export async function recordBulkSupplierPaymentBatch(input: {
   billLines: Array<{ purchaseBillId: string; amount: number }>;
 }): Promise<string> {
   await requireAdminOrManagerProfile();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store context is required");
+  const storeId = await requireErpStoreId(input.storeId);
   if (!input.accountId) throw new Error("Paid through account is required");
   if (input.billLines.length === 0) throw new Error("Add at least one bill payment");
 
@@ -518,8 +512,7 @@ export async function listBulkPaymentBatches(
 ): Promise<{ data: BulkSupplierPaymentBatchRow[]; total: number }> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = options.storeId ?? ctx?.store_id;
+  const storeId = await resolveErpStoreId(options.storeId);
 
   let query = supabase
     .from("erp_supplier_payments")

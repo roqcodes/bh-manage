@@ -8,7 +8,7 @@ import type {
 } from "@/common/erp/purchasing-types";
 import { roundMoney } from "@/common/erp/purchasing-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
+import { requireErpStoreId, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 export async function listVendorCredits(
@@ -72,9 +72,7 @@ export async function createVendorCredit(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store context is required");
+  const storeId = await requireErpStoreId(input.storeId);
 
   const linesJson: Json = input.lines.map((l) => ({
     variant_id: l.variantId ?? "",
@@ -84,6 +82,9 @@ export async function createVendorCredit(input: {
     tax_rate_percent: l.taxRatePercent,
   })) as Json;
 
+  const finalize = input.finalize ?? true;
+  const reduceStock = input.reduceStock ?? false;
+
   const { data, error } = await supabase.rpc("create_erp_vendor_credit", {
     p_vendor_id: input.vendorId,
     p_store_id: storeId,
@@ -91,22 +92,28 @@ export async function createVendorCredit(input: {
     p_lines: linesJson,
     p_reference: input.reference ?? undefined,
     p_notes: input.notes ?? undefined,
-    p_finalize: input.finalize ?? true,
-    p_reduce_stock: input.reduceStock ?? false,
+    p_finalize: false,
+    p_reduce_stock: false,
     p_source_bill_id: input.sourceBillId ?? undefined,
   } as never);
 
   if (error) throw new Error(error.message);
 
+  const creditId = data as string;
+
+  if (finalize) {
+    await finalizeVendorCredit(creditId, { reduceStock });
+  }
+
   await logAuditEvent({
-    action: "vendor_credit",
+    action: finalize ? "finalize_vendor_credit" : "vendor_credit",
     entityType: "vendor_credit",
-    entityId: data as string,
-    description: "Vendor credit created",
+    entityId: creditId,
+    description: finalize ? "Vendor credit created and finalized" : "Vendor credit created",
     storeId,
   });
 
-  return data as string;
+  return creditId;
 }
 
 export async function applyVendorCredit(input: {

@@ -25,7 +25,7 @@ export function isStaffRole(role: string | null | undefined): boolean {
 }
 
 export function isStoreCustomerRole(role: string | null | undefined): boolean {
-  return !role;
+  return !role || role === "customer";
 }
 
 export async function getCustomerStorefrontActivity(

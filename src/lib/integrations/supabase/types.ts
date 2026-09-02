@@ -2745,6 +2745,7 @@ export type Database = {
           gst_amount: number
           gst_number: string | null
           id: string
+          invoice_id: string | null
           inventory_committed: boolean
           invoice_number: string
           issued_at: string | null
@@ -2772,6 +2773,7 @@ export type Database = {
           gst_amount?: number
           gst_number?: string | null
           id?: string
+          invoice_id?: string | null
           inventory_committed?: boolean
           invoice_number: string
           issued_at?: string | null
@@ -2799,6 +2801,7 @@ export type Database = {
           gst_amount?: number
           gst_number?: string | null
           id?: string
+          invoice_id?: string | null
           inventory_committed?: boolean
           invoice_number?: string
           issued_at?: string | null
@@ -3255,6 +3258,7 @@ export type Database = {
           fulfillment_status: string
           gst_number: string | null
           id: string
+          invoice_id: string | null
           inventory_committed: boolean
           inventory_reserved: boolean
           merchant_note: string | null
@@ -3286,6 +3290,7 @@ export type Database = {
           fulfillment_status?: string
           gst_number?: string | null
           id?: string
+          invoice_id?: string | null
           inventory_committed?: boolean
           inventory_reserved?: boolean
           merchant_note?: string | null
@@ -3317,6 +3322,7 @@ export type Database = {
           fulfillment_status?: string
           gst_number?: string | null
           id?: string
+          invoice_id?: string | null
           inventory_committed?: boolean
           inventory_reserved?: boolean
           merchant_note?: string | null
@@ -3347,6 +3353,13 @@ export type Database = {
             columns: ["delivery_user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {
@@ -4859,6 +4872,22 @@ export type Database = {
             }
             Returns: string
           }
+      preview_erp_vat_return: {
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_requested_by?: string
+          p_store_id: string
+        }
+        Returns: Json
+      }
+      refresh_erp_vat_return: {
+        Args: {
+          p_refreshed_by?: string
+          p_return_id: string
+        }
+        Returns: undefined
+      }
       create_erp_vendor_credit: {
         Args: {
           p_created_by?: string

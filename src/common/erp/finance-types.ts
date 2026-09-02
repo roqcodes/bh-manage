@@ -149,6 +149,21 @@ export const BANKING_TRANSACTION_TYPES = {
   account_transfer: "Account transfer",
 } as const;
 
+export type VatReturnPreview = {
+  output_tax: number;
+  input_tax: number;
+  total_tax_payable: number;
+  recoverable_tax: number;
+};
+
+export type LastFiledVatReturnSummary = {
+  id: string;
+  return_number: string;
+  period_start: string;
+  period_end: string;
+  filed_date: string | null;
+} | null;
+
 export type VatReturnListRow = {
   id: string;
   return_number: string;
@@ -167,6 +182,37 @@ export type VatReturnListRow = {
 };
 
 export type VatReturnDetail = VatReturnListRow;
+
+export type VatReturnSourceLine = {
+  id: string;
+  document_number: string;
+  document_date: string;
+  party_name: string | null;
+  tax_amount: number;
+  total_amount: number;
+  href: string;
+};
+
+export type VatReturnPaymentLine = {
+  id: string;
+  payment_number: string;
+  payment_date: string;
+  amount: number;
+  payment_type: string;
+  reference: string | null;
+  href: string;
+};
+
+export type VatReturnDetailWithSources = VatReturnDetail & {
+  recoverable_tax: number;
+  sources: {
+    sales_invoices: VatReturnSourceLine[];
+    credit_notes: VatReturnSourceLine[];
+    purchase_bills: VatReturnSourceLine[];
+    vendor_credits: VatReturnSourceLine[];
+    payments: VatReturnPaymentLine[];
+  };
+};
 
 export const ERP_VAT_PAYMENT_TYPES = ["Cash", "Bank", "Cheque"] as const;
 

@@ -35,7 +35,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 
 type PendingLine = {
   purchaseBillId: string;
@@ -55,7 +58,8 @@ export function SupplierBulkPaymentFormView({
 }: SupplierBulkPaymentFormViewProps) {
   const router = useRouter();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode: "create" });
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isModal = variant === "modal";
@@ -73,25 +77,20 @@ export function SupplierBulkPaymentFormView({
   const [accountId, setAccountId] = useState("");
   const [bankCharges, setBankCharges] = useState("");
   const [bankChargesAccountId, setBankChargesAccountId] = useState("");
-  const [storeId, setStoreId] = useState(activeStoreId ?? "");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
-
-  useEffect(() => {
-    if (!storeId) return;
+    if (!effectiveStoreId) return;
     adminGet<{ data: PaidThroughAccountOption[] }>(
-      `erp/supplier-payments?view=accounts&storeId=${encodeURIComponent(storeId)}`,
+      `erp/supplier-payments?view=accounts&storeId=${encodeURIComponent(effectiveStoreId)}`,
     ).then((res) => setAccounts(res.data ?? []));
     adminGet<{ data: PaidThroughAccountOption[] }>(
-      `erp/supplier-payments?view=expense-accounts&storeId=${encodeURIComponent(storeId)}`,
+      `erp/supplier-payments?view=expense-accounts&storeId=${encodeURIComponent(effectiveStoreId)}`,
     ).then((res) => setExpenseAccounts(res.data ?? []));
-  }, [storeId]);
+  }, [effectiveStoreId]);
 
   useEffect(() => {
-    if (!storeId) {
+    if (!effectiveStoreId) {
       setOpenBills([]);
       return;
     }
@@ -99,13 +98,13 @@ export function SupplierBulkPaymentFormView({
       page: "0",
       limit: "100",
       openOnly: "1",
-      storeId,
+      storeId: effectiveStoreId,
     });
     if (billSearch.trim()) q.set("search", billSearch.trim());
     adminGet<{ data: ErpPurchaseBillListRow[] }>(`erp/purchase-bills?${q.toString()}`).then(
       (res) => setOpenBills((res.data ?? []).filter((row) => row.balance_due > 0)),
     );
-  }, [storeId, billSearch]);
+  }, [effectiveStoreId, billSearch]);
 
   const selectedBill = openBills.find((row) => row.id === selectedBillId) ?? null;
   const total = lines.reduce((s, l) => s + l.amount, 0);
@@ -162,7 +161,7 @@ export function SupplierBulkPaymentFormView({
   async function applyFifo() {
     setError(null);
     const amount = parseFloat(fifoAmount);
-    if (!storeId) return setError("Store is required.");
+    if (!effectiveStoreId) return setError(storeRequiredMessage ?? "Store is required.");
     if (!amount || amount <= 0) return setError("Enter a positive FIFO amount.");
 
     try {
@@ -170,7 +169,7 @@ export function SupplierBulkPaymentFormView({
       const res = await adminGet<{
         allocations: Array<{ purchaseBillId: string; amount: number }>;
       }>(
-        `erp/supplier-payments?view=fifo&storeId=${encodeURIComponent(storeId)}&amount=${amount}&exclude=${encodeURIComponent(exclude)}`,
+        `erp/supplier-payments?view=fifo&storeId=${encodeURIComponent(effectiveStoreId)}&amount=${amount}&exclude=${encodeURIComponent(exclude)}`,
       );
 
       const missingIds = res.allocations
@@ -179,7 +178,7 @@ export function SupplierBulkPaymentFormView({
 
       let mergedBills = openBills;
       if (missingIds.length > 0) {
-        const q = new URLSearchParams({ page: "0", limit: "100", openOnly: "1", storeId });
+        const q = new URLSearchParams({ page: "0", limit: "100", openOnly: "1", storeId: effectiveStoreId });
         const full = await adminGet<{ data: ErpPurchaseBillListRow[] }>(
           `erp/purchase-bills?${q.toString()}`,
         );
@@ -217,7 +216,7 @@ export function SupplierBulkPaymentFormView({
     e.preventDefault();
     if (lines.length === 0) return setError("Add at least one bill payment.");
     if (!accountId) return setError("Paid through account is required.");
-    if (!storeId) return setError("Store is required.");
+    if (!effectiveStoreId) return setError(storeRequiredMessage ?? "Store is required.");
     if (bankChargesAmount >= total) return setError("Bank charges must be less than total payment.");
     if (bankChargesAmount > 0 && !bankChargesAccountId) {
       return setError("Expense account is required for bank charges.");
@@ -227,7 +226,7 @@ export function SupplierBulkPaymentFormView({
       try {
         const res = await adminPost<{ batchId: string }>("erp/supplier-payments", {
           bulk: true,
-          storeId,
+          storeId: effectiveStoreId,
           paymentDate,
           paymentMode,
           accountId,
@@ -279,7 +278,14 @@ export function SupplierBulkPaymentFormView({
           <AdminFormSection title="Payment details">
             <AdminFormGrid cols={3}>
               <AdminFormField label="Store" required>
-                <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+                <ActiveStoreFormField
+                  mode="create"
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
+                />
               </AdminFormField>
               <AdminFormField label="Payment date" required>
                 <Input

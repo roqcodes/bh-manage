@@ -10,6 +10,7 @@ import {
   type ErpInvoicePrintData,
 } from "@/modules/erp/components/erp-invoice-print-document";
 import { downloadElementAsPdf } from "@/lib/html2pdf-download";
+import { printDocumentElement } from "@/lib/print-document";
 
 export function ErpInvoicePrintPage() {
   const params = useParams();
@@ -68,9 +69,15 @@ export function ErpInvoicePrintPage() {
         title={`Tax invoice · ${invoice.invoice_number}`}
         onDownloadPdf={handleDownloadPdf}
         downloading={downloading}
+        onPrint={() => {
+          const element = document.querySelector("[data-invoice-document]");
+          if (element instanceof HTMLElement) printDocumentElement(element);
+        }}
       />
-      <div className="pb-10 pt-4 print:pb-0 print:pt-0">
-        <ErpInvoicePrintDocument invoice={invoice} />
+      <div className="flex justify-center overflow-x-auto bg-slate-100/90 pb-10 pt-4 print:bg-white print:pb-0 print:pt-0">
+        <div className="shrink-0">
+          <ErpInvoicePrintDocument invoice={invoice} />
+        </div>
       </div>
     </div>
   );

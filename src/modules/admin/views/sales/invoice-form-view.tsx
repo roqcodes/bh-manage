@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import type { SalesLineFormRow } from "@/common/erp/sales-types";
 import { calcSalesLine, roundSalesMoney } from "@/common/erp/sales-types";
+import { toDateInputValue } from "@/lib/format-date";
 import { adminGet, adminPatch, adminPost } from "@/modules/admin/lib/admin-api-client";
 import {
   AdminFormField,
@@ -14,6 +15,7 @@ import {
   AdminFormSection,
   AdminFormShell,
   CustomerSearchSelect,
+  ErpDocumentNumberField,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
@@ -22,7 +24,10 @@ import {
   emptySalesLine,
   salesLinesToApiInput,
 } from "@/modules/erp/components/sales-lines-editor";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,7 +49,8 @@ export function InvoiceFormView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(mode === "edit");
@@ -52,17 +58,12 @@ export function InvoiceFormView({
 
   const [customerId, setCustomerId] = useState("");
   const [customerLabel, setCustomerLabel] = useState("");
-  const [storeId, setStoreId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [discount, setDiscount] = useState(0);
   const [taxInclusive, setTaxInclusive] = useState(true);
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<SalesLineFormRow[]>([emptySalesLine()]);
-
-  useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
 
   useEffect(() => {
     const preselected = searchParams.get("customerId");
@@ -95,7 +96,7 @@ export function InvoiceFormView({
         setCustomerLabel(detail.users?.name ?? detail.users?.email ?? "");
         if (detail.store_id) setStoreId(detail.store_id);
         setInvoiceDate(detail.created_at?.slice(0, 10) ?? invoiceDate);
-        setDueDate(detail.due_date ?? "");
+        setDueDate(toDateInputValue(detail.due_date));
         setDiscount(Number(detail.discount ?? 0));
         setTaxInclusive(detail.tax_inclusive);
         setNotes(detail.notes ?? "");
@@ -158,9 +159,17 @@ export function InvoiceFormView({
       setError("Customer is required");
       return;
     }
+    if (!effectiveStoreId) {
+      setError(storeRequiredMessage ?? "Store is required");
+      return;
+    }
     const apiLines = salesLinesToApiInput(lines);
     if (apiLines.length === 0) {
       setError("Add at least one item");
+      return;
+    }
+    if (finalize && totals.total <= 0) {
+      setError("Enter line rates so the total is greater than zero before issuing.");
       return;
     }
 
@@ -181,7 +190,7 @@ export function InvoiceFormView({
 
         const res = await adminPost<{ id: string }>("erp/invoices", {
           userId: customerId,
-          storeId: storeId || undefined,
+          storeId: effectiveStoreId,
           invoiceDate,
           dueDate: dueDate || invoiceDate,
           lines: apiLines,
@@ -286,11 +295,16 @@ export function InvoiceFormView({
                   Add customer
                 </Link>
               </AdminFormField>
-              <AdminFormField label="Invoice #">
-                <Input readOnly value="Auto-generated" className="bg-muted/40 text-muted-foreground" />
-              </AdminFormField>
+              <ErpDocumentNumberField kind="INV" enabled={mode === "create"} />
               <AdminFormField label="Store">
-                <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+                <ActiveStoreFormField
+                  mode={mode}
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
+                />
               </AdminFormField>
               <AdminFormField label="Invoice date">
                 <Input
@@ -324,7 +338,7 @@ export function InvoiceFormView({
             <SalesLinesEditor
               lines={lines}
               onChange={setLines}
-              storeId={storeId}
+              storeId={effectiveStoreId}
               taxInclusive={taxInclusive}
               showSerial
             />

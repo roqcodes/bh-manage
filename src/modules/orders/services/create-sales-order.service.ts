@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { buildOrderItemSnapshot } from "@/modules/orders/services/order-item-pricing.service";
 import { commitOrderInventory } from "@/modules/orders/services/order-wallet-inventory.service";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { requireErpStoreId } from "@/modules/erp/services/store-context.service";
 
 export interface CreateSalesOrderInput {
   userId: string;
@@ -19,7 +19,13 @@ export interface CreateSalesOrderInput {
   tax: number;
   discount: number;
   totalAmount: number;
-  items: { variantId: string; quantity: number; unitPrice?: number }[];
+  taxInclusive?: boolean;
+  items: {
+    variantId: string;
+    quantity: number;
+    unitPrice?: number;
+    taxRatePercent?: number;
+  }[];
 }
 
 export async function createSalesOrder(input: CreateSalesOrderInput): Promise<{
@@ -30,11 +36,7 @@ export async function createSalesOrder(input: CreateSalesOrderInput): Promise<{
   if (!auth.ok) throw new Error("Unauthorized");
 
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) {
-    throw new Error("Store is required for sales orders");
-  }
+  const storeId = await requireErpStoreId(input.storeId);
 
   const { data: orderData, error: orderError } = await supabase
     .from("orders")
@@ -48,6 +50,7 @@ export async function createSalesOrder(input: CreateSalesOrderInput): Promise<{
       subtotal: input.subtotal,
       tax: input.tax,
       discount: input.discount,
+      tax_inclusive: input.taxInclusive ?? true,
       created_by_admin_id: auth.profile.id,
       reference_number: input.referenceNumber ?? null,
       shipment_date: input.shipmentDate ?? null,
@@ -55,7 +58,7 @@ export async function createSalesOrder(input: CreateSalesOrderInput): Promise<{
       sales_person_id: input.salesPersonId ?? null,
       store_id: storeId,
       estimate_id: input.estimateId ?? null,
-    })
+    } as never)
     .select("id, sales_order_number")
     .single();
 
@@ -79,6 +82,7 @@ export async function createSalesOrder(input: CreateSalesOrderInput): Promise<{
       finalPrice: snapshot.final_price,
       marginAmount: snapshot.margin_amount,
       productName: snapshot.product_name,
+      taxRatePercent: item.taxRatePercent ?? 0,
     });
   }
 
@@ -92,9 +96,12 @@ export async function createSalesOrder(input: CreateSalesOrderInput): Promise<{
     final_price: item.finalPrice,
     margin_amount: item.marginAmount,
     product_name: item.productName,
+    tax_rate_percent: item.taxRatePercent,
   }));
 
-  const { error: itemsError } = await supabase.from("order_items").insert(orderItemsInsert);
+  const { error: itemsError } = await supabase
+    .from("order_items")
+    .insert(orderItemsInsert as never);
   if (itemsError) throw new Error(itemsError.message);
 
   await commitOrderInventory(orderId);

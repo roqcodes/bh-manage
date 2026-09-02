@@ -11,7 +11,7 @@ import type { JournalEntryLineRow } from "@/common/erp/finance-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import { getJournalEntryDetail } from "@/modules/erp/services/erp-journal.service";
 import {
-  getAdminErpContext,
+  requireErpStoreId,
   resolveErpStoreId,
   withAccountStoreScope,
 } from "@/modules/erp/services/store-context.service";
@@ -254,9 +254,7 @@ export async function createExpense(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store context is required");
+  const storeId = await requireErpStoreId(input.storeId);
   if (!input.paidThroughAccountId) throw new Error("Paid through account is required");
 
   const { data, error } = await supabase.rpc("create_erp_expense", {

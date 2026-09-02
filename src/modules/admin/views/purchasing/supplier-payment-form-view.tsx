@@ -15,6 +15,7 @@ import {
   AdminFormGrid,
   AdminFormSection,
   AdminFormShell,
+  ErpDocumentNumberField,
   PurchaseBillSearchSelect,
   VendorSearchSelect,
   type ErpFormViewBaseProps,
@@ -193,6 +194,7 @@ export function SupplierPaymentFormView({
         <AdminFormColumns cols={2}>
           <AdminFormSection title="Payment details">
             <AdminFormGrid cols={3}>
+              <ErpDocumentNumberField kind="PM" />
               <AdminFormField label="Vendor" required className="sm:col-span-2">
                 <VendorSearchSelect
                   value={vendorId || null}

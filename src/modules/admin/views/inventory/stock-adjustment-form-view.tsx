@@ -1,23 +1,28 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 import type { ErpVariantSearchRow } from "@/common/erp/purchasing-types";
-import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
+import { adminPost } from "@/modules/admin/lib/admin-api-client";
 import {
   AdminFormColumns,
   AdminFormField,
   AdminFormGrid,
   AdminFormSection,
   AdminFormShell,
+  ErpDocumentNumberField,
+  ProductLiveSearch,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 
 type AdjLine = {
@@ -42,21 +47,15 @@ export function StockAdjustmentFormView({
   onSuccess,
 }: StockAdjustmentFormViewProps) {
   const router = useRouter();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode: "create" });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isModal = variant === "modal";
 
-  const [storeId, setStoreId] = useState("");
   const [adjustmentDate, setAdjustmentDate] = useState(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<AdjLine[]>([]);
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<ErpVariantSearchRow[]>([]);
-
-  useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
 
   function handleCancel() {
     if (isModal) {
@@ -75,15 +74,6 @@ export function StockAdjustmentFormView({
     router.push(`/admin/erp/stock-adjustments/${id}`);
   }
 
-  async function runSearch() {
-    const q = search.trim();
-    if (q.length < 2) return;
-    const res = await adminGet<{ data: ErpVariantSearchRow[] }>(
-      `erp/purchase-catalog?q=${encodeURIComponent(q)}`,
-    );
-    setResults(res.data);
-  }
-
   function addLine(row: ErpVariantSearchRow, direction: "add" | "remove") {
     setLines([
       ...lines,
@@ -96,14 +86,12 @@ export function StockAdjustmentFormView({
         purchaseCost: row.purchase_price ?? 0,
       },
     ]);
-    setResults([]);
-    setSearch("");
   }
 
   function handleSubmit(finalize: boolean) {
     setError(null);
-    if (!storeId) {
-      setError("Store is required");
+    if (!effectiveStoreId) {
+      setError(storeRequiredMessage ?? "Store is required");
       return;
     }
     if (lines.length === 0) {
@@ -120,7 +108,7 @@ export function StockAdjustmentFormView({
     startTransition(async () => {
       try {
         const res = await adminPost<{ id: string }>("erp/stock-adjustments", {
-          storeId,
+          storeId: effectiveStoreId,
           adjustmentDate,
           note: note || undefined,
           finalize,
@@ -159,8 +147,16 @@ export function StockAdjustmentFormView({
     <AdminFormColumns cols={2}>
       <AdminFormSection title="Adjustment details">
         <AdminFormGrid cols={2}>
+          <ErpDocumentNumberField kind="SA" />
           <AdminFormField label="Store" required>
-            <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+            <ActiveStoreFormField
+              mode="create"
+              stores={stores}
+              activeStoreId={activeStoreId}
+              storeId={storeId}
+              onStoreIdChange={setStoreId}
+              label=""
+            />
           </AdminFormField>
           <AdminFormField label="Date">
             <Input
@@ -176,40 +172,41 @@ export function StockAdjustmentFormView({
       </AdminFormSection>
 
       <AdminFormSection title="Items">
-        <div className="flex gap-2">
-          <Input
-            placeholder="Search product…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), runSearch())}
-          />
-          <Button type="button" variant="outline" onClick={runSearch}>
-            <Search className="h-4 w-4" />
-          </Button>
-        </div>
-        {results.map((r) => (
-          <div
-            key={r.id}
-            className="flex items-center justify-between rounded border p-2 text-sm"
-          >
-            <span>
-              {r.product_name} {r.barcode ? `(${r.barcode})` : ""}
-            </span>
-            <div className="flex gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={() => addLine(r, "add")}>
-                Stock add
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => addLine(r, "remove")}
-              >
-                Stock remove
-              </Button>
+        <ProductLiveSearch
+          catalog="purchase"
+          placeholder="Search product…"
+          renderResult={(r, dismiss) => (
+            <div className="flex items-center justify-between gap-2 rounded border border-border bg-background p-2 text-sm">
+              <span>
+                {r.product_name} {r.barcode ? `(${r.barcode})` : ""}
+              </span>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    addLine(r as ErpVariantSearchRow, "add");
+                    dismiss();
+                  }}
+                >
+                  Stock add
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    addLine(r as ErpVariantSearchRow, "remove");
+                    dismiss();
+                  }}
+                >
+                  Stock remove
+                </Button>
+              </div>
             </div>
-          </div>
-        ))}
+          )}
+        />
 
         {lines.length > 0 ? (
           <div className="overflow-x-auto rounded-lg border">

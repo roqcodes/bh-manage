@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
-import { Plus } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 
 import type { VatReturnListRow } from "@/common/erp/finance-types";
 import { adminDelete, adminGet, adminPatch } from "@/modules/admin/lib/admin-api-client";
@@ -26,7 +26,6 @@ import {
   AdminTableHeader,
   AdminTableLink,
   AdminTableRow,
-  ErpListRowActions,
   SortableTableHead,
   useDebouncedValue,
   useErpFormModal,
@@ -34,6 +33,7 @@ import {
 } from "@/modules/admin/ui";
 import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { VatReturnFormView } from "@/modules/admin/views/finance/vat-return-form-view";
+import { VatReturnTaxPopover } from "@/modules/admin/views/finance/vat-return-tax-popover";
 import { VatPaymentFormView } from "@/modules/admin/views/finance/vat-payment-form-view";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +109,20 @@ export function VatReturnsListView() {
   const filedCount = rows.filter((r) => r.status === "filed").length;
   const outstanding = rows.reduce((sum, r) => sum + r.balance_due, 0);
 
+  async function handleRefresh(id: string) {
+    setActingId(id);
+    try {
+      const updated = await adminPatch<VatReturnListRow>(`erp/vat-returns/${id}`, {
+        action: "refresh",
+      });
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...updated } : r)));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Couldn't recalculate VAT return");
+    } finally {
+      setActingId(null);
+    }
+  }
+
   async function handleFile(id: string) {
     if (!confirm("File this VAT return?")) return;
     setActingId(id);
@@ -129,7 +143,7 @@ export function VatReturnsListView() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this VAT return?")) return;
+    if (!confirm("Delete this unfiled VAT return? This cannot be undone.")) return;
     setActingId(id);
     try {
       await adminDelete(`erp/vat-returns/${id}`);
@@ -149,7 +163,7 @@ export function VatReturnsListView() {
       <AdminPageHeader
         title="VAT returns"
         breadcrumb={[{ label: "VAT returns", href: "/admin/erp/vat-returns" }]}
-        description="Prepare, file, and track VAT return periods by store."
+        description="Output tax (sales) minus input tax (purchases). Payable is zero when purchases exceed sales."
         actions={
           <Button size="sm" onClick={() => openNew()}>
             <Plus data-icon="inline-start" />
@@ -193,28 +207,7 @@ export function VatReturnsListView() {
               onSort={toggleSort}
             />
             <SortableTableHead
-              label="Period"
-              sortKey="period_start"
-              activeKey={sortKey}
-              direction={sortDirection}
-              onSort={toggleSort}
-            />
-            <SortableTableHead
-              label="Filed date"
-              sortKey="filed_date"
-              activeKey={sortKey}
-              direction={sortDirection}
-              onSort={toggleSort}
-            />
-            <SortableTableHead
-              label="Store"
-              sortKey="store_name"
-              activeKey={sortKey}
-              direction={sortDirection}
-              onSort={toggleSort}
-            />
-            <SortableTableHead
-              label="Total tax payable"
+              label="Tax payable"
               sortKey="total_tax_payable"
               activeKey={sortKey}
               direction={sortDirection}
@@ -236,7 +229,7 @@ export function VatReturnsListView() {
               direction={sortDirection}
               onSort={toggleSort}
             />
-            <TableHead className="w-28 text-right" />
+            <TableHead className="min-w-[168px] text-right">Actions</TableHead>
           </AdminTableHeader>
           <AdminTableBody>
             {sorted.map((row) => {
@@ -244,30 +237,24 @@ export function VatReturnsListView() {
               return (
                 <AdminTableRow key={row.id}>
                   <AdminTableCell className="font-medium">
-                    <span title={row.return_number}>{formatErpDocRef("VR", row.id)}</span>
-                  </AdminTableCell>
-                  <AdminTableCell>{row.period_label}</AdminTableCell>
-                  <AdminTableCell className="text-muted-foreground">
-                    {formatPeriod(row.period_start, row.period_end)}
-                  </AdminTableCell>
-                  <AdminTableCell>
-                    {row.filed_date ? (
-                      <Badge variant="outline">{formatDisplayDate(row.filed_date)}</Badge>
-                    ) : (
-                      "—"
-                    )}
+                    <AdminTableLink
+                      href={`/admin/erp/vat-returns/${row.id}`}
+                      title={row.return_number}
+                    >
+                      {formatErpDocRef("VR", row.id)}
+                    </AdminTableLink>
                   </AdminTableCell>
                   <AdminTableCell>
-                    {row.store_id && row.store_name ? (
-                      <AdminTableLink href={`/admin/erp/stores/${row.store_id}/edit`}>
-                        {row.store_name}
-                      </AdminTableLink>
-                    ) : (
-                      (row.store_name ?? "—")
-                    )}
+                    <AdminTableLink href={`/admin/erp/vat-returns/${row.id}`}>
+                      {row.period_label}
+                    </AdminTableLink>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {formatPeriod(row.period_start, row.period_end)}
+                      {row.store_name ? ` · ${row.store_name}` : ""}
+                    </p>
                   </AdminTableCell>
-                  <AdminTableCell align="right" className="tabular-nums">
-                    {formatCurrencyAmount(row.total_tax_payable)}
+                  <AdminTableCell align="right">
+                    <VatReturnTaxPopover row={row} />
                   </AdminTableCell>
                   <AdminTableCell
                     align="right"
@@ -277,34 +264,54 @@ export function VatReturnsListView() {
                   </AdminTableCell>
                   <AdminTableCell>{statusBadge(row.status)}</AdminTableCell>
                   <AdminTableCell align="right">
-                    <ErpListRowActions
-                      menuItems={[
-                        ...(row.status === "unfiled"
-                          ? [
-                              {
-                                label: "File VAT return",
-                                onClick: () => void handleFile(row.id),
-                                disabled: actingId === row.id,
-                              },
-                            ]
-                          : []),
-                        ...(canPay
-                          ? [
-                              {
-                                label: "Add payment",
-                                onClick: () => openNew({ vatReturnId: row.id }),
-                              },
-                            ]
-                          : []),
-                        {
-                          label: "Delete",
-                          destructive: true,
-                          separatorBefore: true,
-                          disabled: actingId === row.id,
-                          onClick: () => void handleDelete(row.id),
-                        },
-                      ]}
-                    />
+                    <div className="flex items-center justify-end gap-1">
+                      {row.status === "unfiled" ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={actingId === row.id}
+                            onClick={() => void handleFile(row.id)}
+                          >
+                            File tax
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="outline"
+                            disabled={actingId === row.id}
+                            onClick={() => void handleRefresh(row.id)}
+                            aria-label="Recalculate VAT return"
+                            title="Recalculate"
+                          >
+                            {actingId === row.id ? (
+                              <Loader2 className="animate-spin" />
+                            ) : (
+                              <RefreshCw />
+                            )}
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="outline"
+                            className="text-destructive hover:text-destructive"
+                            disabled={actingId === row.id}
+                            onClick={() => void handleDelete(row.id)}
+                            aria-label="Delete VAT return"
+                            title="Delete"
+                          >
+                            <Trash2 />
+                          </Button>
+                        </>
+                      ) : null}
+                      {canPay ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openNew({ vatReturnId: row.id })}
+                        >
+                          Add payment
+                        </Button>
+                      ) : null}
+                    </div>
                   </AdminTableCell>
                 </AdminTableRow>
               );

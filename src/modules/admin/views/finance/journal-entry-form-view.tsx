@@ -12,9 +12,13 @@ import {
   AdminFormGrid,
   AdminFormSection,
   AdminFormShell,
+  ErpDocumentNumberField,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -47,26 +51,22 @@ export function JournalEntryFormView({
 }: JournalEntryFormViewProps) {
   const router = useRouter();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode: "create" });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<{ id: string; code: string; name: string }[]>([]);
-  const [storeId, setStoreId] = useState("");
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState("");
   const [lines, setLines] = useState<LineRow[]>([emptyLine(), emptyLine()]);
   const isModal = variant === "modal";
 
   useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
-
-  useEffect(() => {
     const q = new URLSearchParams({ page: "0", limit: "500" });
-    if (storeId) q.set("storeId", storeId);
+    if (effectiveStoreId) q.set("storeId", effectiveStoreId);
     adminGet<{ data: { id: string; code: string; name: string }[] }>(`erp/accounts?${q.toString()}`)
       .then((res) => setAccounts(res.data ?? []));
-  }, [storeId]);
+  }, [effectiveStoreId]);
 
   const totals = useMemo(() => {
     let debit = 0;
@@ -98,6 +98,10 @@ export function JournalEntryFormView({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!effectiveStoreId) {
+      setError(storeRequiredMessage ?? "Store is required");
+      return;
+    }
     if (totals.debit !== totals.credit || totals.debit === 0) {
       setError("Journal must balance with non-zero totals");
       return;
@@ -120,7 +124,7 @@ export function JournalEntryFormView({
         const res = await adminPost<{ id: string }>("erp/journal-entries", {
           transactionDate,
           description,
-          storeId: storeId || undefined,
+          storeId: effectiveStoreId,
           lines: apiLines,
         });
         handleSuccessNavigate(res.id);
@@ -161,6 +165,7 @@ export function JournalEntryFormView({
       <form id={formId} onSubmit={handleSubmit} className="space-y-4">
         <AdminFormSection title="Journal header">
           <AdminFormGrid cols={3}>
+            <ErpDocumentNumberField kind="JE" />
             <AdminFormField label="Date">
               <Input
                 type="date"
@@ -169,7 +174,14 @@ export function JournalEntryFormView({
               />
             </AdminFormField>
             <AdminFormField label="Store">
-              <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+              <ActiveStoreFormField
+                mode="create"
+                stores={stores}
+                activeStoreId={activeStoreId}
+                storeId={storeId}
+                onStoreIdChange={setStoreId}
+                label=""
+              />
             </AdminFormField>
             <AdminFormField label="Description" className="sm:col-span-2 lg:col-span-1">
               <Input value={description} onChange={(e) => setDescription(e.target.value)} required />

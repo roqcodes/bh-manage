@@ -42,6 +42,7 @@ export interface ErpPurchaseBillListRow {
   status: string;
   total_amount: number;
   amount_paid: number;
+  credits_applied: number;
   balance_due: number;
   purchase_date: string;
   due_date: string | null;

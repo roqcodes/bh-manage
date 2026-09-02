@@ -9,7 +9,7 @@ import type {
 } from "@/common/erp/purchasing-types";
 import { roundMoney } from "@/common/erp/purchasing-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { requireErpStoreId, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 function calcPoTotals(lines: ErpPurchaseLineInput[], discount: number) {
@@ -106,13 +106,26 @@ export async function getErpPurchaseOrderDetail(poId: string): Promise<ErpPurcha
   if (error) throw new Error(error.message);
   if (!data) return null;
 
-  const { data: bill } = await supabase
+  const { data: activeBill } = await supabase
     .from("erp_purchase_bills")
     .select("id, purchase_bill_number, status")
     .eq("po_id", poId)
+    .neq("status", "cancelled")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  const { data: latestBill } = activeBill
+    ? { data: null }
+    : await supabase
+        .from("erp_purchase_bills")
+        .select("id, purchase_bill_number, status")
+        .eq("po_id", poId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+  const bill = activeBill ?? latestBill;
 
   return {
     ...data,
@@ -150,9 +163,7 @@ export async function createErpPurchaseOrder(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store context is required");
+  const storeId = await requireErpStoreId(input.storeId);
   if (!input.lines.length) throw new Error("At least one line item is required");
 
   const linesJson: Json = input.lines.map((l) => ({

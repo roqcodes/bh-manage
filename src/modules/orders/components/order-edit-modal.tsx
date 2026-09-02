@@ -125,7 +125,7 @@ export function OrderEditModal({
           setIsSearching(false);
         })
         .catch(() => setIsSearching(false));
-    }, 300);
+    }, 200);
     return () => clearTimeout(delay);
   }, [searchQuery]);
 

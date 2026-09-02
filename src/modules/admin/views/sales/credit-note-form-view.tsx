@@ -11,6 +11,7 @@ import {
   AdminFormModalLayout,
   AdminFormSection,
   AdminFormShell,
+  ErpDocumentNumberField,
   InvoiceSearchSelect,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
@@ -24,7 +25,10 @@ import type { SalesLineFormRow } from "@/common/erp/sales-types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import {
   CLOUDINARY_CONFIGURED,
@@ -93,13 +97,13 @@ export function CreditNoteFormView({
 }: CreditNoteFormViewProps) {
   const router = useRouter();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode });
   const [pending, startTransition] = useTransition();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isModal = variant === "modal";
 
-  const [storeId, setStoreId] = useState("");
   const [creditNoteDate, setCreditNoteDate] = useState(new Date().toISOString().slice(0, 10));
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
@@ -155,10 +159,6 @@ export function CreditNoteFormView({
         setSkipInvoicePrefill(false);
       });
   }, [creditNoteId, mode]);
-
-  useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
 
   useEffect(() => {
     if (!selectedInvoiceId || skipInvoicePrefill) {
@@ -234,15 +234,28 @@ export function CreditNoteFormView({
       setError("Source invoice is required");
       return;
     }
+    if (!effectiveStoreId) {
+      setError(storeRequiredMessage ?? "Store is required");
+      return;
+    }
     const apiLines = salesLinesToApiInput(lines);
     if (apiLines.length === 0) {
       setError("Add at least one refund line");
       return;
     }
+    const refundTotal = lines.reduce((sum, line) => {
+      const taxable = line.quantity * line.unitPrice;
+      const tax = taxable * (line.taxRatePercent / 100);
+      return sum + taxable + tax;
+    }, 0);
+    if (finalize && refundTotal <= 0) {
+      setError("Enter line rates so the refund total is greater than zero before issuing.");
+      return;
+    }
 
     const payload = {
       userId: customerId,
-      storeId: storeId || undefined,
+      storeId: effectiveStoreId,
       creditNoteDate,
       lines: apiLines,
       reference: reference || sourceInvoice?.invoice_number || undefined,
@@ -368,8 +381,20 @@ export function CreditNoteFormView({
         <AdminFormModalLayout sidebar={invoiceSidebar}>
           <AdminFormSection title="Credit note details">
             <AdminFormGrid cols={3}>
+              <ErpDocumentNumberField
+                kind="CN"
+                value={creditNoteNumber}
+                enabled={mode === "create"}
+              />
               <AdminFormField label="Store">
-                <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+                <ActiveStoreFormField
+                  mode={mode}
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
+                />
               </AdminFormField>
               <AdminFormField label="Credit note date">
                 <Input
@@ -385,7 +410,7 @@ export function CreditNoteFormView({
                 <InvoiceSearchSelect
                   value={selectedInvoiceId || null}
                   selectedLabel={invoiceLabel || undefined}
-                  storeId={storeId || undefined}
+                  storeId={effectiveStoreId || undefined}
                   onChange={(id, option) => {
                     setSelectedInvoiceId(id ?? "");
                     setInvoiceLabel(option?.label ?? "");
@@ -439,7 +464,7 @@ export function CreditNoteFormView({
           </AdminFormSection>
 
           <AdminFormSection title="Refund items">
-            <SalesLinesEditor lines={lines} onChange={setLines} storeId={storeId} showSerial />
+            <SalesLinesEditor lines={lines} onChange={setLines} storeId={effectiveStoreId} showSerial />
           </AdminFormSection>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

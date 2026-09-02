@@ -14,6 +14,7 @@ import {
   AdminFormModalLayout,
   AdminFormSection,
   AdminFormShell,
+  ErpDocumentNumberField,
   VendorSearchSelect,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
@@ -24,7 +25,10 @@ import {
   linesToApiInput,
   PurchaseLinesEditor,
 } from "@/modules/purchasing/components/purchase-lines-editor";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +50,8 @@ export function PurchaseOrderFormView({
 }: PurchaseOrderFormViewProps) {
   const router = useRouter();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(mode === "edit");
@@ -54,7 +59,6 @@ export function PurchaseOrderFormView({
   const isModal = variant === "modal";
 
   const [vendorId, setVendorId] = useState("");
-  const [storeId, setStoreId] = useState("");
   const [poDate, setPoDate] = useState(new Date().toISOString().slice(0, 10));
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState("");
   const [reference, setReference] = useState("");
@@ -62,10 +66,6 @@ export function PurchaseOrderFormView({
   const [discount, setDiscount] = useState(0);
   const [lines, setLines] = useState<PurchaseLineFormRow[]>([emptyPurchaseLine()]);
   const [poNumber, setPoNumber] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
 
   useEffect(() => {
     if (mode !== "edit" || !poId) return;
@@ -140,8 +140,8 @@ export function PurchaseOrderFormView({
       setError("Vendor is required");
       return;
     }
-    if (!storeId) {
-      setError("Store is required");
+    if (!effectiveStoreId) {
+      setError(storeRequiredMessage ?? "Store is required");
       return;
     }
     if (!apiLines.length) {
@@ -151,7 +151,7 @@ export function PurchaseOrderFormView({
 
     const payload = {
       vendorId,
-      storeId,
+      storeId: effectiveStoreId,
       poDate,
       expectedDeliveryDate: expectedDeliveryDate || null,
       reference: reference || null,
@@ -247,6 +247,7 @@ export function PurchaseOrderFormView({
         <AdminFormModalLayout sidebar={totalsSidebar}>
           <AdminFormSection title="Purchase order details">
             <AdminFormGrid cols={3}>
+              <ErpDocumentNumberField kind="PO" value={poNumber} enabled={mode === "create"} />
               <AdminFormField label="Vendor" required>
                 <VendorSearchSelect
                   value={vendorId || null}
@@ -258,7 +259,14 @@ export function PurchaseOrderFormView({
                 />
               </AdminFormField>
               <AdminFormField label="Destination store" required>
-                <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+                <ActiveStoreFormField
+                  mode={mode}
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
+                />
               </AdminFormField>
               <AdminFormField label="PO date">
                 <Input type="date" value={poDate} onChange={(e) => setPoDate(e.target.value)} />

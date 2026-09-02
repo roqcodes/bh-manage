@@ -61,6 +61,7 @@ type BillDetail = {
   landed_cost_total: number;
   total_amount: number;
   amount_paid: number;
+  credits_applied: number;
   balance_due: number;
   inventory_committed: boolean;
   vendors: { name: string | null; phone: string | null; address: string | null; trn: string | null } | null;
@@ -238,6 +239,7 @@ export function PurchaseBillDetailView({ billId }: { billId: string }) {
   const canCancel =
     bill.status !== "cancelled" &&
     bill.amount_paid === 0 &&
+    bill.credits_applied === 0 &&
     bill.erp_supplier_payment_allocations.length === 0;
 
   const balanceHighlight =

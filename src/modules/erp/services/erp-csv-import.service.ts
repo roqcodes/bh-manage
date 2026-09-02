@@ -4,7 +4,7 @@ import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.serv
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { csvRowsToObjects, parseCsvText } from "@/lib/csv/csv-utils";
 import type { CsvImportEntity } from "@/modules/erp/lib/csv-import-configs";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import { createExpense } from "@/modules/erp/services/erp-expenses.service";
 import { createPurchaseBill } from "@/modules/erp/services/erp-purchase-bills.service";
 import { createAccountTransaction } from "@/modules/erp/services/erp-banking.service";
@@ -229,8 +229,7 @@ async function importVendors(rows: Record<string, string>[]): Promise<ImportResu
 }
 
 async function importExpenses(rows: Record<string, string>[], storeId?: string): Promise<ImportResult> {
-  const ctx = await getAdminErpContext();
-  const resolvedStoreId = storeId ?? ctx?.store_id;
+  const resolvedStoreId = await resolveErpStoreId(storeId);
   if (!resolvedStoreId) return { imported: 0, errors: ["Store is required for expense import."] };
 
   const supabase = await createSupabaseServerClient();
@@ -289,8 +288,7 @@ async function importExpenses(rows: Record<string, string>[], storeId?: string):
 }
 
 async function importPurchaseBills(rows: Record<string, string>[], storeId?: string): Promise<ImportResult> {
-  const ctx = await getAdminErpContext();
-  const resolvedStoreId = storeId ?? ctx?.store_id;
+  const resolvedStoreId = await resolveErpStoreId(storeId);
   if (!resolvedStoreId) return { imported: 0, errors: ["Store is required."] };
 
   const supabase = await createSupabaseServerClient();
@@ -344,8 +342,7 @@ async function importBankingTransactions(
   rows: Record<string, string>[],
   storeId?: string,
 ): Promise<ImportResult> {
-  const ctx = await getAdminErpContext();
-  const resolvedStoreId = storeId ?? ctx?.store_id;
+  const resolvedStoreId = await resolveErpStoreId(storeId);
   if (!resolvedStoreId) return { imported: 0, errors: ["Store is required."] };
 
   const supabase = await createSupabaseServerClient();

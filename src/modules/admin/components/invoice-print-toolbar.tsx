@@ -7,11 +7,13 @@ export function InvoicePrintToolbar({
   backHref,
   title,
   onDownloadPdf,
+  onPrint,
   downloading = false,
 }: {
   backHref: string;
   title: string;
   onDownloadPdf?: () => void;
+  onPrint?: () => void;
   downloading?: boolean;
 }) {
   return (
@@ -41,7 +43,7 @@ export function InvoicePrintToolbar({
         ) : null}
         <button
           type="button"
-          onClick={() => window.print()}
+          onClick={onPrint ?? (() => window.print())}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-900/10 bg-slate-900 px-3 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-slate-800"
         >
           <Printer className="size-4 shrink-0" aria-hidden />

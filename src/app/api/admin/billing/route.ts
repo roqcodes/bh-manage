@@ -4,6 +4,7 @@ import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 import { createManualOrder } from "@/modules/orders/services/create-manual-order.service";
 
 const createManualOrderSchema = z.object({
+  userId: z.string().uuid().optional(),
   customerName: z.string().optional(),
   phone: z.string().optional(),
   company: z.string().optional(),

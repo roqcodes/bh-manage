@@ -4,7 +4,7 @@ import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.serv
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpLineInput, ErpInvoiceListRow } from "@/common/erp/sales-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
-import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
+import { requireErpStoreId, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
 function linesToJson(lines: ErpLineInput[]): Json {
@@ -126,9 +126,7 @@ export async function createErpInvoice(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store context is required");
+  const storeId = await requireErpStoreId(input.storeId);
 
   const { data, error } = await supabase.rpc("create_erp_invoice", {
     p_user_id: input.userId,
@@ -244,8 +242,9 @@ export async function getErpInvoiceEditable(invoiceId: string): Promise<boolean>
     .from("invoices")
     .select("status, amount_paid, credits_applied")
     .eq("id", invoiceId)
-    .single();
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Invoice not found");
   if (data.status === "cancelled") return false;
   return Number(data.amount_paid ?? 0) === 0 && Number(data.credits_applied ?? 0) === 0;
 }
@@ -255,10 +254,21 @@ export async function getErpInvoiceDetail(invoiceId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("invoices")
-    .select("*, stores(name, logo_url, address_line1, city, country, phone, trn), invoice_items(*)")
+    .select(
+      `*, stores(name, logo_url, address_line1, city, country, phone, trn), invoice_items(*),
+      erp_payment_allocations(
+        amount,
+        erp_customer_payments(id, payment_number, payment_date, payment_mode, total_amount)
+      ),
+      erp_credit_note_applications(
+        amount,
+        erp_credit_notes(id, credit_note_number, credit_note_date)
+      )`,
+    )
     .eq("id", invoiceId)
-    .single();
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Invoice not found");
 
   const { data: user, error: userError } = await supabase
     .from("users")

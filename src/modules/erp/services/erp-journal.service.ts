@@ -7,7 +7,7 @@ import type {
   JournalEntryListRow,
   SourceJournalGroup,
 } from "@/common/erp/finance-types";
-import { getAdminErpContext, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
+import { requireErpStoreId, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 
 export async function listJournalEntries(
   page = 0,
@@ -186,9 +186,7 @@ export async function createManualJournalEntry(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store is required");
+  const storeId = await requireErpStoreId(input.storeId);
 
   const linesJson = input.lines.map((line) => ({
     account_id: line.accountId,

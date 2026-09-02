@@ -46,11 +46,13 @@ export function EntitySearchSelect({
   loadOnFocus = true,
 }: EntitySearchSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const fetchOptionsRef = useRef(fetchOptions);
+  fetchOptionsRef.current = fetchOptions;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<EntitySearchOption[]>([]);
-  const debouncedQuery = useDebouncedValue(query, 250);
+  const debouncedQuery = useDebouncedValue(query, 200);
 
   const displayValue = useMemo(() => {
     if (open) return query;
@@ -68,7 +70,7 @@ export function EntitySearchSelect({
     }
     let cancelled = false;
     setLoading(true);
-    fetchOptions(q)
+    fetchOptionsRef.current(q)
       .then((rows) => {
         if (!cancelled) setOptions(rows);
       })
@@ -78,7 +80,7 @@ export function EntitySearchSelect({
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, open, fetchOptions, minChars, loadOnFocus]);
+  }, [debouncedQuery, open, minChars, loadOnFocus]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {

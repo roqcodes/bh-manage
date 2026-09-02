@@ -629,8 +629,8 @@ BEGIN
         ROUND(COALESCE(si.stock, 0), 2) AS stock,
         ROUND(COALESCE(si.reserved_stock, 0), 2) AS reserved_stock,
         ROUND(COALESCE(si.stock, 0) - COALESCE(si.reserved_stock, 0), 2) AS available_stock,
-        ROUND(COALESCE(pv.purchase_price, 0), 2) AS purchase_price,
-        ROUND(COALESCE(pv.sales_price, 0), 2) AS sales_price
+        ROUND(COALESCE(si.purchase_price, pv.purchase_price, 0), 2) AS purchase_price,
+        ROUND(COALESCE(si.sales_price, pv.price, 0), 2) AS sales_price
       FROM public.store_inventory si
       JOIN public.product_variants pv ON pv.id = si.variant_id
       JOIN public.products p ON p.id = pv.product_id
@@ -663,7 +663,10 @@ BEGIN
         COUNT(DISTINCT si.variant_id) AS sku_count,
         ROUND(COALESCE(SUM(si.stock), 0), 2) AS total_stock,
         ROUND(COALESCE(SUM(si.reserved_stock), 0), 2) AS total_reserved,
-        ROUND(COALESCE(SUM(si.stock * COALESCE(pv.purchase_price, 0)), 0), 2) AS stock_value_at_cost
+        ROUND(
+          COALESCE(SUM(si.stock * COALESCE(si.purchase_price, pv.purchase_price, 0)), 0),
+          2
+        ) AS stock_value_at_cost
       FROM public.stores s
       LEFT JOIN public.store_inventory si ON si.store_id = s.id
       LEFT JOIN public.product_variants pv ON pv.id = si.variant_id

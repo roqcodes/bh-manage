@@ -30,7 +30,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 
 type PendingLine = {
   invoiceId: string;
@@ -51,7 +54,8 @@ export function CustomerBulkPaymentFormView({
 }: CustomerBulkPaymentFormViewProps) {
   const router = useRouter();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode: "create" });
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isModal = variant === "modal";
@@ -71,22 +75,17 @@ export function CustomerBulkPaymentFormView({
   const [accountId, setAccountId] = useState("");
   const [bankCharges, setBankCharges] = useState("");
   const [bankChargesAccountId, setBankChargesAccountId] = useState("");
-  const [storeId, setStoreId] = useState(activeStoreId ?? "");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
-
-  useEffect(() => {
-    if (!storeId) return;
+    if (!effectiveStoreId) return;
     adminGet<{ data: PaidThroughAccountOption[] }>(
-      `erp/customer-bulk-payments?view=accounts&storeId=${encodeURIComponent(storeId)}`,
+      `erp/customer-bulk-payments?view=accounts&storeId=${encodeURIComponent(effectiveStoreId)}`,
     ).then((res) => setAccounts(res.data ?? []));
     adminGet<{ data: PaidThroughAccountOption[] }>(
-      `erp/customer-bulk-payments?view=expense-accounts&storeId=${encodeURIComponent(storeId)}`,
+      `erp/customer-bulk-payments?view=expense-accounts&storeId=${encodeURIComponent(effectiveStoreId)}`,
     ).then((res) => setExpenseAccounts(res.data ?? []));
-  }, [storeId]);
+  }, [effectiveStoreId]);
 
   const total = lines.reduce((s, l) => s + l.amount, 0);
   const bankChargesAmount = parseFloat(bankCharges) || 0;
@@ -149,7 +148,7 @@ export function CustomerBulkPaymentFormView({
       page: "0",
       limit: "100",
       openOnly: "1",
-      storeId,
+      storeId: effectiveStoreId,
     });
     const full = await adminGet<{ data: ErpInvoiceListRow[] }>(`erp/invoices?${q.toString()}`);
     return (full.data ?? []).filter((row) => row.balance_due > 0);
@@ -158,7 +157,7 @@ export function CustomerBulkPaymentFormView({
   async function applyFifo() {
     setError(null);
     const amount = parseFloat(fifoAmount);
-    if (!storeId) return setError("Store is required.");
+    if (!effectiveStoreId) return setError(storeRequiredMessage ?? "Store is required.");
     if (!amount || amount <= 0) return setError("Enter a positive FIFO amount.");
 
     try {
@@ -166,7 +165,7 @@ export function CustomerBulkPaymentFormView({
       const res = await adminGet<{
         allocations: Array<{ invoiceId: string; amount: number }>;
       }>(
-        `erp/customer-bulk-payments?view=fifo&storeId=${encodeURIComponent(storeId)}&amount=${amount}&exclude=${encodeURIComponent(exclude)}`,
+        `erp/customer-bulk-payments?view=fifo&storeId=${encodeURIComponent(effectiveStoreId)}&amount=${amount}&exclude=${encodeURIComponent(exclude)}`,
       );
 
       const openInvoices = await fetchOpenInvoices();
@@ -202,7 +201,7 @@ export function CustomerBulkPaymentFormView({
     e.preventDefault();
     if (lines.length === 0) return setError("Add at least one invoice payment.");
     if (!accountId) return setError("Deposit account is required.");
-    if (!storeId) return setError("Store is required.");
+    if (!effectiveStoreId) return setError(storeRequiredMessage ?? "Store is required.");
     if (bankChargesAmount >= total) return setError("Bank charges must be less than total payment.");
     if (bankChargesAmount > 0 && !bankChargesAccountId) {
       return setError("Expense account is required for bank charges.");
@@ -211,7 +210,7 @@ export function CustomerBulkPaymentFormView({
     startTransition(async () => {
       try {
         const res = await adminPost<{ batchId: string }>("erp/customer-bulk-payments", {
-          storeId,
+          storeId: effectiveStoreId,
           paymentDate,
           paymentMode,
           accountId,
@@ -272,7 +271,14 @@ export function CustomerBulkPaymentFormView({
                 />
               </AdminFormField>
               <AdminFormField label="Store" required>
-                <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+                <ActiveStoreFormField
+                  mode="create"
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
+                />
               </AdminFormField>
               <AdminFormField label="Payment mode">
                 <select
@@ -339,9 +345,9 @@ export function CustomerBulkPaymentFormView({
                 <InvoiceSearchSelect
                   value={selectedInvoiceId || null}
                   selectedLabel={invoiceLabel || undefined}
-                  storeId={storeId || undefined}
+                  storeId={effectiveStoreId || undefined}
                   openOnly
-                  disabled={!storeId}
+                  disabled={!effectiveStoreId}
                   onChange={(id, option) => {
                     setSelectedInvoiceId(id ?? "");
                     setInvoiceLabel(option?.label ?? "");

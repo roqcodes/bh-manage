@@ -34,8 +34,12 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
 
   const canEdit = po.status === "pending";
   const canCancel = po.status === "pending";
+  const activeBill =
+    po.linked_bill && po.linked_bill.status !== "cancelled" ? po.linked_bill : null;
+  const cancelledBill =
+    po.linked_bill?.status === "cancelled" ? po.linked_bill : null;
   const canConvert =
-    !po.linked_bill &&
+    !activeBill &&
     po.status !== "cancelled" &&
     po.purchase_order_items.length > 0;
 
@@ -86,16 +90,25 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
               href={`/admin/erp/purchase-bills?form=new&poId=${poId}`}
               className={buttonVariants()}
             >
-              Convert to bill
+              {cancelledBill ? "Re-issue bill" : "Convert to bill"}
             </Link>
           ) : null}
-          {po.linked_bill ? (
+          {activeBill ? (
             <Link
-              href={`/admin/erp/purchase-bills/${po.linked_bill.id}`}
+              href={`/admin/erp/purchase-bills/${activeBill.id}`}
               className={buttonVariants({ variant: "outline" })}
-              title={po.linked_bill.purchase_bill_number}
+              title={activeBill.purchase_bill_number}
             >
-              Bill {formatErpDocRef("PB", po.linked_bill.id)}
+              Bill {formatErpDocRef("PB", activeBill.id)}
+            </Link>
+          ) : null}
+          {cancelledBill && !activeBill ? (
+            <Link
+              href={`/admin/erp/purchase-bills/${cancelledBill.id}`}
+              className={buttonVariants({ variant: "outline" })}
+              title={cancelledBill.purchase_bill_number}
+            >
+              View cancelled bill
             </Link>
           ) : null}
           {canCancel ? (

@@ -14,6 +14,7 @@ import {
   AdminFormSection,
   AdminFormShell,
   CustomerSearchSelect,
+  ErpDocumentNumberField,
   VendorSearchSelect,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
@@ -21,7 +22,10 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import { AttachmentField } from "@/modules/erp/components/attachment-field";
 
 type ExpenseAccount = { id: string; name: string; code: string };
@@ -41,14 +45,14 @@ export function ExpenseFormView({
 }: ExpenseFormViewProps) {
   const router = useRouter();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode });
   const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(mode === "edit");
   const [error, setError] = useState<string | null>(null);
   const isModal = variant === "modal";
 
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10));
-  const [storeId, setStoreId] = useState(activeStoreId ?? "");
   const [accountId, setAccountId] = useState("");
   const [amount, setAmount] = useState("");
   const [taxMode, setTaxMode] = useState<"exclusive" | "inclusive">("exclusive");
@@ -69,24 +73,22 @@ export function ExpenseFormView({
   const [attachmentUrl, setAttachmentUrl] = useState("");
 
   useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
-
-  useEffect(() => {
-    const q = storeId
-      ? `?view=accounts&storeId=${encodeURIComponent(storeId)}`
+    const q = effectiveStoreId
+      ? `?view=accounts&storeId=${encodeURIComponent(effectiveStoreId)}`
       : "?view=accounts";
     adminGet<{ data: ExpenseAccount[] }>(`erp/expenses${q}`).then((res) =>
       setExpenseAccounts(res.data),
     );
-  }, [storeId]);
+  }, [effectiveStoreId]);
 
   useEffect(() => {
-    const q = storeId ? `?view=paid-through&storeId=${encodeURIComponent(storeId)}` : "?view=paid-through";
+    const q = effectiveStoreId
+      ? `?view=paid-through&storeId=${encodeURIComponent(effectiveStoreId)}`
+      : "?view=paid-through";
     adminGet<{ data: PaidThroughAccountOption[] }>(`erp/expenses${q}`).then((res) =>
       setPaidAccounts(res.data),
     );
-  }, [storeId]);
+  }, [effectiveStoreId]);
 
   useEffect(() => {
     if (mode !== "edit" || !expenseId) return;
@@ -133,13 +135,13 @@ export function ExpenseFormView({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const amt = parseFloat(amount);
-    if (!storeId) return setError("Store is required.");
+    if (!effectiveStoreId) return setError(storeRequiredMessage ?? "Store is required.");
     if (!accountId) return setError("Expense account is required.");
     if (!amt || amt <= 0) return setError("Amount must be positive.");
     if (!paidThroughId) return setError("Paid through account is required.");
 
     const payload = {
-      storeId,
+      storeId: effectiveStoreId,
       expenseDate,
       accountId,
       amount: amt,
@@ -201,11 +203,19 @@ export function ExpenseFormView({
     <AdminFormColumns cols={2}>
       <AdminFormSection title="Expense details">
         <AdminFormGrid cols={3}>
+          <ErpDocumentNumberField kind="EXP" enabled={mode === "create"} />
           <AdminFormField label="Expense date" required>
             <Input type="date" value={expenseDate} onChange={(e) => setExpenseDate(e.target.value)} required />
           </AdminFormField>
           <AdminFormField label="Store" required>
-            <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+            <ActiveStoreFormField
+              mode={mode}
+              stores={stores}
+              activeStoreId={activeStoreId}
+              storeId={storeId}
+              onStoreIdChange={setStoreId}
+              label=""
+            />
           </AdminFormField>
           <AdminFormField label="Expense account" required>
             <select

@@ -47,6 +47,7 @@ export function ErpListRowActions({
   viewHref,
   editHref,
   printHref,
+  onPrintClick,
   editDisabled,
   menuItems = [],
   iconActions = [],
@@ -56,6 +57,7 @@ export function ErpListRowActions({
   viewHref?: string;
   editHref?: string;
   printHref?: string;
+  onPrintClick?: () => void;
   editDisabled?: boolean;
   menuItems?: ErpListMenuItem[];
   iconActions?: ErpListIconAction[];
@@ -97,6 +99,7 @@ export function ErpListRowActions({
     return (
       <Button
         key={action.label}
+        nativeButton
         size="icon-sm"
         variant="ghost"
         disabled={action.disabled}
@@ -124,19 +127,42 @@ export function ErpListRowActions({
         </Button>
       ) : null}
       {editHref ? (
+        editDisabled ? (
+          <Button
+            nativeButton
+            size="icon-sm"
+            variant="ghost"
+            disabled
+            aria-label="Edit"
+            className={responsiveIcons ? "hidden md:inline-flex" : undefined}
+          >
+            <Pencil />
+          </Button>
+        ) : (
+          <Button
+            nativeButton={false}
+            size="icon-sm"
+            variant="ghost"
+            render={<Link href={editHref} />}
+            aria-label="Edit"
+            className={responsiveIcons ? "hidden md:inline-flex" : undefined}
+          >
+            <Pencil />
+          </Button>
+        )
+      ) : null}
+      {onPrintClick ? (
         <Button
-          nativeButton={false}
+          nativeButton
           size="icon-sm"
           variant="ghost"
-          disabled={editDisabled}
-          render={editDisabled ? undefined : <Link href={editHref} />}
-          aria-label="Edit"
+          onClick={onPrintClick}
+          aria-label="Print"
           className={responsiveIcons ? "hidden md:inline-flex" : undefined}
         >
-          <Pencil />
+          <Printer />
         </Button>
-      ) : null}
-      {printHref ? (
+      ) : printHref ? (
         <Button
           nativeButton={false}
           size="icon-sm"
@@ -160,6 +186,7 @@ export function ErpListRowActions({
           <DropdownMenuTrigger
             render={
               <Button
+                nativeButton
                 size="icon-sm"
                 variant="ghost"
                 aria-label={menuLabel}

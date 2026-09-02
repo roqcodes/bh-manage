@@ -4,6 +4,7 @@ import { format } from "date-fns";
 
 import { BuyHubInvoiceLogo } from "@/modules/brand/components/buyhub-logo";
 import { formatCurrencyAmount } from "@/lib/format-currency";
+import { formatDateOnly } from "@/lib/format-date";
 
 export type ErpInvoicePrintData = {
   invoice_number: string;
@@ -51,11 +52,14 @@ export function ErpInvoicePrintDocument({ invoice }: { invoice: ErpInvoicePrintD
   const invoiceDate = invoice.created_at
     ? format(new Date(invoice.created_at), "MMMM d, yyyy")
     : "—";
+  const dueDate = invoice.due_date
+    ? format(new Date(formatDateOnly(invoice.due_date) + "T12:00:00"), "MMMM d, yyyy")
+    : "—";
 
   return (
     <article
       data-invoice-document
-      className="mx-auto max-w-3xl bg-white px-6 py-8 text-slate-900 print:max-w-none print:px-4 print:py-6 print:text-black"
+      className="bh-a4-page text-slate-900 print:text-black"
     >
       <header className="border-b border-slate-200 pb-6 print:border-slate-300 print:pb-4">
         {invoice.stores?.logo_url ? (
@@ -83,7 +87,7 @@ export function ErpInvoicePrintDocument({ invoice }: { invoice: ErpInvoicePrintD
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
               Due date
             </p>
-            <p className="mt-0.5 font-semibold">{invoice.due_date ?? "—"}</p>
+            <p className="mt-0.5 font-semibold">{dueDate}</p>
           </div>
         </div>
       </header>
@@ -134,16 +138,16 @@ export function ErpInvoicePrintDocument({ invoice }: { invoice: ErpInvoicePrintD
       </section>
 
       <section className="mt-6 overflow-x-auto print:mt-4">
-        <table className="w-full border-collapse text-sm print:text-xs">
+        <table className="w-full min-w-full table-fixed border-collapse text-sm print:text-xs">
           <thead>
             <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-wide text-slate-500">
-              <th className="py-2 pr-2">#</th>
+              <th className="w-8 py-2 pr-2">#</th>
               <th className="py-2 pr-2">Item</th>
-              <th className="py-2 pr-2 text-right">Rate</th>
-              <th className="py-2 pr-2 text-right">Qty</th>
-              <th className="py-2 pr-2 text-right">Tax %</th>
-              <th className="py-2 pr-2 text-right">Tax</th>
-              <th className="py-2 text-right">Total</th>
+              <th className="w-16 py-2 pr-2 text-right">Rate</th>
+              <th className="w-12 py-2 pr-2 text-right">Qty</th>
+              <th className="w-14 py-2 pr-2 text-right">Tax %</th>
+              <th className="w-16 py-2 pr-2 text-right">Tax</th>
+              <th className="w-20 py-2 text-right">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -151,7 +155,7 @@ export function ErpInvoicePrintDocument({ invoice }: { invoice: ErpInvoicePrintD
               <tr key={`${item.product_name}-${index}`} className="border-b border-slate-100">
                 <td className="py-2 pr-2 text-slate-500">{index + 1}</td>
                 <td className="py-2 pr-2">
-                  <p className="font-medium">{item.product_name}</p>
+                  <p className="font-medium break-words">{item.product_name}</p>
                   {item.description ? (
                     <p className="text-xs text-slate-500">{item.description}</p>
                   ) : null}

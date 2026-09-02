@@ -14,6 +14,7 @@ import {
   AdminFormModalLayout,
   AdminFormSection,
   AdminFormShell,
+  ErpDocumentNumberField,
   PurchaseBillSearchSelect,
   VendorSearchSelect,
   type ErpFormViewBaseProps,
@@ -22,7 +23,10 @@ import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleto
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import {
   emptyPurchaseLine,
   linesToApiInput,
@@ -112,7 +116,8 @@ export function VendorCreditFormView({
   const searchParams = useSearchParams();
   const formId = useId();
   const prefillBillId = searchParams.get("billId") ?? "";
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode });
   const isModal = variant === "modal";
 
   const [isPending, startTransition] = useTransition();
@@ -122,7 +127,6 @@ export function VendorCreditFormView({
 
   const [vendorId, setVendorId] = useState("");
   const [vendorLabel, setVendorLabel] = useState("");
-  const [storeId, setStoreId] = useState("");
   const [sourceBillId, setSourceBillId] = useState(prefillBillId);
   const [billLabel, setBillLabel] = useState("");
   const [creditDate, setCreditDate] = useState(new Date().toISOString().slice(0, 10));
@@ -133,10 +137,6 @@ export function VendorCreditFormView({
   const [creditNumber, setCreditNumber] = useState("");
   const [skipBillPrefill, setSkipBillPrefill] = useState(mode === "edit");
   const [lines, setLines] = useState<PurchaseLineFormRow[]>([emptyPurchaseLine()]);
-
-  useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
 
   useEffect(() => {
     if (!prefillBillId || mode !== "create") return;
@@ -251,14 +251,18 @@ export function VendorCreditFormView({
       setError("Supplier is required.");
       return;
     }
-    if (!storeId) {
-      setError("Store is required.");
+    if (!effectiveStoreId) {
+      setError(storeRequiredMessage ?? "Store is required.");
       return;
     }
 
     const apiLines = purchaseLinesToVendorCreditInput(lines);
     if (apiLines.length === 0) {
       setError("Add at least one item with quantity and rate.");
+      return;
+    }
+    if (finalize && totals.total <= 0) {
+      setError("Enter line rates so the credit total is greater than zero before issuing.");
       return;
     }
 
@@ -270,7 +274,7 @@ export function VendorCreditFormView({
       try {
         const payload = {
           vendorId,
-          storeId,
+          storeId: effectiveStoreId,
           creditDate,
           sourceBillId: sourceBillId || undefined,
           reference: reference || undefined,
@@ -412,9 +416,7 @@ export function VendorCreditFormView({
                   }}
                 />
               </AdminFormField>
-              <AdminFormField label="Credit note #">
-                <Input readOnly value="Auto-generated on save" className="bg-muted/40 text-muted-foreground" />
-              </AdminFormField>
+              <ErpDocumentNumberField kind="VC" value={creditNumber} enabled={mode === "create"} />
               <AdminFormField label="Vendor credit date">
                 <Input type="date" value={creditDate} onChange={(e) => setCreditDate(e.target.value)} />
               </AdminFormField>
@@ -426,14 +428,21 @@ export function VendorCreditFormView({
                 />
               </AdminFormField>
               <AdminFormField label="Store">
-                <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+                <ActiveStoreFormField
+                  mode={mode}
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
+                />
               </AdminFormField>
               <AdminFormField label="Source purchase bill" className="sm:col-span-2">
                 <PurchaseBillSearchSelect
                   value={sourceBillId || null}
                   selectedLabel={billLabel || undefined}
                   vendorId={vendorId || undefined}
-                  storeId={storeId || undefined}
+                  storeId={effectiveStoreId || undefined}
                   disabled={!vendorId}
                   onChange={(id, option) => {
                     setSourceBillId(id ?? "");

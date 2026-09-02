@@ -35,7 +35,7 @@ export function computeOrderPaymentSummary(order: OrderWithItems): OrderPaymentS
 
   const grandTotal = roundMoney(Number(order.total_amount ?? itemTotal));
 
-  if (storedSubtotal != null && storedDiscount > 0) {
+  if (storedSubtotal != null) {
     const lineDiscount = roundMoney(Math.max(0, storedSubtotal - itemTotal));
     const orderDiscount = roundMoney(Math.max(0, storedDiscount - lineDiscount));
 

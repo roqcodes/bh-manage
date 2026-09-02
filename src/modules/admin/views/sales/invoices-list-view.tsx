@@ -8,6 +8,7 @@ import { adminDelete, adminGet } from "@/modules/admin/lib/admin-api-client";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { Pagination } from "@/modules/admin/components/pagination";
 import { formatCurrencyAmount } from "@/lib/format-currency";
+import { formatDateOnly } from "@/lib/format-date";
 import { formatErpDocRef } from "@/lib/erp-document-ref";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +28,9 @@ import {
   useSortableData,
 } from "@/modules/admin/ui";
 import { InvoiceFormView } from "@/modules/admin/views/sales/invoice-form-view";
+import { ErpInvoicePrintModal } from "@/modules/erp/components/erp-invoice-print-modal";
+import { useErpInvoicePrintModal } from "@/modules/erp/components/use-erp-invoice-print-modal";
+import { InvoiceChannelBadge } from "@/modules/erp/components/invoice-channel-badge";
 import { TableHead } from "@/components/ui/table";
 import { useErpListState } from "@/modules/admin/ui/use-erp-list-state";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
@@ -44,6 +48,7 @@ const STATUS_OPTIONS = [
 
 export function InvoicesListView() {
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/invoices");
+  const { openInvoicePrint, invoicePrintModalProps } = useErpInvoicePrintModal();
   const [reloadToken, setReloadToken] = useState(0);
   const {
     search,
@@ -167,6 +172,14 @@ export function InvoicesListView() {
               className="hidden md:table-cell"
             />
             <SortableTableHead
+              label="Channel"
+              sortKey="source"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+              className="hidden sm:table-cell"
+            />
+            <SortableTableHead
               label="Customer"
               sortKey="customer_name"
               activeKey={sortKey}
@@ -229,6 +242,9 @@ export function InvoicesListView() {
                     (row.store_name ?? "—")
                   )}
                 </AdminTableCell>
+                <AdminTableCell className="hidden sm:table-cell">
+                  <InvoiceChannelBadge source={row.source} />
+                </AdminTableCell>
                 <AdminTableCell className="max-w-[160px] truncate">
                   {row.customer_name ?? "—"}
                 </AdminTableCell>
@@ -236,7 +252,7 @@ export function InvoicesListView() {
                   <StatusBadge status={row.status} />
                 </AdminTableCell>
                 <AdminTableCell className="hidden text-muted-foreground lg:table-cell">
-                  {row.due_date ?? "—"}
+                  {formatDateOnly(row.due_date)}
                 </AdminTableCell>
                 <AdminTableCell align="right" className="font-semibold tabular-nums">
                   {formatCurrencyAmount(row.total_amount)}
@@ -253,13 +269,16 @@ export function InvoicesListView() {
                       row.credits_applied > 0 ||
                       row.status === "cancelled"
                     }
-                    printHref={`/admin/erp/invoices/${row.id}/print`}
+                    onPrintClick={() => openInvoicePrint(row.id)}
                     menuItems={[
-                      {
-                        label: "Add payment",
-                        href: `/admin/erp/payments/new?invoiceId=${encodeURIComponent(row.id)}`,
-                        disabled: row.balance_due <= 0 || row.status === "cancelled",
-                      },
+                      ...(row.status !== "cancelled" && row.balance_due > 0
+                        ? [
+                            {
+                              label: "Add payment",
+                              href: `/admin/erp/payments/new?invoiceId=${encodeURIComponent(row.id)}`,
+                            },
+                          ]
+                        : []),
                       {
                         label: "Cancel invoice",
                         destructive: true,
@@ -292,6 +311,8 @@ export function InvoicesListView() {
           onSuccess={() => setReloadToken((t) => t + 1)}
         />
       ) : null}
+
+      <ErpInvoicePrintModal {...invoicePrintModalProps} />
     </AdminPageLayout>
   );
 }

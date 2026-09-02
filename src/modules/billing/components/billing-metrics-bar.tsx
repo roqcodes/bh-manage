@@ -70,9 +70,9 @@ export function BillingMetricsBar({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Manual Billing</h1>
+          <h1 className="text-xl font-semibold tracking-tight">POS Billing</h1>
           <p className="text-sm text-muted-foreground">
-            Create invoices for offline and external customers.
+            Record in-store sales as online orders with immediate fulfillment.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -82,7 +82,7 @@ export function BillingMetricsBar({
           </Button>
           <Button size="sm" onClick={onSave} disabled={!canSave || isSubmitting}>
             <Save data-icon="inline-start" />
-            {isSubmitting ? "Saving…" : "Save invoice"}
+            {isSubmitting ? "Saving…" : "Complete sale"}
           </Button>
         </div>
       </div>

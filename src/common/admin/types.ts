@@ -316,6 +316,7 @@ export interface OrderItem {
   margin_amount: number | null;
   created_at: string | null;
   customer_edit_flag?: string | null;
+  tax_rate_percent?: number | null;
   /** Live catalog join when loading order detail (not stored on order_items). */
   variant_meta?: OrderItemVariantMeta | null;
 }
@@ -406,6 +407,13 @@ export interface OrderWithItems {
   inventory_committed?: boolean | null;
   preferred_delivery_date?: string | null;
   shipment_date?: string | null;
+  sales_order_number?: string | null;
+  reference_number?: string | null;
+  delivery_method?: string | null;
+  invoice_id?: string | null;
+  linked_invoice?: { id: string; status: string } | null;
+  tax_inclusive?: boolean | null;
+  store_name?: string | null;
   users: OrderUser | null;
   addresses: OrderAddress | null;
   order_items: OrderItem[];

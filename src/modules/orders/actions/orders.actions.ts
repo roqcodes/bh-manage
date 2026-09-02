@@ -32,6 +32,7 @@ export async function updateOrderStatusAction(
   await updateOrderStatusById(orderId, status);
   revalidatePath("/admin/orders");
   revalidatePath("/admin/erp/sales-orders");
+  revalidatePath(`/admin/erp/sales-orders/${orderId}`);
   revalidatePath(`/admin/orders/${orderId}`);
 }
 
@@ -59,6 +60,7 @@ export async function updateOrderDetailsAction(
   await updateOrderDetailsById(orderId, input);
   revalidatePath("/admin/orders");
   revalidatePath("/admin/erp/sales-orders");
+  revalidatePath(`/admin/erp/sales-orders/${orderId}`);
   revalidatePath(`/admin/orders/${orderId}`);
 }
 
@@ -68,6 +70,7 @@ export async function cancelOrderAndRefundAction(
   await cancelOrderAndRefund(orderId);
   revalidatePath("/admin/orders");
   revalidatePath("/admin/erp/sales-orders");
+  revalidatePath(`/admin/erp/sales-orders/${orderId}`);
   revalidatePath(`/admin/orders/${orderId}`);
 }
 
@@ -119,5 +122,6 @@ export async function updateOrderWithItemsAction(
   await updateOrderWithItems(orderId, input);
   revalidatePath("/admin/orders");
   revalidatePath("/admin/erp/sales-orders");
+  revalidatePath(`/admin/erp/sales-orders/${orderId}`);
   revalidatePath(`/admin/orders/${orderId}`);
 }

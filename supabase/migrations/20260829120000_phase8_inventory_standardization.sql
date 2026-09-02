@@ -291,7 +291,7 @@ BEGIN
 
   PERFORM public.log_stock_movement(
     p_variant_id, -p_quantity, 'sale', p_reference_id, p_reference_type,
-    p_reason, p_store_id, NULL, NULL
+    p_reason, p_store_id, NULL, NULL, p_user_id
   );
 
   PERFORM public.reconcile_central_inventory_from_stores(p_variant_id);
@@ -786,7 +786,7 @@ BEGIN
       CASE WHEN p_multiplier = -1 THEN 'sale' ELSE 'return' END,
       p_order_id, 'order',
       CASE WHEN p_multiplier = -1 THEN 'POS/ERP order sale' ELSE 'POS/ERP order restore' END,
-      v_order.store_id, NULL, NULL
+      v_order.store_id, NULL, NULL, v_uid
     );
   END LOOP;
 

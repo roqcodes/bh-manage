@@ -35,8 +35,9 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(result);
   } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to list purchase bills";
     console.error("[GET /api/admin/erp/purchase-bills]", error);
-    return NextResponse.json({ error: "Failed to list purchase bills" }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ id }, { status: 201 });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to create purchase bill";
+    console.error("[POST /api/admin/erp/purchase-bills]", error);
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

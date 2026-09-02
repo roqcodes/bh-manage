@@ -64,6 +64,7 @@ export function PurchaseBillsListView() {
   const [rows, setRows] = useState<ErpPurchaseBillListRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [cancellingId, startCancel] = useTransition();
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
@@ -78,12 +79,17 @@ export function PurchaseBillsListView() {
     ).then((res) => {
       setRows(res.data);
       setTotal(res.total);
+      setLoadError(null);
     });
   }
 
   useEffect(() => {
     setLoading(true);
-    reload().finally(() => setLoading(false));
+    reload()
+      .catch((error) => {
+        setLoadError(error instanceof Error ? error.message : "Failed to load purchase bills");
+      })
+      .finally(() => setLoading(false));
   }, [page, debouncedSearch, status, dateFrom, dateTo, reloadToken, listParams, activeStoreId]);
 
   function handleCancel(id: string) {
@@ -108,6 +114,12 @@ export function PurchaseBillsListView() {
           </Button>
         }
       />
+
+      {loadError ? (
+        <p className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          {loadError}
+        </p>
+      ) : null}
 
       <AdminListCard
         search={search}
@@ -199,7 +211,10 @@ export function PurchaseBillsListView() {
           <AdminTableBody>
             {sorted.map((r) => {
               const canCancel =
-                r.status !== "cancelled" && r.amount_paid === 0 && r.balance_due === r.total_amount;
+                r.status !== "cancelled" &&
+                r.amount_paid === 0 &&
+                r.credits_applied === 0 &&
+                r.balance_due === r.total_amount;
               const canEdit = r.status === "draft";
               return (
                 <AdminTableRow key={r.id}>

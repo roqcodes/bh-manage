@@ -1112,8 +1112,7 @@ BEGIN
     'net_profit_ytd', v_income - v_cogs - v_expenses,
     'low_stock_count', (
       SELECT COUNT(*) FROM public.inventory i
-      JOIN public.product_variants pv ON pv.id = i.variant_id
-      WHERE i.stock <= COALESCE(pv.reorder_point, 0)
+      WHERE i.stock <= COALESCE(i.reorder_point, 0)
     ),
     'daily_sales', v_daily_sales,
     'invoice_status_ytd', (

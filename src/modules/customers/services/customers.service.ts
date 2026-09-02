@@ -3,6 +3,10 @@ import "server-only";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { PAGE_SIZE, type Order, type AdminUser, type Paginated } from "@/common/admin/types";
+import {
+  buildIlikePattern,
+  CUSTOMER_ROLE_OR_FILTER,
+} from "@/modules/customers/lib/customer-query";
 
 export interface CustomerStats {
   total: number;
@@ -133,19 +137,21 @@ export async function searchCustomers(query: string, limit = 20): Promise<
   Pick<AdminUser, "id" | "name" | "email" | "phone" | "customer_number">[]
 > {
   await requireAdminOrManagerProfile();
-  const q = query.trim();
-  if (!q) return [];
-
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
+  const pattern = buildIlikePattern(query);
+
+  let request = supabase
     .from("users")
     .select("id, name, email, phone, customer_number")
-    .is("role", null)
-    .or(
-      `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,customer_number.ilike.%${q}%`,
-    )
-    .order("name")
-    .limit(limit);
+    .or(CUSTOMER_ROLE_OR_FILTER);
+
+  if (pattern) {
+    request = request.or(
+      `name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},customer_number.ilike.${pattern}`,
+    );
+  }
+
+  const { data, error } = await request.order("name").limit(limit);
 
   if (error) throw new Error(error.message);
   return (data ?? []) as Pick<
@@ -159,28 +165,27 @@ export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & 
   const supabase = await createSupabaseServerClient();
   const from = page * PAGE_SIZE;
 
-  // Only show pure customers (role IS NULL)
   const [usersResult, countResult, retailCountResult, activeCountResult] = await Promise.all([
     supabase
       .from("users")
       .select(
         "id,name,email,phone,role,is_verified,created_at,customer_number,company_name,location,opening_balance",
       )
-      .is("role", null)
+      .or(CUSTOMER_ROLE_OR_FILTER)
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1),
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
-      .is("role", null),
+      .or(CUSTOMER_ROLE_OR_FILTER),
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
-      .is("role", null),
+      .or(CUSTOMER_ROLE_OR_FILTER),
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
-      .is("role", null)
+      .or(CUSTOMER_ROLE_OR_FILTER)
       .eq("is_verified", true),
   ]);
 

@@ -16,6 +16,7 @@ import {
   Phone,
   Printer,
   RotateCcw,
+  Store,
   Truck,
   User,
 } from "lucide-react";
@@ -70,6 +71,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { computeOrderPaymentSummary } from "@/modules/orders/lib/order-payment-summary";
 import { Separator } from "@/components/ui/separator";
+import { formatErpDocRef } from "@/lib/erp-document-ref";
 
 function TimelineAvatar({ label }: { label: string }) {
   return (
@@ -182,7 +184,133 @@ function buildTimeline(order: OrderWithItems, total: number) {
     });
   }
 
+  if (order.linked_invoice) {
+    const invRef = formatErpDocRef("INV", order.linked_invoice.id);
+    const cancelled = order.linked_invoice.status === "cancelled";
+    events.push({
+      id: "invoiced",
+      title: cancelled ? "Invoice cancelled" : "Converted to invoice",
+      detail: cancelled
+        ? `Previous invoice ${invRef} was cancelled.`
+        : `Invoice ${invRef} created from this order.`,
+      at: order.created_at,
+      icon: "INV",
+    });
+  }
+
   return events;
+}
+
+function buildSalesOrderTimeline(order: OrderWithItems) {
+  const ref = formatErpDocRef("SO", order.id);
+  const events: {
+    id: string;
+    title: string;
+    detail: string;
+    at: string | null;
+    icon: string;
+  }[] = [
+    {
+      id: "created",
+      title: "Sales order created",
+      detail: `${ref} was created.`,
+      at: order.created_at,
+      icon: "SO",
+    },
+  ];
+
+  if (order.merchant_note?.trim()) {
+    events.push({
+      id: "merchant-note",
+      title: "Note added",
+      detail: order.merchant_note.trim(),
+      at: order.created_at,
+      icon: "✎",
+    });
+  }
+
+  if (order.linked_invoice) {
+    const invRef = formatErpDocRef("INV", order.linked_invoice.id);
+    const cancelled = order.linked_invoice.status === "cancelled";
+    events.push({
+      id: "invoiced",
+      title: cancelled ? "Invoice cancelled" : "Converted to invoice",
+      detail: cancelled
+        ? `Previous invoice ${invRef} was cancelled.`
+        : `Invoice ${invRef} created from this sales order.`,
+      at: order.created_at,
+      icon: "INV",
+    });
+  }
+
+  if (isCancelled(order.status)) {
+    events.push({
+      id: "cancelled",
+      title: "Sales order cancelled",
+      detail: "This sales order was cancelled and stock was restored.",
+      at: order.created_at,
+      icon: "×",
+    });
+  }
+
+  return events;
+}
+
+function formatOptionalDate(value: string | null | undefined) {
+  if (!value) return null;
+  return format(new Date(`${value}T12:00:00`), "EEE, d MMM yyyy");
+}
+
+function SalesOrderInfoSection({ order }: { order: OrderWithItems }) {
+  const shipmentLabel = formatOptionalDate(order.shipment_date);
+
+  return (
+    <Card className="border border-border ring-0">
+      <CardHeader className="border-b">
+        <CardTitle className="flex items-center gap-2">
+          <Store className="size-4" />
+          Fulfillment details
+        </CardTitle>
+        <CardDescription>Store, shipment, and reference for this sales order</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 pt-4 text-sm">
+        <div className="rounded-lg border bg-muted/30 p-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Store
+          </p>
+          <p className="mt-1 font-medium">{order.store_name ?? "Not assigned"}</p>
+        </div>
+        <div className="rounded-lg border bg-background p-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Shipment date
+          </p>
+          <p className="mt-1 font-medium">{shipmentLabel ?? "Not set"}</p>
+        </div>
+        <div className="rounded-lg border bg-background p-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Delivery method
+          </p>
+          <p className="mt-1 font-medium">{order.delivery_method ?? "Not set"}</p>
+        </div>
+        <div className="rounded-lg border bg-background p-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Reference
+          </p>
+          <p className="mt-1 font-medium">{order.reference_number ?? "—"}</p>
+        </div>
+        {order.tax_inclusive != null ? (
+          <div className="rounded-lg border bg-background p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Tax treatment
+            </p>
+            <p className="mt-1 font-medium">
+              {order.tax_inclusive ? "Prices include tax" : "Prices exclude tax"}
+            </p>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
 }
 
 function MerchantNoteSection({
@@ -450,11 +578,32 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`
         : null;
 
-  const timeline = useMemo(
-    () => buildTimeline(order, total),
-    [order, total],
-  );
   const isSalesOrder = order.source === "sales_order";
+  const isOnlineChannel =
+    !isSalesOrder &&
+    (order.source === "online" || order.source === "manual" || !order.source);
+  const salesOrderRef = formatErpDocRef("SO", order.id);
+  const activeInvoice =
+    order.linked_invoice && order.linked_invoice.status !== "cancelled"
+      ? order.linked_invoice
+      : null;
+  const cancelledInvoice =
+    order.linked_invoice?.status === "cancelled" ? order.linked_invoice : null;
+  const needsShipBeforeInvoice =
+    isOnlineChannel && !order.inventory_committed;
+  const canConvertToInvoice =
+    (isSalesOrder || isOnlineChannel) &&
+    !cancelled &&
+    !activeInvoice &&
+    !needsShipBeforeInvoice &&
+    Boolean(order.users?.id) &&
+    order.order_items.length > 0;
+  const canCancelOrder = !cancelled && !activeInvoice;
+
+  const timeline = useMemo(
+    () => (isSalesOrder ? buildSalesOrderTimeline(order) : buildTimeline(order, total)),
+    [isSalesOrder, order, total],
+  );
 
   async function invalidate() {
     await queryClient.invalidateQueries({
@@ -505,11 +654,18 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
       ) : null}
 
       <AdminBreadcrumb
-        items={[
-          { label: "Orders", href: "/admin/orders" },
-          { label: `#${shortOrderRef(order.id)}` },
-        ]}
-        backHref="/admin/orders"
+        items={
+          isSalesOrder
+            ? [
+                { label: "Sales orders", href: "/admin/erp/sales-orders" },
+                { label: salesOrderRef },
+              ]
+            : [
+                { label: "Orders", href: "/admin/orders" },
+                { label: `#${shortOrderRef(order.id)}` },
+              ]
+        }
+        backHref={isSalesOrder ? "/admin/erp/sales-orders" : "/admin/orders"}
       />
 
       {actionError ? (
@@ -518,7 +674,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
         </p>
       ) : null}
 
-      {isCustomerEditedOrder(order.customer_edited_at) ? (
+      {!isSalesOrder && isCustomerEditedOrder(order.customer_edited_at) ? (
         <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
           <p className="font-semibold">Customer edited this order</p>
           <p className="mt-1 text-violet-800/90">
@@ -529,14 +685,19 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-2">
-          <h1 className="font-mono text-2xl font-semibold tracking-tight">
-            #{shortOrderRef(order.id)}
+          <h1
+            className={`font-semibold tracking-tight ${isSalesOrder ? "text-2xl" : "font-mono text-2xl"}`}
+            title={isSalesOrder ? (order.sales_order_number ?? undefined) : undefined}
+          >
+            {isSalesOrder ? salesOrderRef : `#${shortOrderRef(order.id)}`}
           </h1>
           <div className="flex flex-wrap items-center gap-2">
             <PaymentPill paymentStatus={order.payment_status} />
             <FulfillmentPill status={order.status} />
-            <InventoryFulfillmentStatusPill status={order.fulfillment_status} />
-            {isCustomerEditedOrder(order.customer_edited_at) ? (
+            {!isSalesOrder ? (
+              <InventoryFulfillmentStatusPill status={order.fulfillment_status} />
+            ) : null}
+            {!isSalesOrder && isCustomerEditedOrder(order.customer_edited_at) ? (
               <CustomerEditedPill />
             ) : null}
             <span className="text-sm text-muted-foreground">
@@ -547,7 +708,12 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {isSalesOrder && !cancelled ? (
+          {needsShipBeforeInvoice && !activeInvoice && !cancelled ? (
+            <span className="text-xs text-muted-foreground">
+              Ship order before invoicing
+            </span>
+          ) : null}
+          {canConvertToInvoice ? (
             <Button
               size="sm"
               disabled={isPending}
@@ -556,7 +722,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                 startTransition(async () => {
                   try {
                     const res = await adminPost<{ invoiceId: string }>(
-                      `erp/sales-orders/${order.id}/convert-to-invoice`,
+                      `orders/${order.id}/convert-to-invoice`,
                       {},
                     );
                     router.push(`/admin/erp/invoices/${res.invoiceId}`);
@@ -568,10 +734,18 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                 });
               }}
             >
-              Create invoice
+              {cancelledInvoice ? "Re-issue invoice" : "Create invoice"}
             </Button>
           ) : null}
-          {!cancelled ? (
+          {(activeInvoice ?? cancelledInvoice) ? (
+            <Link
+              href={`/admin/erp/invoices/${(activeInvoice ?? cancelledInvoice)!.id}`}
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+            >
+              {cancelledInvoice ? "View cancelled invoice" : "View invoice"}
+            </Link>
+          ) : null}
+          {canCancelOrder ? (
             <Button
               variant="outline"
               size="sm"
@@ -579,87 +753,94 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
               onClick={handleCancelAndRefund}
             >
               <RotateCcw data-icon="inline-start" />
-              {paid ? "Cancel & refund" : "Cancel order"}
+              {isSalesOrder ? "Cancel order" : paid ? "Cancel & refund" : "Cancel order"}
             </Button>
           ) : null}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isPending || cancelled}
-            onClick={() => setShowEdit(true)}
-          >
-            <Pencil data-icon="inline-start" />
-            Edit
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="outline" size="sm" disabled={isPending} />
-              }
-            >
-              More actions
-              <ChevronDown data-icon="inline-end" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuGroup>
-                <DropdownMenuItem
-                  nativeButton={false}
+          {!isSalesOrder ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isPending || cancelled}
+                onClick={() => setShowEdit(true)}
+              >
+                <Pencil data-icon="inline-start" />
+                Edit
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
                   render={
-                    <Link
-                      href={`/admin/orders/${order.id}/invoice`}
-                      target="_blank"
-                    />
+                    <Button variant="outline" size="sm" disabled={isPending} />
                   }
                 >
-                  <Printer />
-                  Print invoice
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  nativeButton={false}
-                  render={
-                    <Link
-                      href={`/admin/orders/${order.id}/invoice?download=1`}
-                      target="_blank"
-                    />
-                  }
+                  More actions
+                  <ChevronDown data-icon="inline-end" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      nativeButton={false}
+                      render={
+                        <Link
+                          href={`/admin/orders/${order.id}/invoice`}
+                          target="_blank"
+                        />
+                      }
+                    >
+                      <Printer />
+                      Print invoice
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      nativeButton={false}
+                      render={
+                        <Link
+                          href={`/admin/orders/${order.id}/invoice?download=1`}
+                          target="_blank"
+                        />
+                      }
+                    >
+                      <Download />
+                      Download invoice (PDF)
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {canAdvanceFulfillment && nextActionLabel ? (
+                <Button
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => handleStatusChange(nextStatus!)}
                 >
-                  <Download />
-                  Download invoice (PDF)
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {canAdvanceFulfillment && nextActionLabel ? (
-            <Button
-              size="sm"
-              disabled={isPending}
-              onClick={() => handleStatusChange(nextStatus!)}
-            >
-              {nextActionLabel}
-            </Button>
+                  {nextActionLabel}
+                </Button>
+              ) : null}
+            </>
           ) : null}
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
-          <OrderFulfillmentPanel
-            order={order}
-            onUpdated={invalidate}
-          />
+          {!isSalesOrder ? (
+            <OrderFulfillmentPanel order={order} onUpdated={invalidate} />
+          ) : null}
 
           <Card className="border border-border ring-0">
             <CardHeader className="border-b">
               <CardTitle>Line items</CardTitle>
               <CardDescription>
                 {cancelled
-                  ? "This order was cancelled."
-                  : `Order status: ${order.status}`}
+                  ? isSalesOrder
+                    ? "This sales order was cancelled."
+                    : "This order was cancelled."
+                  : isSalesOrder
+                    ? `Sales order status: ${order.status}`
+                    : `Order status: ${order.status}`}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 pt-4">
               <OrderLineItemsList order={order} />
-              {!cancelled && canAdvanceFulfillment && nextStatus ? (
+              {!isSalesOrder && !cancelled && canAdvanceFulfillment && nextStatus ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
                   <p className="text-sm text-muted-foreground">
                     <Truck className="mr-1 inline" />
@@ -674,7 +855,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                     {nextActionLabel}
                   </Button>
                 </div>
-              ) : needsStoreAssignment ? (
+              ) : !isSalesOrder && needsStoreAssignment ? (
                 <p className="border-t pt-3 text-sm text-amber-800">
                   Assign a fulfilling store above before marking this order as
                   shipped.
@@ -686,6 +867,9 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
           <Card className="border border-border ring-0">
             <CardHeader className="border-b">
               <CardTitle>Payment summary</CardTitle>
+              {isSalesOrder ? (
+                <CardDescription>Totals captured when this sales order was created</CardDescription>
+              ) : null}
             </CardHeader>
             <CardContent className="flex flex-col gap-2 pt-4 text-sm">
               <div className="flex justify-between">
@@ -730,7 +914,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
               ) : null}
               <Separator />
               <div className="flex justify-between font-semibold">
-                <span>{currencyLabel("Order total")}</span>
+                <span>{currencyLabel(isSalesOrder ? "Total" : "Order total")}</span>
                 <span className="tabular-nums">{formatInr(total)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
@@ -748,7 +932,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                 </div>
               ) : paid ? (
                 <div className="flex justify-between font-medium text-emerald-700">
-                  <span>{currencyLabel("Paid via wallet")}</span>
+                  <span>{currencyLabel(isSalesOrder ? "Paid" : "Paid via wallet")}</span>
                   <span className="tabular-nums">{formatInr(total)}</span>
                 </div>
               ) : paymentNotRequired ? (
@@ -763,7 +947,9 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
           <Card className="border border-border ring-0">
             <CardHeader className="border-b">
               <CardTitle>Timeline</CardTitle>
-              <CardDescription>Order milestones</CardDescription>
+              <CardDescription>
+                {isSalesOrder ? "Sales order milestones" : "Order milestones"}
+              </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
               <ol className="flex flex-col gap-4">
@@ -799,18 +985,24 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
             onSaved={() => void invalidate()}
           />
 
-          <ExpectedDeliverySection
-            orderId={order.id}
-            preferredDate={order.preferred_delivery_date}
-            expectedDate={order.shipment_date}
-            onSaved={() => void invalidate()}
-          />
+          {!isSalesOrder ? (
+            <ExpectedDeliverySection
+              orderId={order.id}
+              preferredDate={order.preferred_delivery_date}
+              expectedDate={order.shipment_date}
+              onSaved={() => void invalidate()}
+            />
+          ) : (
+            <SalesOrderInfoSection order={order} />
+          )}
 
           <Card className="border border-border ring-0">
             <CardHeader className="border-b pb-4">
               <CardTitle>Customer</CardTitle>
               <CardDescription>
-                Contact details and delivery information
+                {isSalesOrder
+                  ? "Contact details for this sales order"
+                  : "Contact details and delivery information"}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-5 pt-5">
@@ -869,47 +1061,49 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                 ) : null}
               </div>
 
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <MapPin className="size-4 text-muted-foreground" />
-                  <p className="text-sm font-medium">Delivery store</p>
-                </div>
-                {addressText ? (
-                  <div className="rounded-lg border bg-background p-3.5">
-                    {order.addresses?.label ? (
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {order.addresses.label}
-                      </p>
-                    ) : null}
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      {addressText}
-                    </p>
-                    {order.addresses?.phone ? (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Phone: {order.addresses.phone}
-                      </p>
-                    ) : null}
-                    {order.addresses?.latitude != null &&
-                    order.addresses?.longitude != null ? (
-                      <div className="mt-3 space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground">
-                          Pin {Number(order.addresses.latitude).toFixed(6)},{' '}
-                          {Number(order.addresses.longitude).toFixed(6)}
-                        </p>
-                        <AddressMapEmbed
-                          latitude={Number(order.addresses.latitude)}
-                          longitude={Number(order.addresses.longitude)}
-                          label={order.addresses.label ?? "Delivery"}
-                        />
-                      </div>
-                    ) : null}
+              {!isSalesOrder ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="size-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">Delivery store</p>
                   </div>
-                ) : (
-                  <p className="rounded-lg border border-dashed bg-muted/20 p-3.5 text-sm text-muted-foreground">
-                    No delivery store saved for this order.
-                  </p>
-                )}
-              </div>
+                  {addressText ? (
+                    <div className="rounded-lg border bg-background p-3.5">
+                      {order.addresses?.label ? (
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {order.addresses.label}
+                        </p>
+                      ) : null}
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {addressText}
+                      </p>
+                      {order.addresses?.phone ? (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Phone: {order.addresses.phone}
+                        </p>
+                      ) : null}
+                      {order.addresses?.latitude != null &&
+                      order.addresses?.longitude != null ? (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Pin {Number(order.addresses.latitude).toFixed(6)},{' '}
+                            {Number(order.addresses.longitude).toFixed(6)}
+                          </p>
+                          <AddressMapEmbed
+                            latitude={Number(order.addresses.latitude)}
+                            longitude={Number(order.addresses.longitude)}
+                            label={order.addresses.label ?? "Delivery"}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="rounded-lg border border-dashed bg-muted/20 p-3.5 text-sm text-muted-foreground">
+                      No delivery store saved for this order.
+                    </p>
+                  )}
+                </div>
+              ) : null}
 
               <div className="flex flex-wrap gap-2 border-t pt-4">
                 {order.users?.id ? (
@@ -925,7 +1119,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                     View customer
                   </Link>
                 ) : null}
-                {mapHref ? (
+                {!isSalesOrder && mapHref ? (
                   <a
                     href={mapHref}
                     target="_blank"

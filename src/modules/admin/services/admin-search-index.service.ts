@@ -13,6 +13,7 @@ import type {
   AdminSearchIndexItem,
   AdminSearchIndexResponse,
 } from "@/modules/admin/types/admin-search";
+import { CUSTOMER_ROLE_OR_FILTER } from "@/modules/customers/lib/customer-query";
 
 const FETCH_LIMIT = 5000;
 
@@ -116,7 +117,7 @@ export async function buildAdminSearchIndex(): Promise<AdminSearchIndexResponse>
     supabase
       .from("users")
       .select("id,name,email,phone,is_verified,created_at")
-      .is("role", null)
+      .or(CUSTOMER_ROLE_OR_FILTER)
       .order("created_at", { ascending: false })
       .limit(FETCH_LIMIT),
     supabase

@@ -4,67 +4,10 @@ import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.serv
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import { createErpInvoice } from "@/modules/erp/services/erp-invoices.service";
+import { convertOrderToInvoice } from "@/modules/erp/services/convert-order-to-invoice.service";
 
 export async function convertSalesOrderToInvoice(orderId: string): Promise<string> {
-  await requireAdminOrManagerProfile();
-  const supabase = await createSupabaseServerClient();
-
-  const { data: order, error } = await supabase
-    .from("orders")
-    .select("*, order_items(*)")
-    .eq("id", orderId)
-    .single();
-
-  if (error) throw new Error(error.message);
-  if (order.source !== "sales_order") {
-    throw new Error("Only ERP sales orders can be converted to invoices.");
-  }
-  if (order.status === "cancelled") {
-    throw new Error("Cannot invoice a cancelled sales order.");
-  }
-
-  const existingInvoiceId = (order as { invoice_id?: string | null }).invoice_id;
-  if (existingInvoiceId) return existingInvoiceId;
-
-  const items = order.order_items ?? [];
-  if (items.length === 0) throw new Error("Sales order has no line items.");
-  if (!order.user_id) throw new Error("Sales order has no customer.");
-
-  const lines = items.map((item: Record<string, unknown>) => ({
-    variantId: item.variant_id as string | undefined,
-    productName: String(item.product_name ?? "Item"),
-    quantity: Number(item.quantity ?? 1),
-    unitPrice: Number(item.final_price ?? item.price ?? 0),
-    taxRatePercent: 5,
-  }));
-
-  const invoiceId = await createErpInvoice({
-    userId: order.user_id,
-    storeId: order.store_id ?? undefined,
-    invoiceDate: new Date().toISOString().slice(0, 10),
-    dueDate: order.shipment_date ?? new Date().toISOString().slice(0, 10),
-    lines,
-    discount: Number(order.discount ?? 0),
-    taxInclusive: false,
-    reference: order.reference_number ?? order.sales_order_number ?? undefined,
-    notes: `Converted from sales order ${order.sales_order_number ?? orderId}`,
-    finalize: true,
-  });
-
-  await supabase
-    .from("orders")
-    .update({ invoice_id: invoiceId } as never)
-    .eq("id", orderId);
-
-  await logAuditEvent({
-    action: "convert_to_invoice",
-    entityType: "sales_order",
-    entityId: orderId,
-    description: `Sales order converted to invoice`,
-    storeId: order.store_id ?? undefined,
-  });
-
-  return invoiceId;
+  return convertOrderToInvoice(orderId);
 }
 
 export async function billExpenseToCustomer(expenseId: string): Promise<string> {

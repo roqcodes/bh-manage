@@ -204,7 +204,13 @@ function CustomerPopover({ order }: { order: Order }) {
   );
 }
 
-function ItemsPopover({ order }: { order: Order }) {
+function ItemsPopover({
+  order,
+  detailBasePath,
+}: {
+  order: Order;
+  detailBasePath: string;
+}) {
   const count = order.item_count;
   const label = `${count} item${count === 1 ? "" : "s"}`;
   const total = formatInr(Number(order.total_amount ?? 0));
@@ -236,7 +242,7 @@ function ItemsPopover({ order }: { order: Order }) {
           subtitle={`${totalQty || count} units · ${total}`}
           footer={
             <Link
-              href={`/admin/orders/${order.id}`}
+              href={`${detailBasePath}/${order.id}`}
               className="inline-flex text-[11px] font-semibold text-primary hover:underline"
             >
               View full order →
@@ -323,10 +329,12 @@ export function OrdersBulkActionBar({
   selectedIds,
   orders,
   onClearSelection,
+  variant = "online",
 }: {
   selectedIds: Set<string>;
   orders: Order[];
   onClearSelection: () => void;
+  variant?: "online" | "erp";
 }) {
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
@@ -344,33 +352,37 @@ export function OrdersBulkActionBar({
         {selectedIds.size} order{selectedIds.size === 1 ? "" : "s"} selected
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <Button
-          size="sm"
-          disabled={isPending}
-          onClick={() => {
-            startTransition(async () => {
-              await bulkUpdateOrderStatusAction(
-                Array.from(selectedIds),
-                "shipped",
-              );
-              void queryClient.invalidateQueries({
-                queryKey: ["admin", "orders"],
-              });
-              onClearSelection();
-            });
-          }}
-        >
-          <Truck data-icon="inline-start" />
-          Mark as fulfilled
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => printShippingLabels(Array.from(selectedIds))}
-        >
-          <Printer data-icon="inline-start" />
-          Print shipping labels
-        </Button>
+        {variant === "online" ? (
+          <>
+            <Button
+              size="sm"
+              disabled={isPending}
+              onClick={() => {
+                startTransition(async () => {
+                  await bulkUpdateOrderStatusAction(
+                    Array.from(selectedIds),
+                    "shipped",
+                  );
+                  void queryClient.invalidateQueries({
+                    queryKey: ["admin", "orders"],
+                  });
+                  onClearSelection();
+                });
+              }}
+            >
+              <Truck data-icon="inline-start" />
+              Mark as fulfilled
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => printShippingLabels(Array.from(selectedIds))}
+            >
+              <Printer data-icon="inline-start" />
+              Print shipping labels
+            </Button>
+          </>
+        ) : null}
         <Button
           size="sm"
           variant="outline"
@@ -395,11 +407,13 @@ export function OrdersDataTable({
   selectedIds,
   onSelectedIdsChange,
   variant = "online",
+  detailBasePath = "/admin/orders",
 }: {
   orders: Order[];
   selectedIds: Set<string>;
   onSelectedIdsChange: (ids: Set<string>) => void;
   variant?: "online" | "erp";
+  detailBasePath?: string;
 }) {
   const pageIds = orders.map((o) => o.id);
   const allPageSelected =
@@ -458,7 +472,7 @@ export function OrdersDataTable({
           ) : null}
           <TableHead className="hidden md:table-cell">Store</TableHead>
           <TableHead>Payment</TableHead>
-          <TableHead>Fulfillment</TableHead>
+          <TableHead>{variant === "erp" ? "Status" : "Fulfillment"}</TableHead>
           <TableHead>Items</TableHead>
           <TableHead className="text-right">{currencyLabel("Total")}</TableHead>
           <TableHead className="w-10" />
@@ -489,7 +503,7 @@ export function OrdersDataTable({
               </TableCell>
               <TableCell>
                 <Link
-                  href={`/admin/orders/${order.id}`}
+                  href={`${detailBasePath}/${order.id}`}
                   className={cn(
                     "font-mono text-[13px] font-medium leading-snug text-foreground hover:text-primary hover:underline",
                   )}
@@ -544,7 +558,7 @@ export function OrdersDataTable({
                 </div>
               </TableCell>
               <TableCell>
-                <ItemsPopover order={order} />
+                <ItemsPopover order={order} detailBasePath={detailBasePath} />
               </TableCell>
               <TableCell className="text-right text-sm font-semibold tabular-nums">
                 {formatInr(total)}
@@ -566,21 +580,23 @@ export function OrdersDataTable({
                     <DropdownMenuGroup>
                       <DropdownMenuItem
                         nativeButton={false}
-                        render={<Link href={`/admin/orders/${order.id}`} />}
+                        render={<Link href={`${detailBasePath}/${order.id}`} />}
                       >
                         View order
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        nativeButton={false}
-                        render={
-                          <Link
-                            href={`/admin/orders/${order.id}/invoice`}
-                            target="_blank"
-                          />
-                        }
-                      >
-                        Print invoice
-                      </DropdownMenuItem>
+                      {variant === "online" ? (
+                        <DropdownMenuItem
+                          nativeButton={false}
+                          render={
+                            <Link
+                              href={`/admin/orders/${order.id}/invoice`}
+                              target="_blank"
+                            />
+                          }
+                        >
+                          Print invoice
+                        </DropdownMenuItem>
+                      ) : null}
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup>

@@ -26,11 +26,15 @@ import {
   AdminFormModalLayout,
   AdminFormSection,
   AdminFormShell,
+  ErpDocumentNumberField,
   VendorSearchSelect,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,6 +91,12 @@ function poLinesToForm(po: ErpPurchaseOrderDetail): PurchaseLineFormRow[] {
   }));
 }
 
+function addDays(isoDate: string, days: number): string {
+  const d = new Date(`${isoDate}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export type PurchaseBillFormViewProps = ErpFormViewBaseProps & {
   mode: "create" | "edit";
   billId?: string;
@@ -105,7 +115,8 @@ export function PurchaseBillFormView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [landedMaster, setLandedMaster] = useState<ErpLandedCostItem[]>([]);
@@ -116,9 +127,10 @@ export function PurchaseBillFormView({
 
   const [vendorId, setVendorId] = useState("");
   const [vendorLabel, setVendorLabel] = useState("");
-  const [storeId, setStoreId] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0, 10));
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(() =>
+    addDays(new Date().toISOString().slice(0, 10), 30),
+  );
   const [poId, setPoId] = useState<string | null>(poIdParam ?? null);
   const [vendorBillNumber, setVendorBillNumber] = useState("");
   const [grnReference, setGrnReference] = useState("");
@@ -131,8 +143,10 @@ export function PurchaseBillFormView({
   const [billNumber, setBillNumber] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
+    if (mode === "create") {
+      setDueDate(addDays(purchaseDate, 30));
+    }
+  }, [purchaseDate, mode]);
 
   useEffect(() => {
     adminGet<{ data: ErpLandedCostItem[] }>("erp/landed-costs").then((r) =>
@@ -244,18 +258,26 @@ export function PurchaseBillFormView({
   function submit(finalize: boolean) {
     setError(null);
     const apiLines = linesToApiInput(lines);
-    if (!vendorId || !storeId) {
-      setError("Vendor and store are required");
+    if (!vendorId || !effectiveStoreId) {
+      setError(
+        !effectiveStoreId
+          ? (storeRequiredMessage ?? "Select a store using the header switcher before saving.")
+          : "Vendor and store are required",
+      );
       return;
     }
     if (!apiLines.length) {
       setError("Add at least one valid line item");
       return;
     }
+    if (finalize && totals.total <= 0) {
+      setError("Enter line rates so the grand total is greater than zero before finalizing.");
+      return;
+    }
 
     const payload = {
       vendorId,
-      storeId,
+      storeId: effectiveStoreId,
       purchaseDate,
       dueDate: dueDate || null,
       poId,
@@ -370,6 +392,7 @@ export function PurchaseBillFormView({
         <AdminFormModalLayout sidebar={totalsSidebar}>
           <AdminFormSection title="Purchase header">
             <AdminFormGrid cols={3}>
+              <ErpDocumentNumberField kind="PB" value={billNumber} enabled={mode === "create"} />
               <AdminFormField label="Supplier" required>
                 <VendorSearchSelect
                   value={vendorId || null}
@@ -381,7 +404,14 @@ export function PurchaseBillFormView({
                 />
               </AdminFormField>
               <AdminFormField label="Destination store" required>
-                <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+                <ActiveStoreFormField
+                  mode={mode}
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
+                />
               </AdminFormField>
               <AdminFormField label="Purchase date">
                 <Input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />

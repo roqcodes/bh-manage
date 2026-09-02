@@ -3,14 +3,18 @@ import "server-only";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type {
+  LastFiledVatReturnSummary,
   VatPaymentListRow,
-  VatReturnDetail,
+  VatReturnDetailWithSources,
   VatReturnListRow,
+  VatReturnPaymentLine,
+  VatReturnPreview,
+  VatReturnSourceLine,
 } from "@/common/erp/finance-types";
 import type { PaidThroughAccountOption } from "@/common/erp/purchasing-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import {
-  getAdminErpContext,
+  requireErpStoreId,
   resolveErpStoreId,
   withAccountStoreScope,
 } from "@/modules/erp/services/store-context.service";
@@ -104,6 +108,75 @@ export async function listVatReturns(
   };
 }
 
+export async function getLastFiledVatReturn(storeId?: string): Promise<LastFiledVatReturnSummary> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+  const activeStoreId = await requireErpStoreId(storeId);
+
+  const { data, error } = await supabase
+    .from("erp_vat_returns")
+    .select("id, return_number, period_start, period_end, filed_date")
+    .eq("store_id", activeStoreId)
+    .eq("status", "filed")
+    .order("period_end", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    return_number: data.return_number,
+    period_start: data.period_start,
+    period_end: data.period_end,
+    filed_date: data.filed_date,
+  };
+}
+
+export async function previewVatReturn(input: {
+  storeId?: string;
+  periodStart: string;
+  periodEnd: string;
+}): Promise<VatReturnPreview> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+  const storeId = await requireErpStoreId(input.storeId);
+
+  const { data, error } = await supabase.rpc("preview_erp_vat_return", {
+    p_store_id: storeId,
+    p_period_start: input.periodStart,
+    p_period_end: input.periodEnd,
+  });
+  if (error) throw new Error(error.message);
+
+  const row = (data ?? {}) as Record<string, unknown>;
+  return {
+    output_tax: Number(row.output_tax ?? 0),
+    input_tax: Number(row.input_tax ?? 0),
+    total_tax_payable: Number(row.total_tax_payable ?? 0),
+    recoverable_tax: Number(row.recoverable_tax ?? 0),
+  };
+}
+
+export async function refreshVatReturn(returnId: string): Promise<VatReturnDetailWithSources> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("refresh_erp_vat_return", {
+    p_return_id: returnId,
+  });
+  if (error) throw new Error(error.message);
+
+  await logAuditEvent({
+    action: "refresh_vat_return",
+    entityType: "vat_return",
+    entityId: returnId,
+    description: "VAT return recalculated",
+  });
+
+  return getVatReturnDetail(returnId);
+}
+
 export async function createVatReturn(input: {
   storeId?: string;
   periodStart: string;
@@ -112,15 +185,13 @@ export async function createVatReturn(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store is required");
+  const storeId = await requireErpStoreId(input.storeId);
 
   const { data, error } = await supabase.rpc("create_erp_vat_return", {
     p_store_id: storeId,
     p_period_start: input.periodStart,
     p_period_end: input.periodEnd,
-    p_notes: input.notes ?? undefined,
+    p_notes: input.notes ?? null,
   });
   if (error) throw new Error(error.message);
 
@@ -135,7 +206,7 @@ export async function createVatReturn(input: {
   return data as string;
 }
 
-export async function getVatReturnDetail(returnId: string): Promise<VatReturnDetail> {
+export async function getVatReturnDetail(returnId: string): Promise<VatReturnDetailWithSources> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
@@ -149,7 +220,175 @@ export async function getVatReturnDetail(returnId: string): Promise<VatReturnDet
     supabase,
     data.store_id ? [data.store_id] : [],
   );
-  return mapVatReturnRow(data as Record<string, unknown>, storeNames);
+  const base = mapVatReturnRow(data as Record<string, unknown>, storeNames);
+  const sources = await loadVatReturnSources(
+    supabase,
+    base.store_id,
+    base.period_start,
+    base.period_end,
+    returnId,
+  );
+
+  return {
+    ...base,
+    recoverable_tax: Math.max(0, base.input_tax - base.output_tax),
+    sources,
+  };
+}
+
+async function loadCustomerNames(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userIds: string[],
+): Promise<Map<string, string | null>> {
+  const uniqueIds = [...new Set(userIds.filter(Boolean))];
+  const nameById = new Map<string, string | null>();
+  if (uniqueIds.length === 0) return nameById;
+
+  const { data, error } = await supabase.from("users").select("id, name").in("id", uniqueIds);
+  if (error) throw new Error(error.message);
+
+  for (const user of data ?? []) {
+    nameById.set(user.id, user.name);
+  }
+  return nameById;
+}
+
+async function loadVatReturnSources(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  storeId: string | null,
+  periodStart: string,
+  periodEnd: string,
+  returnId: string,
+): Promise<VatReturnDetailWithSources["sources"]> {
+  const storeFilter = storeId ? { store_id: storeId } : {};
+
+  const [invoicesRes, creditNotesRes, billsRes, vendorCreditsRes, paymentsRes] =
+    await Promise.all([
+      supabase
+        .from("invoices")
+        .select(
+          "id, invoice_number, issued_at, created_at, gst_amount, total_amount, status, store_id, user_id",
+        )
+        .in("status", ["issued", "partial", "paid", "overdue"])
+        .match(storeFilter),
+      supabase
+        .from("erp_credit_notes")
+        .select(
+          "id, credit_note_number, credit_note_date, tax_amount, total_amount, status, store_id, user_id",
+        )
+        .in("status", ["issued", "applied"])
+        .gte("credit_note_date", periodStart)
+        .lte("credit_note_date", periodEnd)
+        .match(storeFilter),
+      supabase
+        .from("erp_purchase_bills")
+        .select(
+          "id, purchase_bill_number, purchase_date, tax_amount, total_amount, status, store_id, vendors(name)",
+        )
+        .in("status", ["finalized", "partial", "paid"])
+        .gte("purchase_date", periodStart)
+        .lte("purchase_date", periodEnd)
+        .match(storeFilter),
+      supabase
+        .from("erp_vendor_credits")
+        .select(
+          "id, credit_number, credit_date, tax_amount, total_amount, status, store_id, vendors(name)",
+        )
+        .in("status", ["issued", "applied"])
+        .gte("credit_date", periodStart)
+        .lte("credit_date", periodEnd)
+        .match(storeFilter),
+      supabase
+        .from("erp_vat_payments")
+        .select("id, payment_number, payment_date, amount, payment_type, reference")
+        .eq("vat_return_id", returnId)
+        .order("payment_date", { ascending: false }),
+    ]);
+
+  if (invoicesRes.error) throw new Error(invoicesRes.error.message);
+  if (creditNotesRes.error) throw new Error(creditNotesRes.error.message);
+  if (billsRes.error) throw new Error(billsRes.error.message);
+  if (vendorCreditsRes.error) throw new Error(vendorCreditsRes.error.message);
+  if (paymentsRes.error) throw new Error(paymentsRes.error.message);
+
+  const filteredInvoices = (invoicesRes.data ?? []).filter((row) => {
+    const effectiveDate =
+      (row.issued_at as string | null)?.slice(0, 10) ??
+      (row.created_at as string | null)?.slice(0, 10);
+    return effectiveDate && effectiveDate >= periodStart && effectiveDate <= periodEnd;
+  });
+
+  const customerNames = await loadCustomerNames(supabase, [
+    ...filteredInvoices.map((row) => row.user_id as string),
+    ...(creditNotesRes.data ?? []).map((row) => row.user_id as string),
+  ]);
+
+  const salesInvoices: VatReturnSourceLine[] = filteredInvoices.map((row) => ({
+    id: row.id,
+    document_number: row.invoice_number,
+    document_date:
+      (row.issued_at as string | null)?.slice(0, 10) ??
+      (row.created_at as string | null)?.slice(0, 10) ??
+      "",
+    party_name: customerNames.get(row.user_id as string) ?? null,
+    tax_amount: Number(row.gst_amount ?? 0),
+    total_amount: Number(row.total_amount ?? 0),
+    href: `/admin/erp/invoices/${row.id}`,
+  }));
+
+  const creditNotes: VatReturnSourceLine[] = (creditNotesRes.data ?? []).map((row) => ({
+    id: row.id,
+    document_number: row.credit_note_number,
+    document_date: row.credit_note_date,
+    party_name: customerNames.get(row.user_id as string) ?? null,
+    tax_amount: Number(row.tax_amount ?? 0),
+    total_amount: Number(row.total_amount ?? 0),
+    href: `/admin/erp/credit-notes/${row.id}`,
+  }));
+
+  const purchaseBills: VatReturnSourceLine[] = (billsRes.data ?? []).map((row) => {
+    const vendor = row.vendors as { name: string } | null;
+    return {
+      id: row.id,
+      document_number: row.purchase_bill_number,
+      document_date: row.purchase_date,
+      party_name: vendor?.name ?? null,
+      tax_amount: Number(row.tax_amount ?? 0),
+      total_amount: Number(row.total_amount ?? 0),
+      href: `/admin/erp/purchase-bills/${row.id}`,
+    };
+  });
+
+  const vendorCredits: VatReturnSourceLine[] = (vendorCreditsRes.data ?? []).map((row) => {
+    const vendor = row.vendors as { name: string } | null;
+    return {
+      id: row.id,
+      document_number: row.credit_number,
+      document_date: row.credit_date,
+      party_name: vendor?.name ?? null,
+      tax_amount: Number(row.tax_amount ?? 0),
+      total_amount: Number(row.total_amount ?? 0),
+      href: `/admin/erp/vendor-credits/${row.id}`,
+    };
+  });
+
+  const payments: VatReturnPaymentLine[] = (paymentsRes.data ?? []).map((row) => ({
+    id: row.id,
+    payment_number: row.payment_number,
+    payment_date: row.payment_date,
+    amount: Number(row.amount ?? 0),
+    payment_type: row.payment_type,
+    reference: row.reference,
+    href: `/admin/erp/vat-payments`,
+  }));
+
+  return {
+    sales_invoices: salesInvoices,
+    credit_notes: creditNotes,
+    purchase_bills: purchaseBills,
+    vendor_credits: vendorCredits,
+    payments,
+  };
 }
 
 export async function fileVatReturn(returnId: string): Promise<void> {

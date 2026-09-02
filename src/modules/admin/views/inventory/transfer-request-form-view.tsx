@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 import type { ErpVariantSearchRow } from "@/common/erp/purchasing-types";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
@@ -13,6 +13,8 @@ import {
   AdminFormGrid,
   AdminFormSection,
   AdminFormShell,
+  ErpDocumentNumberField,
+  ProductLiveSearch,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -53,8 +55,6 @@ export function TransferRequestFormView({
   const [requestDate, setRequestDate] = useState(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<RequestLine[]>([]);
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<ErpVariantSearchRow[]>([]);
 
   useEffect(() => {
     if (!fromStoreId || lines.length === 0) return;
@@ -92,19 +92,6 @@ export function TransferRequestFormView({
     router.push(`/admin/erp/transfer-requests/${id}`);
   }
 
-  async function runSearch() {
-    const q = search.trim();
-    if (q.length < 2) return;
-    if (!fromStoreId) {
-      setError("Select the supplying store first to see available stock.");
-      return;
-    }
-    const res = await adminGet<{ data: ErpVariantSearchRow[] }>(
-      `erp/purchase-catalog?q=${encodeURIComponent(q)}`,
-    );
-    setResults(res.data);
-  }
-
   async function addLine(row: ErpVariantSearchRow) {
     if (!fromStoreId) {
       setError("Select the supplying store first.");
@@ -127,8 +114,6 @@ export function TransferRequestFormView({
         averagePurchaseCost: row.purchase_price ?? 0,
       },
     ]);
-    setResults([]);
-    setSearch("");
   }
 
   function handleSubmit(submit: boolean) {
@@ -194,6 +179,7 @@ export function TransferRequestFormView({
     <AdminFormColumns cols={2}>
       <AdminFormSection title="Request details">
         <AdminFormGrid cols={2}>
+          <ErpDocumentNumberField kind="TR" />
           <AdminFormField label="Supplying store (has stock)" required>
             <StoreSelect value={fromStoreId} onChange={setFromStoreId} stores={stores} label="" />
           </AdminFormField>
@@ -214,31 +200,12 @@ export function TransferRequestFormView({
       </AdminFormSection>
 
       <AdminFormSection title="Items">
-        <div className="flex gap-2">
-          <Input
-            placeholder="Search product…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), runSearch())}
-            disabled={!fromStoreId}
-          />
-          <Button type="button" variant="outline" onClick={runSearch}>
-            <Search className="h-4 w-4" />
-          </Button>
-        </div>
-        {results.map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            className="block w-full rounded border p-2 text-left text-sm hover:bg-muted/50"
-            onClick={() => addLine(r)}
-          >
-            {r.product_name}
-            {fromStoreId ? (
-              <span className="ml-2 text-muted-foreground">— search to see stock after add</span>
-            ) : null}
-          </button>
-        ))}
+        <ProductLiveSearch
+          catalog="purchase"
+          placeholder="Search product…"
+          disabled={!fromStoreId}
+          onSelect={(row) => addLine(row as ErpVariantSearchRow)}
+        />
         {!fromStoreId ? (
           <p className="text-sm text-muted-foreground">
             Select the supplying store to search items and view its on-hand stock.

@@ -23,7 +23,8 @@ export async function GET(
     return NextResponse.json({ ...invoice, editable });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to load invoice";
-    return NextResponse.json({ error: msg }, { status: 400 });
+    const status = msg === "Invoice not found" ? 404 : 400;
+    return NextResponse.json({ error: msg }, { status });
   }
 }
 

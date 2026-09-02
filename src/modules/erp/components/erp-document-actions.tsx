@@ -34,6 +34,8 @@ export type ErpDocumentActionsProps = {
   viewHref: string;
   editHref?: string;
   printHref?: string;
+  onPrintClick?: () => void;
+  onDownloadClick?: () => void;
   emailConfig?: ErpDocumentEmailConfig;
   canEdit?: boolean;
   canDelete?: boolean;
@@ -49,6 +51,8 @@ export function ErpDocumentActions({
   viewHref,
   editHref,
   printHref,
+  onPrintClick,
+  onDownloadClick,
   emailConfig,
   canEdit = false,
   canDelete = false,
@@ -144,6 +148,7 @@ export function ErpDocumentActions({
           </Button>
         ) : (
           <Button
+            nativeButton
             size={iconSize}
             variant={layout === "bar" ? "outline" : "ghost"}
             disabled
@@ -153,26 +158,50 @@ export function ErpDocumentActions({
           </Button>
         )
       ) : null}
-      {printHref ? (
+      {onPrintClick || printHref ? (
         <>
-          <Button
-            nativeButton={false}
-            size={iconSize}
-            variant={layout === "bar" ? "outline" : "ghost"}
-            render={<Link href={printHref} target="_blank" />}
-            aria-label="Print"
-          >
-            <Printer />
-          </Button>
-          <Button
-            nativeButton={false}
-            size={iconSize}
-            variant={layout === "bar" ? "outline" : "ghost"}
-            render={<Link href={`${printHref}?download=1`} target="_blank" />}
-            aria-label="Download PDF"
-          >
-            <Download />
-          </Button>
+          {onPrintClick ? (
+            <Button
+              nativeButton
+              size={iconSize}
+              variant={layout === "bar" ? "outline" : "ghost"}
+              onClick={onPrintClick}
+              aria-label="Print"
+            >
+              <Printer />
+            </Button>
+          ) : (
+            <Button
+              nativeButton={false}
+              size={iconSize}
+              variant={layout === "bar" ? "outline" : "ghost"}
+              render={<Link href={printHref!} target="_blank" />}
+              aria-label="Print"
+            >
+              <Printer />
+            </Button>
+          )}
+          {onDownloadClick ? (
+            <Button
+              nativeButton
+              size={iconSize}
+              variant={layout === "bar" ? "outline" : "ghost"}
+              onClick={onDownloadClick}
+              aria-label="Download PDF"
+            >
+              <Download />
+            </Button>
+          ) : printHref ? (
+            <Button
+              nativeButton={false}
+              size={iconSize}
+              variant={layout === "bar" ? "outline" : "ghost"}
+              render={<Link href={`${printHref}?download=1`} target="_blank" />}
+              aria-label="Download PDF"
+            >
+              <Download />
+            </Button>
+          ) : null}
         </>
       ) : null}
       {emailConfig ? (

@@ -2,8 +2,9 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useEffect } from "react";
 
 import type { OrderWithItems } from "@/common/admin/types";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
@@ -15,6 +16,7 @@ import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 type OrderDetailPayload = { order: OrderWithItems };
 
 export function AdminOrderDetailView() {
+  const router = useRouter();
   const params = useParams();
   const slug = (params.slug as string[] | undefined) ?? [];
   const id =
@@ -26,6 +28,12 @@ export function AdminOrderDetailView() {
     enabled: Boolean(id),
     placeholderData: keepPreviousData,
   });
+
+  useEffect(() => {
+    if (data?.order?.source === "sales_order") {
+      router.replace(`/admin/erp/sales-orders/${id}`);
+    }
+  }, [data?.order?.source, id, router]);
 
   if (!id) {
     return (
@@ -75,6 +83,10 @@ export function AdminOrderDetailView() {
         </Link>
       </div>
     );
+  }
+
+  if (data.order.source === "sales_order") {
+    return <AdminPageSkeleton />;
   }
 
   return (

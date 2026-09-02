@@ -14,6 +14,7 @@ import {
   AdminFormSection,
   AdminFormShell,
   CustomerSearchSelect,
+  ErpDocumentNumberField,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
@@ -22,7 +23,10 @@ import {
   emptySalesLine,
   salesLinesToApiInput,
 } from "@/modules/erp/components/sales-lines-editor";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,7 +48,8 @@ export function EstimateFormView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [loadingEstimate, setLoadingEstimate] = useState(mode === "edit");
@@ -52,7 +57,6 @@ export function EstimateFormView({
 
   const [customerId, setCustomerId] = useState("");
   const [customerLabel, setCustomerLabel] = useState("");
-  const [storeId, setStoreId] = useState("");
   const [estimateDate, setEstimateDate] = useState(new Date().toISOString().slice(0, 10));
   const [validUntil, setValidUntil] = useState("");
   const [discount, setDiscount] = useState(0);
@@ -60,10 +64,6 @@ export function EstimateFormView({
   const [notes, setNotes] = useState("");
   const [reference, setReference] = useState("");
   const [lines, setLines] = useState<SalesLineFormRow[]>([emptySalesLine()]);
-
-  useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
 
   useEffect(() => {
     const preselected = searchParams.get("customerId");
@@ -171,6 +171,10 @@ export function EstimateFormView({
       setError("Customer is required");
       return;
     }
+    if (!effectiveStoreId) {
+      setError(storeRequiredMessage ?? "Store is required");
+      return;
+    }
     const apiLines = salesLinesToApiInput(lines);
     if (apiLines.length === 0) {
       setError("Add at least one item");
@@ -200,7 +204,7 @@ export function EstimateFormView({
 
         const res = await adminPost<{ id: string }>("erp/estimates", {
           userId: customerId,
-          storeId: storeId || undefined,
+          storeId: effectiveStoreId,
           ...payload,
           finalize: submitMode !== "draft",
         });
@@ -302,11 +306,16 @@ export function EstimateFormView({
                 </Link>
               </AdminFormField>
               <AdminFormField label="Store">
-                <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+                <ActiveStoreFormField
+                  mode={mode}
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
+                />
               </AdminFormField>
-              <AdminFormField label="Estimate #">
-                <Input value="Auto-generated" disabled />
-              </AdminFormField>
+              <ErpDocumentNumberField kind="EST" enabled={mode === "create"} />
               <AdminFormField label="Estimate date">
                 <Input type="date" value={estimateDate} onChange={(e) => setEstimateDate(e.target.value)} />
               </AdminFormField>
@@ -327,7 +336,7 @@ export function EstimateFormView({
           </AdminFormSection>
 
           <AdminFormSection title="Estimate items">
-            <SalesLinesEditor lines={lines} onChange={setLines} storeId={storeId} taxInclusive={taxInclusive} showSerial />
+            <SalesLinesEditor lines={lines} onChange={setLines} storeId={effectiveStoreId} taxInclusive={taxInclusive} showSerial />
           </AdminFormSection>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

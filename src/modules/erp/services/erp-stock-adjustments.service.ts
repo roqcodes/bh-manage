@@ -86,25 +86,33 @@ export async function createStockAdjustment(input: {
     purchase_cost: l.direction === "remove" ? 0 : l.purchaseCost,
   })) as Json;
 
+  const finalize = input.finalize ?? false;
+
   const { data, error } = await supabase.rpc("create_erp_stock_adjustment", {
     p_store_id: input.storeId,
     p_adjustment_date: input.adjustmentDate,
     p_lines: linesJson,
     p_note: input.note ?? undefined,
-    p_finalize: input.finalize ?? false,
+    p_finalize: false,
   });
 
   if (error) throw new Error(error.message);
 
+  const adjustmentId = data as string;
+
+  if (finalize) {
+    await finalizeStockAdjustment(adjustmentId);
+  }
+
   await logAuditEvent({
-    action: "stock_adjustment",
+    action: finalize ? "finalize_stock_adjustment" : "stock_adjustment",
     entityType: "stock_adjustment",
-    entityId: data as string,
-    description: "Stock adjustment created",
+    entityId: adjustmentId,
+    description: finalize ? "Stock adjustment created and finalized" : "Stock adjustment created",
     storeId: input.storeId,
   });
 
-  return data as string;
+  return adjustmentId;
 }
 
 export async function finalizeStockAdjustment(adjustmentId: string): Promise<void> {

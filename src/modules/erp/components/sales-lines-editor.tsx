@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { useMemo } from "react";
+import { Plus, Trash2 } from "lucide-react";
 
 import type { ErpSalesVariantSearchRow, SalesLineFormRow } from "@/common/erp/sales-types";
 import { calcSalesLine, roundSalesMoney } from "@/common/erp/sales-types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { ProductLiveSearch } from "@/modules/admin/ui/product-live-search";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -63,10 +63,6 @@ export function SalesLinesEditor({
   taxInclusive?: boolean;
   showSerial?: boolean;
 }) {
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<ErpSalesVariantSearchRow[]>([]);
-  const [searching, setSearching] = useState(false);
-
   const totals = useMemo(() => {
     let subtotal = 0;
     let tax = 0;
@@ -87,22 +83,6 @@ export function SalesLinesEditor({
     };
   }, [lines, taxInclusive]);
 
-  async function runSearch() {
-    const q = search.trim();
-    if (q.length < 2) return;
-    setSearching(true);
-    try {
-      const params = new URLSearchParams({ q });
-      if (storeId) params.set("storeId", storeId);
-      const res = await adminGet<{ data: ErpSalesVariantSearchRow[] }>(
-        `erp/sales-catalog?${params.toString()}`,
-      );
-      setResults(res.data);
-    } finally {
-      setSearching(false);
-    }
-  }
-
   function addFromSearch(row: ErpSalesVariantSearchRow) {
     onChange([
       ...lines.filter((l) => l.productName.trim()),
@@ -120,8 +100,6 @@ export function SalesLinesEditor({
         unitId: null,
       },
     ]);
-    setResults([]);
-    setSearch("");
   }
 
   function updateLine(key: string, patch: Partial<SalesLineFormRow>) {
@@ -134,38 +112,13 @@ export function SalesLinesEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <Input
-          placeholder="Search product by name or barcode…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), runSearch())}
-          className="max-w-sm"
-        />
-        <Button type="button" variant="outline" onClick={runSearch} disabled={searching}>
-          <Search className="mr-1 h-4 w-4" />
-          {searching ? "Searching…" : "Search"}
-        </Button>
-      </div>
-
-      {results.length > 0 && (
-        <div className="rounded-lg border border-border bg-muted/30 p-2">
-          {results.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-background"
-              onClick={() => addFromSearch(r)}
-            >
-              <span className="font-medium">{r.product_name}</span>
-              {r.name ? <span className="text-slate-500"> — {r.name}</span> : null}
-              <span className="ml-2 text-slate-500">
-                Stock: {r.available_stock} · {formatCurrencyAmount(r.sales_price ?? 0)}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+      <ProductLiveSearch
+        catalog="sales"
+        storeId={storeId}
+        placeholder="Search product by name or barcode…"
+        className="max-w-md"
+        onSelect={(row) => addFromSearch(row as ErpSalesVariantSearchRow)}
+      />
 
       <div className="overflow-x-auto rounded-lg border">
         <Table>

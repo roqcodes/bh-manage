@@ -3,14 +3,14 @@ import "server-only";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpVariantSearchRow } from "@/common/erp/purchasing-types";
+import { buildIlikePattern } from "@/lib/postgrest-search";
 
 export async function searchPurchaseVariants(query: string, limit = 25): Promise<ErpVariantSearchRow[]> {
   await requireAdminOrManagerProfile();
-  const q = query.trim();
-  if (!q) return [];
+  const pattern = buildIlikePattern(query);
+  if (!pattern) return [];
 
   const supabase = await createSupabaseServerClient();
-  const pattern = `%${q}%`;
 
   const { data, error } = await supabase
     .from("product_variants")

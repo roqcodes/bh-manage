@@ -78,9 +78,8 @@ export function SalesOrdersListView() {
   return (
     <AdminPageLayout>
       <AdminPageHeader
-        title="Sales orders"
+        title=""
         breadcrumb={[{ label: "Sales orders", href: "/admin/erp/sales-orders" }]}
-        description="Sales orders confirm fulfillment before billing (Zoho-style). Convert to invoice when goods are delivered."
       />
       <OrdersPanel
         orders={data.data}

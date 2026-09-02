@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import { useId, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -15,6 +15,7 @@ import {
   AdminFormSection,
   AdminFormShell,
   CustomerSearchSelect,
+  ErpDocumentNumberField,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import {
@@ -22,7 +23,10 @@ import {
   emptySalesLine,
   salesLinesToApiInput,
 } from "@/modules/erp/components/sales-lines-editor";
-import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,14 +42,14 @@ export function SalesOrderFormView({
 }: SalesOrderFormViewProps) {
   const router = useRouter();
   const formId = useId();
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode: "create" });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isModal = variant === "modal";
 
   const [customerId, setCustomerId] = useState("");
   const [customerLabel, setCustomerLabel] = useState("");
-  const [storeId, setStoreId] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
   const [shipmentDate, setShipmentDate] = useState(new Date().toISOString().slice(0, 10));
@@ -54,10 +58,6 @@ export function SalesOrderFormView({
   const [discount, setDiscount] = useState(0);
   const [taxInclusive, setTaxInclusive] = useState(true);
   const [lines, setLines] = useState<SalesLineFormRow[]>([emptySalesLine()]);
-
-  useEffect(() => {
-    if (activeStoreId && !storeId) setStoreId(activeStoreId);
-  }, [activeStoreId, storeId]);
 
   const totals = useMemo(() => {
     let subtotal = 0;
@@ -90,13 +90,17 @@ export function SalesOrderFormView({
       onOpenChange?.(false);
       onSuccess?.(orderId);
     }
-    router.push(`/admin/orders/${orderId}`);
+    router.push(`/admin/erp/sales-orders/${orderId}`);
   }
 
   function handleSubmit() {
     setError(null);
     if (!customerId) {
       setError("Customer is required");
+      return;
+    }
+    if (!effectiveStoreId) {
+      setError(storeRequiredMessage ?? "Store is required");
       return;
     }
     const apiLines = salesLinesToApiInput(lines);
@@ -110,6 +114,7 @@ export function SalesOrderFormView({
         variantId: l.variantId as string,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
+        taxRatePercent: l.taxRatePercent,
       }));
     if (items.length === 0) {
       setError("Select items from catalog search so variants are linked");
@@ -122,7 +127,7 @@ export function SalesOrderFormView({
           "erp/sales-orders",
           {
             userId: customerId,
-            storeId: storeId || undefined,
+            storeId: effectiveStoreId,
             referenceNumber: referenceNumber || undefined,
             shipmentDate: shipmentDate || undefined,
             deliveryMethod: deliveryMethod || undefined,
@@ -130,6 +135,7 @@ export function SalesOrderFormView({
             tax: totals.tax,
             discount,
             totalAmount: totals.total,
+            taxInclusive,
             items,
           },
         );
@@ -230,9 +236,7 @@ export function SalesOrderFormView({
                   }}
                 />
               </AdminFormField>
-              <AdminFormField label="Sales order number">
-                <Input readOnly value="Auto-generated" className="bg-muted/40 text-muted-foreground" />
-              </AdminFormField>
+              <ErpDocumentNumberField kind="SO" />
               <AdminFormField label="Reference number">
                 <Input
                   value={referenceNumber}
@@ -268,7 +272,14 @@ export function SalesOrderFormView({
                 />
               </AdminFormField>
               <AdminFormField label="Store">
-                <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
+                <ActiveStoreFormField
+                  mode="create"
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
+                />
               </AdminFormField>
             </AdminFormGrid>
           </AdminFormSection>
@@ -277,7 +288,7 @@ export function SalesOrderFormView({
             <SalesLinesEditor
               lines={lines}
               onChange={setLines}
-              storeId={storeId}
+              storeId={effectiveStoreId}
               taxInclusive={taxInclusive}
               showSerial
             />

@@ -15,7 +15,7 @@ import type {
 } from "@/common/erp/sales-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import {
-  getAdminErpContext,
+  requireErpStoreId,
   resolveErpStoreId,
   withAccountStoreScope,
 } from "@/modules/erp/services/store-context.service";
@@ -193,9 +193,7 @@ export async function recordCustomerPayment(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store context is required");
+  const storeId = await requireErpStoreId(input.storeId);
   if (!input.accountId) throw new Error("Deposit account is required");
 
   const bankCharges = input.bankCharges ?? 0;
@@ -242,7 +240,7 @@ export async function getPaymentDetail(paymentId: string) {
   const { data, error } = await supabase
     .from("erp_customer_payments")
     .select(
-      "*, users:users!erp_customer_payments_user_id_fkey(name, email), stores(name), accounts!erp_customer_payments_account_id_fkey(name), bank_charges_account:accounts!erp_customer_payments_bank_charges_account_id_fkey(name), erp_payment_allocations(*, invoices(invoice_number, total_amount, balance_due))",
+      "*, users:users!erp_customer_payments_user_id_fkey(name, email), stores(name), accounts!erp_customer_payments_account_id_fkey(name), bank_charges_account:accounts!erp_customer_payments_bank_charges_account_id_fkey(name), erp_payment_allocations(*, invoices(id, invoice_number, total_amount, balance_due))",
     )
     .eq("id", paymentId)
     .single();
@@ -673,9 +671,7 @@ export async function recordBulkCustomerPaymentBatch(input: {
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = input.storeId ?? ctx?.store_id;
-  if (!storeId) throw new Error("Store context is required");
+  const storeId = await requireErpStoreId(input.storeId);
   if (!input.accountId) throw new Error("Deposit account is required");
   if (input.lines.length === 0) throw new Error("Add at least one invoice payment");
 

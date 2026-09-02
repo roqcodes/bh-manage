@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { useMemo } from "react";
+import { Plus, Trash2 } from "lucide-react";
 
 import type { PurchaseLineFormRow } from "@/common/erp/purchasing-types";
 import { calcPurchaseLine, roundMoney } from "@/common/erp/purchasing-types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import type { ErpVariantSearchRow } from "@/common/erp/purchasing-types";
+import { ProductLiveSearch } from "@/modules/admin/ui/product-live-search";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,10 +47,6 @@ export function PurchaseLinesEditor({
   showExpiry?: boolean;
   showSerial?: boolean;
 }) {
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<ErpVariantSearchRow[]>([]);
-  const [searching, setSearching] = useState(false);
-
   const totals = useMemo(() => {
     let subtotal = 0;
     let tax = 0;
@@ -65,20 +61,6 @@ export function PurchaseLinesEditor({
     }
     return { subtotal: roundMoney(subtotal), tax: roundMoney(tax), total: roundMoney(subtotal + tax) };
   }, [lines]);
-
-  async function runSearch() {
-    const q = search.trim();
-    if (q.length < 2) return;
-    setSearching(true);
-    try {
-      const res = await adminGet<{ data: ErpVariantSearchRow[] }>(
-        `erp/purchase-catalog?q=${encodeURIComponent(q)}`,
-      );
-      setResults(res.data);
-    } finally {
-      setSearching(false);
-    }
-  }
 
   function addVariant(v: ErpVariantSearchRow) {
     const label = v.name ? `${v.product_name} — ${v.name}` : v.product_name;
@@ -95,8 +77,6 @@ export function PurchaseLinesEditor({
         taxRatePercent: v.tax_rate_percent ?? 0,
       },
     ]);
-    setSearch("");
-    setResults([]);
   }
 
   function updateLine(index: number, patch: Partial<PurchaseLineFormRow>) {
@@ -114,40 +94,17 @@ export function PurchaseLinesEditor({
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex min-w-[240px] flex-1 flex-col gap-1">
           <label className="text-xs font-medium text-slate-600">Search product / variant</label>
-          <div className="flex gap-2">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name, barcode, code…"
-              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), runSearch())}
-            />
-            <Button type="button" variant="outline" onClick={runSearch} disabled={searching}>
-              <Search className="size-4" />
-            </Button>
-          </div>
+          <ProductLiveSearch
+            catalog="purchase"
+            placeholder="Name, barcode, code…"
+            onSelect={(row) => addVariant(row as ErpVariantSearchRow)}
+          />
         </div>
         <Button type="button" variant="outline" onClick={() => onChange([...lines, emptyPurchaseLine()])}>
           <Plus className="size-4" />
           Add line
         </Button>
       </div>
-
-      {results.length > 0 && (
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-2 text-sm">
-          {results.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              className="block w-full rounded px-2 py-1 text-left hover:bg-white"
-              onClick={() => addVariant(r)}
-            >
-              {r.product_name}
-              {r.name ? ` — ${r.name}` : ""}
-              {r.barcode ? ` (${r.barcode})` : ""}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="overflow-x-auto rounded-lg border border-slate-200">
         <Table>

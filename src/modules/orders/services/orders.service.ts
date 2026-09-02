@@ -359,7 +359,7 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id,created_at,status,payment_status,total_amount,subtotal,tax,discount,merchant_note,customer_edited_at,address_id,source,fulfillment_status,inventory_reserved,inventory_committed,preferred_delivery_date,shipment_date,users:users!orders_user_fkey(id,name,email,phone),order_items(id,order_id,variant_id,quantity,price,product_name,vendor_id,base_price,final_price,margin_amount,customer_edit_flag,created_at)",
+      "id,created_at,status,payment_status,total_amount,subtotal,tax,discount,merchant_note,customer_edited_at,address_id,source,fulfillment_status,inventory_reserved,inventory_committed,preferred_delivery_date,shipment_date,sales_order_number,reference_number,delivery_method,invoice_id,tax_inclusive,users:users!orders_user_fkey(id,name,email,phone),stores(name),order_items(id,order_id,variant_id,quantity,price,product_name,vendor_id,base_price,final_price,margin_amount,customer_edit_flag,tax_rate_percent,created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -370,6 +370,7 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
   const row = data as unknown as Omit<OrderWithItems, "addresses" | "customer_order_count"> & {
     users: OrderWithItems["users"];
     address_id: string | null;
+    stores?: { name: string } | null;
   };
 
   let addresses: OrderWithItems["addresses"] = null;
@@ -403,8 +404,40 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
     ? await fetchOrderFulfillments(id)
     : [];
 
+  let linked_invoice: OrderWithItems["linked_invoice"] = null;
+  const { data: activeInvoice } = await supabase
+    .from("invoices")
+    .select("id, status")
+    .eq("order_id", id)
+    .neq("status", "cancelled")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeInvoice) {
+    linked_invoice = { id: activeInvoice.id, status: activeInvoice.status };
+  } else if (row.invoice_id) {
+    const { data: inv } = await supabase
+      .from("invoices")
+      .select("id, status")
+      .eq("id", row.invoice_id)
+      .maybeSingle();
+    linked_invoice = inv ? { id: inv.id, status: inv.status } : null;
+  } else {
+    const { data: inv } = await supabase
+      .from("invoices")
+      .select("id, status")
+      .eq("order_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    linked_invoice = inv ? { id: inv.id, status: inv.status } : null;
+  }
+
   return {
     ...row,
+    store_name: row.stores?.name ?? null,
+    linked_invoice,
     order_items: enrichedItems,
     variant_groups,
     addresses,

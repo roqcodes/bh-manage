@@ -3,10 +3,15 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 import { buildOrderItemSnapshot } from "@/modules/orders/services/order-item-pricing.service";
-import { commitOrderInventory } from "@/modules/orders/services/order-wallet-inventory.service";
-import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import {
+  assignOrderFulfillmentStore,
+  shipOrderFulfillments,
+} from "@/modules/orders/services/order-wallet-inventory.service";
+import { requireErpStoreId } from "@/modules/erp/services/store-context.service";
+import { convertOrderToInvoice } from "@/modules/erp/services/convert-order-to-invoice.service";
 
 export interface CreateManualOrderInput {
+  userId?: string;
   customerName?: string;
   phone?: string;
   company?: string;
@@ -18,7 +23,6 @@ export interface CreateManualOrderInput {
   items: {
     variantId: string;
     quantity: number;
-    // Allow admin to override price, but default to system if not provided
     unitPrice?: number;
   }[];
 }
@@ -30,78 +34,58 @@ export interface CreateManualOrderResult {
   itemCount: number;
 }
 
+/** Admin POS counter sale — creates an online order, fulfills immediately at the active store. */
 export async function createManualOrder(
   input: CreateManualOrderInput,
 ): Promise<CreateManualOrderResult> {
-  // Ensure the user is an admin
   const auth = await requireAdminApiProfile();
   if (!auth.ok) throw new Error("Unauthorized");
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const storeId = ctx?.store_id;
-  if (!storeId) {
-    throw new Error("Store context is required for manual orders");
-  }
+  const storeId = await requireErpStoreId();
 
   if (!input.items || input.items.length === 0) {
-    throw new Error("Cannot create a manual invoice with no items");
+    throw new Error("Cannot create a sale with no items");
   }
 
-  // Step 1: Build order line items with pricing
   const orderLineItems = [];
-  let calculatedSubtotal = 0;
-
   for (const item of input.items) {
-    try {
-      const snapshot = await buildOrderItemSnapshot({
-        variantId: item.variantId,
-        quantity: item.quantity,
-        unitPriceOverride: item.unitPrice,
-      });
+    const snapshot = await buildOrderItemSnapshot({
+      variantId: item.variantId,
+      quantity: item.quantity,
+      unitPriceOverride: item.unitPrice,
+    });
 
-      const finalPrice = snapshot.final_price;
-
-      orderLineItems.push({
-        variantId: item.variantId,
-        quantity: item.quantity,
-        vendorId: snapshot.vendor_id,
-        basePrice: snapshot.base_price,
-        finalPrice,
-        marginAmount: snapshot.margin_amount,
-        productName: snapshot.product_name,
-      });
-
-      calculatedSubtotal += finalPrice * item.quantity;
-    } catch (error) {
-      throw new Error(
-        `Failed to process item "${item.variantId}" - ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
+    orderLineItems.push({
+      variantId: item.variantId,
+      quantity: item.quantity,
+      vendorId: snapshot.vendor_id,
+      basePrice: snapshot.base_price,
+      finalPrice: snapshot.final_price,
+      marginAmount: snapshot.margin_amount,
+      productName: snapshot.product_name,
+    });
   }
 
-  // Trust frontend calculation if it's close, else we can strictly enforce it. 
-  // Let's use the provided totals for the DB record since admins might apply manual order-level discounts.
   const finalTotalAmount = input.totalAmount;
 
-  // Step 2: Create order record (in transaction)
-  // user_id is null since it's an external customer, but we store their details.
   const { data: orderData, error: orderError } = await supabase
     .from("orders")
     .insert({
-      user_id: null,
+      user_id: input.userId ?? null,
       address_id: null,
       total_amount: finalTotalAmount,
-      status: "completed", // Manual invoices are assumed to be completed/paid on the spot
-      payment_status: "paid", // or pending if they want to track accounts receivable
+      status: "processing",
+      payment_status: "paid",
       customer_name: input.customerName || null,
       phone: input.phone || null,
       company: input.company || null,
       gst_number: input.gstNumber || null,
-      source: "manual",
+      source: "online",
       store_id: storeId,
       subtotal: input.subtotal,
       tax: input.tax,
       discount: input.discount,
+      merchant_note: "POS counter sale",
       created_by_admin_id: auth.profile.id,
     })
     .select("id")
@@ -112,9 +96,7 @@ export async function createManualOrder(
   }
 
   const orderId = orderData.id;
-  const orderNumber = `MAN-${orderId.slice(0, 8).toUpperCase()}`;
 
-  // Step 3: Create order_items records
   const orderItemsInsert = orderLineItems.map((item) => ({
     order_id: orderId,
     variant_id: item.variantId,
@@ -132,37 +114,42 @@ export async function createManualOrder(
     .insert(orderItemsInsert);
 
   if (itemsError) {
-    // Rollback: delete the order
     await supabase.from("orders").delete().eq("id", orderId);
     throw new Error(`Failed to insert order items: ${itemsError.message}`);
   }
 
-  // Step 4: Decrement inventory for all line items
   try {
-    await commitOrderInventory(orderId);
+    await assignOrderFulfillmentStore(orderId, storeId);
+    await shipOrderFulfillments(orderId);
+    const { error: finalizeError } = await supabase
+      .from("orders")
+      .update({
+        status: "delivered",
+        fulfillment_status: "shipped",
+        inventory_committed: true,
+      })
+      .eq("id", orderId);
+    if (finalizeError) throw new Error(finalizeError.message);
   } catch (invErr) {
     await supabase.from("order_items").delete().eq("order_id", orderId);
     await supabase.from("orders").delete().eq("id", orderId);
     throw invErr instanceof Error
       ? invErr
-      : new Error("Failed to update inventory for manual order");
+      : new Error("Failed to fulfill POS sale");
   }
 
-  // Generate an invoice using the existing function
   try {
-    await supabase.rpc('generate_invoice_for_order', {
-      p_order_id: orderId,
-      p_gst_number: input.gstNumber || undefined
-    });
-  } catch (invoiceError) {
-    console.error("Failed to generate invoice automatically", invoiceError);
-    // Non-fatal, admin can generate it later if needed
+    await convertOrderToInvoice(orderId);
+  } catch (invoiceErr) {
+    console.error("[createManualOrder] invoice conversion failed:", invoiceErr);
+    throw invoiceErr instanceof Error
+      ? invoiceErr
+      : new Error("Sale completed but invoice could not be created");
   }
 
-  // Step 5: Return order confirmation
   return {
     orderId,
-    orderNumber,
+    orderNumber: orderId.slice(0, 8).toUpperCase(),
     totalAmount: finalTotalAmount,
     itemCount: orderLineItems.reduce((sum, item) => sum + item.quantity, 0),
   };
