@@ -575,11 +575,14 @@ export interface DashboardErpInvoiceRow {
 export interface DashboardMonthlySeriesPoint {
   month: string;
   monthNum: number;
+  monthKey?: string;
   income: number;
   cogs: number;
   expenses: number;
   netProfit: number;
 }
+
+export type DashboardChartGranularity = "day" | "month";
 
 export interface DashboardFulfillmentCounts {
   needsAssignment: number;
@@ -589,6 +592,11 @@ export interface DashboardFulfillmentCounts {
 }
 
 export interface AdminDashboardPayload {
+  storeId: string;
+  storeName: string;
+  periodFrom: string;
+  periodTo: string;
+  chartGranularity: DashboardChartGranularity;
   metrics: DashboardMetrics;
   alerts: DashboardAlert[];
   pipeline: OrderPipelineCounts;

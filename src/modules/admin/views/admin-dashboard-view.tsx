@@ -4,17 +4,21 @@ import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   AlertTriangle,
+  ArrowDownLeft,
   ArrowRight,
+  ArrowUpRight,
   Boxes,
   ChevronRight,
   FileText,
   Package,
+  Receipt,
   ShoppingCart,
-  TrendingDown,
-  TrendingUp,
+  Store,
   Truck,
+  Wallet,
 } from "lucide-react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -34,6 +38,7 @@ import {
 import type {
   AdminDashboardPayload,
   DashboardAlert,
+  DashboardChartGranularity,
   DashboardErpInvoiceRow,
   DashboardMonthlySeriesPoint,
   Order,
@@ -46,6 +51,9 @@ import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { CurrencyAmount } from "@/components/currency-amount";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   formatCurrencyAmount,
   formatCurrencyCompactAmount,
@@ -53,10 +61,12 @@ import {
 import { useCurrencySettings } from "@/modules/settings/providers/currency-settings-provider";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { AdminPageHeader, AdminPageLayout } from "@/modules/admin/ui";
+import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { inventoryFulfillmentLabel } from "@/modules/orders/components/orders-ui";
+import { cn } from "@/lib/utils";
 
 const CHART_INCOME = "hsl(var(--primary))";
-const CHART_COGS = "#38bdf8";
 const CHART_EXPENSE = "#f59e0b";
 const CHART_PROFIT = "#22c55e";
 const CHART_LOSS = "#ef4444";
@@ -69,6 +79,125 @@ const INVOICE_STATUS_COLORS: Record<string, string> = {
   cancelled: "#ef4444",
   void: "#64748b",
 };
+
+function defaultDashboardDates() {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    dateFrom: `${today.slice(0, 4)}-01-01`,
+    dateTo: today,
+  };
+}
+
+function DashboardDateFilters({
+  dateFrom,
+  dateTo,
+  granularity,
+  onDateFromChange,
+  onDateToChange,
+  onGranularityChange,
+}: {
+  dateFrom: string;
+  dateTo: string;
+  granularity: DashboardChartGranularity;
+  onDateFromChange: (value: string) => void;
+  onDateToChange: (value: string) => void;
+  onGranularityChange: (value: DashboardChartGranularity) => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  function applyPreset(preset: "ytd" | "month" | "last30") {
+    if (preset === "ytd") {
+      const defaults = defaultDashboardDates();
+      onDateFromChange(defaults.dateFrom);
+      onDateToChange(defaults.dateTo);
+      onGranularityChange("month");
+      return;
+    }
+    if (preset === "month") {
+      onDateFromChange(`${today.slice(0, 8)}01`);
+      onDateToChange(today);
+      onGranularityChange("day");
+      return;
+    }
+    const start = new Date();
+    start.setDate(start.getDate() - 29);
+    onDateFromChange(start.toISOString().slice(0, 10));
+    onDateToChange(today);
+    onGranularityChange("day");
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex flex-wrap items-end gap-3 px-4 py-3">
+        <div className="space-y-1">
+          <Label htmlFor="dashboard-date-from">From</Label>
+          <Input
+            id="dashboard-date-from"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => onDateFromChange(e.target.value)}
+            className="h-9 w-[150px]"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="dashboard-date-to">To</Label>
+          <Input
+            id="dashboard-date-to"
+            type="date"
+            value={dateTo}
+            onChange={(e) => onDateToChange(e.target.value)}
+            className="h-9 w-[150px]"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label>Group by</Label>
+          <div className="flex h-9 rounded-md border border-input p-0.5">
+            <Button
+              type="button"
+              variant={granularity === "day" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-full px-3"
+              onClick={() => onGranularityChange("day")}
+            >
+              Days
+            </Button>
+            <Button
+              type="button"
+              variant={granularity === "month" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-full px-3"
+              onClick={() => onGranularityChange("month")}
+            >
+              Months
+            </Button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5 pb-0.5">
+          <Button type="button" variant="outline" size="sm" onClick={() => applyPreset("ytd")}>
+            YTD
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => applyPreset("month")}>
+            This month
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => applyPreset("last30")}>
+            Last 30 days
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function chartXAxisProps(pointCount: number) {
+  const dense = pointCount > 14;
+  return {
+    tick: { fontSize: dense ? 9 : 11 },
+    angle: dense ? -45 : 0,
+    textAnchor: dense ? ("end" as const) : ("middle" as const),
+    height: dense ? 56 : 30,
+    interval: pointCount > 31 ? Math.max(0, Math.floor(pointCount / 18)) : 0,
+  };
+}
 
 function fmtMoney(n: number, settings: ReturnType<typeof useCurrencySettings>["settings"]) {
   return formatCurrencyCompactAmount(n, settings);
@@ -102,22 +231,65 @@ function ChartMoneyTooltip({
   );
 }
 
-function DashboardHeader() {
+function DashboardMetricCard({
+  label,
+  value,
+  href,
+  icon: Icon,
+  negative,
+  subtext,
+}: {
+  label: string;
+  value: string;
+  href?: string;
+  icon: typeof Wallet;
+  negative?: boolean;
+  subtext?: string;
+}) {
+  const content = (
+    <Card className="overflow-hidden border border-border py-0 ring-0 transition-colors hover:border-primary/30">
+      <CardContent className="flex items-start gap-3 px-4 py-3.5">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          <p
+            className={cn(
+              "mt-0.5 text-xl font-semibold tabular-nums tracking-tight",
+              negative ? "text-rose-600" : "text-foreground",
+            )}
+          >
+            {value}
+          </p>
+          {subtext ? <p className="mt-0.5 text-[11px] text-muted-foreground">{subtext}</p> : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  if (!href) return content;
+  return <Link href={href}>{content}</Link>;
+}
+
+function SectionHeading({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="flex flex-wrap items-end justify-between gap-2">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Cash flow, store sales, online orders, fulfillment, and inventory — current year.
-        </p>
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
+        {description ? (
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+        ) : null}
       </div>
-      <Link
-        href="/admin/erp/reports"
-        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-      >
-        Open reports
-        <ArrowRight className="size-3.5" />
-      </Link>
+      {action}
     </div>
   );
 }
@@ -132,13 +304,12 @@ function AlertStrip({ alerts }: { alerts: DashboardAlert[] }) {
         <Link
           key={alert.id}
           href={alert.href}
-          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition hover:bg-muted ${
-            alert.severity === "critical"
-              ? "border-rose-200 bg-rose-50 text-rose-800"
-              : alert.severity === "warning"
-                ? "border-amber-200 bg-amber-50 text-amber-900"
-                : "border-sky-200 bg-sky-50 text-sky-900"
-          }`}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition hover:bg-muted",
+            alert.severity === "critical" && "border-rose-200 bg-rose-50 text-rose-800",
+            alert.severity === "warning" && "border-amber-200 bg-amber-50 text-amber-900",
+            alert.severity === "attention" && "border-sky-200 bg-sky-50 text-sky-900",
+          )}
         >
           <AlertTriangle className="size-3.5 shrink-0" />
           {alert.count.toLocaleString()} {alert.label}
@@ -149,111 +320,44 @@ function AlertStrip({ alerts }: { alerts: DashboardAlert[] }) {
   );
 }
 
-function KpiTile({
-  label,
-  value,
-  href,
-  negative,
-}: {
-  label: string;
-  value: string;
-  href: string;
-  negative?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex flex-col justify-between rounded-lg border bg-card px-3 py-3 transition hover:border-primary/30 hover:bg-muted/40"
-    >
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
-      <span
-        className={`mt-2 text-lg font-semibold tabular-nums ${
-          negative ? "text-rose-600" : "text-foreground"
-        }`}
-      >
-        {value}
-      </span>
-      <span className="mt-1 text-[10px] text-primary opacity-0 transition group-hover:opacity-100">
-        View details →
-      </span>
-    </Link>
-  );
-}
-
-function ErpKpiStack({
-  erp,
-  settings,
-}: {
-  erp: ErpFinancialDashboard | null;
-  settings: ReturnType<typeof useCurrencySettings>["settings"];
-}) {
-  const netProfit = erp?.net_profit_ytd ?? 0;
-  return (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
-      <KpiTile
-        label="Net profit / loss"
-        value={fmtMoney(netProfit, settings)}
-        href="/admin/erp/reports/profit-and-loss"
-        negative={netProfit < 0}
-      />
-      <KpiTile
-        label="Net income"
-        value={fmtMoney(erp?.net_income_ytd ?? 0, settings)}
-        href="/admin/erp/reports/finance-summary"
-      />
-      <KpiTile
-        label="Accounts payable"
-        value={fmtMoney(erp?.accounts_payable ?? 0, settings)}
-        href="/admin/erp/reports/vendor-balance"
-        negative={(erp?.accounts_payable ?? 0) < 0}
-      />
-      <KpiTile
-        label="Accounts receivable"
-        value={fmtMoney(erp?.accounts_receivable ?? 0, settings)}
-        href="/admin/erp/reports/customer-balance"
-      />
-      <KpiTile
-        label="Low stock items"
-        value={(erp?.low_stock_count ?? 0).toLocaleString()}
-        href="/admin/erp/reports/item-stock"
-      />
-    </div>
-  );
-}
-
-function IncomeCogsChart({
+function IncomeExpensesChart({
   series,
   erp,
   settings,
+  granularity,
 }: {
   series: DashboardMonthlySeriesPoint[];
   erp: ErpFinancialDashboard | null;
   settings: ReturnType<typeof useCurrencySettings>["settings"];
+  granularity: DashboardChartGranularity;
 }) {
+  const xAxis = chartXAxisProps(series.length);
+  const periodLabel = granularity === "day" ? "day" : "month";
+
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold">Income vs cost of goods sold</CardTitle>
-        <p className="text-xs text-muted-foreground">Monthly totals for the current year</p>
+        <CardTitle className="text-sm font-semibold">Income vs expenses</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Posted journal entries by {periodLabel} (matches Profit &amp; Loss)
+        </p>
       </CardHeader>
       <CardContent>
-        <div className="h-[220px] w-full">
+        <div className="h-[240px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <AreaChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: xAxis.height - 24 }}>
               <defs>
                 <linearGradient id="incomeFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={CHART_INCOME} stopOpacity={0.35} />
                   <stop offset="95%" stopColor={CHART_INCOME} stopOpacity={0.02} />
                 </linearGradient>
-                <linearGradient id="cogsFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={CHART_COGS} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={CHART_COGS} stopOpacity={0.02} />
+                <linearGradient id="expenseFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={CHART_EXPENSE} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={CHART_EXPENSE} stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="month" {...xAxis} />
               <YAxis
                 tick={{ fontSize: 11 }}
                 tickFormatter={(v) => formatCurrencyCompactAmount(Number(v), settings)}
@@ -270,30 +374,30 @@ function IncomeCogsChart({
               />
               <Area
                 type="monotone"
-                dataKey="cogs"
-                name="COGS"
-                stroke={CHART_COGS}
-                fill="url(#cogsFill)"
+                dataKey="expenses"
+                name="Expenses"
+                stroke={CHART_EXPENSE}
+                fill="url(#expenseFill)"
                 strokeWidth={2}
               />
             </AreaChart>
           </ResponsiveContainer>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 border-t pt-3 text-center">
-          <Link href="/admin/erp/reports/finance-summary" className="hover:underline">
+          <Link href="/admin/erp/reports/profit-and-loss" className="hover:underline">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Total income YTD
+              Total income
             </p>
             <p className="text-base font-semibold tabular-nums text-primary">
               {fmtMoney(erp?.net_income_ytd ?? 0, settings)}
             </p>
           </Link>
-          <Link href="/admin/erp/purchase-bills" className="hover:underline">
+          <Link href="/admin/erp/reports/profit-and-loss" className="hover:underline">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Total COGS YTD
+              Total expenses
             </p>
             <p className="text-base font-semibold tabular-nums">
-              {fmtMoney(erp?.cogs_ytd ?? 0, settings)}
+              {fmtMoney(erp?.expenses_ytd ?? 0, settings)}
             </p>
           </Link>
         </div>
@@ -320,8 +424,8 @@ function InvoiceStatusDonut({
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold">Invoices this year</CardTitle>
-        <p className="text-xs text-muted-foreground">By status</p>
+        <CardTitle className="text-sm font-semibold">Invoices in period</CardTitle>
+        <p className="text-xs text-muted-foreground">Branch invoice status for selected dates</p>
       </CardHeader>
       <CardContent>
         <div className="h-[180px] w-full">
@@ -365,7 +469,7 @@ function InvoiceStatusDonut({
           href="/admin/erp/invoices"
           className="mt-2 flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2 text-sm hover:bg-muted"
         >
-          <span>{totalCount.toLocaleString()} invoices YTD</span>
+          <span>{totalCount.toLocaleString()} invoices in period</span>
           <ChevronRight className="size-4 text-muted-foreground" />
         </Link>
       </CardContent>
@@ -376,21 +480,25 @@ function InvoiceStatusDonut({
 function NetProfitChart({
   series,
   settings,
+  granularity,
 }: {
   series: DashboardMonthlySeriesPoint[];
   settings: ReturnType<typeof useCurrencySettings>["settings"];
+  granularity: DashboardChartGranularity;
 }) {
   const chartData = series.map((row) => ({
     ...row,
     fill: row.netProfit >= 0 ? CHART_PROFIT : CHART_LOSS,
   }));
+  const xAxis = chartXAxisProps(series.length);
+  const periodLabel = granularity === "day" ? "day" : "month";
 
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
           <CardTitle className="text-sm font-semibold">Net profit / loss</CardTitle>
-          <p className="text-xs text-muted-foreground">By month</p>
+          <p className="text-xs text-muted-foreground">By {periodLabel} from posted journals</p>
         </div>
         <Link
           href="/admin/erp/reports/profit-and-loss"
@@ -400,17 +508,16 @@ function NetProfitChart({
         </Link>
       </CardHeader>
       <CardContent>
-        <div className="h-[220px] w-full">
+        <div className="h-[240px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: xAxis.height - 24 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="month" {...xAxis} />
               <YAxis
                 tick={{ fontSize: 11 }}
                 tickFormatter={(v) => formatCurrencyCompactAmount(Number(v), settings)}
               />
               <Tooltip content={<ChartMoneyTooltip settings={settings} />} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="netProfit" name="Net profit" radius={[4, 4, 0, 0]}>
                 {chartData.map((row) => (
                   <Cell key={row.month} fill={row.fill} />
@@ -424,53 +531,20 @@ function NetProfitChart({
   );
 }
 
-function DailySalesPanel({
-  invoices,
-  erpInvoicesToday,
-  onlineOrdersToday,
-  onlineRevenueToday,
-}: {
-  invoices: DashboardErpInvoiceRow[];
-  erpInvoicesToday: number;
-  onlineOrdersToday: number;
-  onlineRevenueToday: number;
-}) {
-  const salesToday = erpInvoicesToday + onlineOrdersToday;
-
+function RecentInvoicesPanel({ invoices }: { invoices: DashboardErpInvoiceRow[] }) {
   return (
     <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
-          <CardTitle className="text-sm font-semibold">Daily sales</CardTitle>
-          <p className="text-xs text-muted-foreground">Store invoices &amp; online orders</p>
+          <CardTitle className="text-sm font-semibold">Recent invoices</CardTitle>
+          <p className="text-xs text-muted-foreground">Latest branch sales</p>
         </div>
-        <Badge variant="secondary">{salesToday} today</Badge>
+        <Link href="/admin/erp/invoices" className="text-xs text-primary hover:underline">
+          All invoices
+        </Link>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <Link
-            href="/admin/erp/invoices"
-            className="rounded-md border px-2.5 py-2 hover:bg-muted"
-          >
-            <span className="text-muted-foreground">Store invoices</span>
-            <p className="font-semibold tabular-nums">{erpInvoicesToday}</p>
-          </Link>
-          <Link
-            href="/admin/orders"
-            className="rounded-md border px-2.5 py-2 hover:bg-muted"
-          >
-            <span className="text-muted-foreground">Online orders</span>
-            <p className="font-semibold tabular-nums">
-              {onlineOrdersToday}
-              {onlineRevenueToday > 0 ? (
-                <span className="ml-1 font-normal text-muted-foreground">
-                  · <CurrencyAmount amount={onlineRevenueToday} compact />
-                </span>
-              ) : null}
-            </p>
-          </Link>
-        </div>
-        <ul className="max-h-[240px] space-y-1 overflow-y-auto">
+      <CardContent>
+        <ul className="max-h-[280px] space-y-1 overflow-y-auto">
           {invoices.length === 0 ? (
             <li className="py-6 text-center text-sm text-muted-foreground">No recent invoices</li>
           ) : (
@@ -496,13 +570,6 @@ function DailySalesPanel({
             ))
           )}
         </ul>
-        <Link
-          href="/admin/erp/invoices"
-          className="flex w-full items-center justify-center gap-1 rounded-md border py-2 text-sm font-medium text-primary hover:bg-muted"
-        >
-          Show more
-          <ChevronRight className="size-4" />
-        </Link>
       </CardContent>
     </Card>
   );
@@ -514,7 +581,7 @@ function ActivityLogPanel({ entries }: { entries: AuditLogEntry[] }) {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
           <CardTitle className="text-sm font-semibold">Recent activity</CardTitle>
-          <p className="text-xs text-muted-foreground">ERP actions</p>
+          <p className="text-xs text-muted-foreground">Branch ERP actions</p>
         </div>
         <Link
           href="/admin/erp/reports/activity-logs"
@@ -524,15 +591,12 @@ function ActivityLogPanel({ entries }: { entries: AuditLogEntry[] }) {
         </Link>
       </CardHeader>
       <CardContent>
-        <ul className="max-h-[320px] space-y-0 overflow-y-auto">
+        <ul className="max-h-[280px] space-y-0 overflow-y-auto">
           {entries.length === 0 ? (
             <li className="py-8 text-center text-sm text-muted-foreground">No activity yet</li>
           ) : (
             entries.map((entry) => (
-              <li
-                key={entry.id}
-                className="border-l-2 border-primary/20 py-2 pl-3 first:pt-0"
-              >
+              <li key={entry.id} className="border-l-2 border-primary/20 py-2 pl-3 first:pt-0">
                 <p className="text-sm font-medium capitalize">
                   {entry.action.replace(/_/g, " ")}
                   <span className="font-normal text-muted-foreground">
@@ -544,7 +608,6 @@ function ActivityLogPanel({ entries }: { entries: AuditLogEntry[] }) {
                   {format(new Date(entry.created_at), "dd MMM yyyy, h:mm a")}
                   {" · "}
                   By {formatAuditLogUserDetail(entry)}
-                  {entry.description ? ` · ${entry.description}` : ""}
                 </p>
               </li>
             ))
@@ -726,7 +789,7 @@ function OrderTimelinePanel({ orders }: { orders: Order[] }) {
   );
 }
 
-function InventoryAlertsPanel({
+function InventoryPanel({
   alerts,
   procurement,
   lowStockCount,
@@ -735,19 +798,17 @@ function InventoryAlertsPanel({
   procurement: AdminDashboardPayload["procurement"];
   lowStockCount: number;
 }) {
-  const stockAlerts = alerts.filter((a) =>
-    ["out-of-stock", "low-stock"].includes(a.id),
-  );
+  const stockAlerts = alerts.filter((a) => ["out-of-stock", "low-stock"].includes(a.id));
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
-          <CardTitle className="text-sm font-semibold">Inventory alerts</CardTitle>
-          <p className="text-xs text-muted-foreground">Central catalog &amp; store stock</p>
+          <CardTitle className="text-sm font-semibold">Branch inventory</CardTitle>
+          <p className="text-xs text-muted-foreground">Stock levels at this store</p>
         </div>
-        <Link href="/admin/inventory" className="text-xs text-primary hover:underline">
-          Inventory
+        <Link href="/admin/erp/reports/store-wise-stock" className="text-xs text-primary hover:underline">
+          Stock report
         </Link>
       </CardHeader>
       <CardContent>
@@ -757,10 +818,22 @@ function InventoryAlertsPanel({
             className="rounded-lg border px-3 py-3 hover:bg-muted"
           >
             <div className="flex items-center gap-2 text-rose-600">
-              <TrendingDown className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">ERP low stock</span>
+              <ArrowDownLeft className="size-4" />
+              <span className="text-xs font-medium uppercase tracking-wide">Low / out of stock</span>
             </div>
             <p className="mt-2 text-2xl font-semibold tabular-nums">{lowStockCount}</p>
+          </Link>
+          <Link
+            href="/admin/erp/reports/store-wise-stock"
+            className="rounded-lg border px-3 py-3 hover:bg-muted"
+          >
+            <div className="flex items-center gap-2 text-emerald-600">
+              <ArrowUpRight className="size-4" />
+              <span className="text-xs font-medium uppercase tracking-wide">Units on hand</span>
+            </div>
+            <p className="mt-2 text-2xl font-semibold tabular-nums">
+              {procurement.availableInventoryUnits.toLocaleString()}
+            </p>
           </Link>
           <Link
             href="/admin/inventory"
@@ -786,18 +859,6 @@ function InventoryAlertsPanel({
               {procurement.pipelineShortageVariants}
             </p>
           </Link>
-          <Link
-            href="/admin/erp/reports/store-wise-stock"
-            className="rounded-lg border px-3 py-3 hover:bg-muted"
-          >
-            <div className="flex items-center gap-2 text-emerald-600">
-              <TrendingUp className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Units on hand</span>
-            </div>
-            <p className="mt-2 text-2xl font-semibold tabular-nums">
-              {procurement.availableInventoryUnits.toLocaleString()}
-            </p>
-          </Link>
         </div>
         {stockAlerts.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -820,11 +881,34 @@ function InventoryAlertsPanel({
 
 export function AdminDashboardView() {
   const { settings } = useCurrencySettings();
-  const { data, isError, error, isPending } = useQuery({
-    queryKey: adminQueryKeys.dashboard(),
-    queryFn: () => adminGet<AdminDashboardPayload>("dashboard"),
+  const queryClient = useQueryClient();
+  const { activeStoreId, storeId } = useActiveStoreScope();
+  const defaults = defaultDashboardDates();
+  const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
+  const [dateTo, setDateTo] = useState(defaults.dateTo);
+  const [granularity, setGranularity] = useState<DashboardChartGranularity>("month");
+
+  const { data, isError, error, isPending, isFetching } = useQuery({
+    queryKey: adminQueryKeys.dashboard(storeId, dateFrom, dateTo, granularity),
+    queryFn: () => {
+      const q = new URLSearchParams();
+      if (storeId) q.set("storeId", storeId);
+      q.set("dateFrom", dateFrom);
+      q.set("dateTo", dateTo);
+      q.set("granularity", granularity);
+      return adminGet<AdminDashboardPayload>(`dashboard?${q.toString()}`);
+    },
     placeholderData: keepPreviousData,
+    enabled: Boolean(storeId || activeStoreId) && Boolean(dateFrom && dateTo),
   });
+
+  useEffect(() => {
+    function onStoreChanged() {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+    }
+    window.addEventListener("buyhub:erp-store-changed", onStoreChanged);
+    return () => window.removeEventListener("buyhub:erp-store-changed", onStoreChanged);
+  }, [queryClient]);
 
   if (isPending && !data) {
     return <AdminPageSkeleton />;
@@ -832,7 +916,7 @@ export function AdminDashboardView() {
 
   if (isError) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-6">
+      <AdminPageLayout>
         <div className="flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4">
           <AlertTriangle className="size-5 shrink-0 text-rose-600" />
           <div>
@@ -842,7 +926,7 @@ export function AdminDashboardView() {
             </p>
           </div>
         </div>
-      </div>
+      </AdminPageLayout>
     );
   }
 
@@ -860,61 +944,136 @@ export function AdminDashboardView() {
     recentErpInvoices,
     erpInvoicesToday,
     fulfillmentCounts,
+    storeName,
+    periodFrom,
+    periodTo,
   } = data;
 
+  const netProfit = erpFinancial?.net_profit_ytd ?? 0;
+  const salesToday = erpInvoicesToday + business.ordersToday;
+  const periodLabel = `${format(new Date(`${periodFrom}T00:00:00`), "dd MMM yyyy")} – ${format(new Date(`${periodTo}T00:00:00`), "dd MMM yyyy")}`;
+
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6">
-      <DashboardHeader />
+    <AdminPageLayout>
+      <AdminPageHeader
+        title="Dashboard"
+        description={`Overview for ${storeName}`}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="gap-1.5 font-normal">
+              <Store className="size-3.5" />
+              {storeName}
+            </Badge>
+            <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/admin/erp/reports" />}>
+              Reports
+              <ArrowRight data-icon="inline-end" className="size-3.5" />
+            </Button>
+          </div>
+        }
+      />
+
       <AlertStrip alerts={alerts} />
 
-      <section aria-label="Cash flow summary">
-        <div className="mb-3">
-          <h2 className="text-sm font-semibold">Cash flow summary</h2>
-          <p className="text-xs text-muted-foreground">Current financial year</p>
+      <section className="space-y-3" aria-label="Key metrics">
+        <SectionHeading title="At a glance" description="Today and selected period for this branch" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <DashboardMetricCard
+            label="Sales today"
+            value={String(salesToday)}
+            subtext={`${erpInvoicesToday} invoices · ${business.ordersToday} online orders`}
+            href="/admin/erp/invoices"
+            icon={Receipt}
+          />
+          <DashboardMetricCard
+            label="Net profit"
+            value={fmtMoney(netProfit, settings)}
+            subtext={periodLabel}
+            href="/admin/erp/reports/profit-and-loss"
+            icon={Wallet}
+            negative={netProfit < 0}
+          />
+          <DashboardMetricCard
+            label="Accounts receivable"
+            value={fmtMoney(erpFinancial?.accounts_receivable ?? 0, settings)}
+            subtext="Open invoice balances"
+            href="/admin/erp/reports/customer-balance"
+            icon={ArrowUpRight}
+          />
+          <DashboardMetricCard
+            label="Accounts payable"
+            value={fmtMoney(erpFinancial?.accounts_payable ?? 0, settings)}
+            subtext="Open bill balances"
+            href="/admin/erp/reports/vendor-balance"
+            icon={ArrowDownLeft}
+            negative={(erpFinancial?.accounts_payable ?? 0) > 0}
+          />
         </div>
-        <div className="grid gap-4 lg:grid-cols-12">
+      </section>
+
+      <section className="space-y-3" aria-label="Financial performance">
+        <SectionHeading
+          title="Financial performance"
+          description={periodLabel}
+          action={
+            <div className="flex items-center gap-2">
+              {isFetching ? (
+                <span className="text-xs text-muted-foreground">Updating…</span>
+              ) : null}
+              <Link
+                href={`/admin/erp/reports/profit-and-loss?dateFrom=${periodFrom}&dateTo=${periodTo}`}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Open P&amp;L
+              </Link>
+            </div>
+          }
+        />
+        <DashboardDateFilters
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          granularity={granularity}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+          onGranularityChange={setGranularity}
+        />
+        <div className="grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <ErpKpiStack erp={erpFinancial} settings={settings} />
-          </div>
-          <div className="lg:col-span-7">
-            <IncomeCogsChart series={erpMonthlySeries} erp={erpFinancial} settings={settings} />
-          </div>
-          <div className="lg:col-span-3">
-            <InvoiceStatusDonut
-              data={erpFinancial?.invoice_status_ytd}
+            <IncomeExpensesChart
+              series={erpMonthlySeries}
+              erp={erpFinancial}
               settings={settings}
+              granularity={granularity}
             />
           </div>
+          <InvoiceStatusDonut data={erpFinancial?.invoice_status_ytd} settings={settings} />
+        </div>
+        <NetProfitChart series={erpMonthlySeries} settings={settings} granularity={granularity} />
+      </section>
+
+      <section className="space-y-3" aria-label="Online operations">
+        <SectionHeading title="Online operations" description="Fulfillment pipeline and order timeline" />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <FulfillmentPanel counts={fulfillmentCounts} pipeline={pipeline} />
+          <OrderTimelinePanel orders={recentOrders} />
         </div>
       </section>
 
-      <section aria-label="Sales and activity" className="grid gap-4 lg:grid-cols-3">
-        <NetProfitChart series={erpMonthlySeries} settings={settings} />
-        <DailySalesPanel
-          invoices={recentErpInvoices}
-          erpInvoicesToday={erpInvoicesToday}
-          onlineOrdersToday={business.ordersToday}
-          onlineRevenueToday={business.revenueToday}
-        />
-        <ActivityLogPanel entries={erpActivity} />
+      <section className="space-y-3" aria-label="Activity and sales">
+        <SectionHeading title="Activity &amp; sales" description="Recent branch activity and invoices" />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ActivityLogPanel entries={erpActivity} />
+          <RecentInvoicesPanel invoices={recentErpInvoices} />
+        </div>
       </section>
 
-      <section aria-label="Online operations" className="grid gap-4 lg:grid-cols-2">
-        <FulfillmentPanel counts={fulfillmentCounts} pipeline={pipeline} />
-        <OrderTimelinePanel orders={recentOrders} />
-      </section>
-
-      <section aria-label="Inventory">
-        <InventoryAlertsPanel
+      <section className="space-y-3" aria-label="Inventory">
+        <SectionHeading title="Inventory" />
+        <InventoryPanel
           alerts={alerts}
           procurement={procurement}
           lowStockCount={erpFinancial?.low_stock_count ?? 0}
         />
       </section>
-
-      <footer className="pt-2 text-center text-xs text-muted-foreground">
-        BuyHub Management Console
-      </footer>
-    </div>
+    </AdminPageLayout>
   );
 }

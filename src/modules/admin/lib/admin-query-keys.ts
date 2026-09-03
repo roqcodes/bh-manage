@@ -12,7 +12,13 @@ export const fixedAssetDetailQueryKey = (id: string) =>
 export const adminQueryKeys = {
   session: () => ["admin", "session"] as const,
   erpContext: () => ["admin", "erp-context"] as const,
-  dashboard: () => ["admin", "dashboard"] as const,
+  dashboard: (
+    storeId?: string | null,
+    dateFrom?: string,
+    dateTo?: string,
+    granularity?: string,
+  ) =>
+    ["admin", "dashboard", storeId ?? "active", dateFrom ?? "", dateTo ?? "", granularity ?? "month"] as const,
   navBadges: () => ["admin", "nav-badges"] as const,
   products: (page: number, categoryId: string | null, storeId?: string | null) =>
     ["admin", "products", page, categoryId ?? "all", storeId ?? "all"] as const,
