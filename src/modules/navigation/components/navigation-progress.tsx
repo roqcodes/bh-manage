@@ -1,18 +1,19 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef } from "react";
+
+import { setNavigationProgressActive } from "@/modules/navigation/lib/async-progress";
 
 function NavigationProgressInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [active, setActive] = useState(false);
   const routeKey = `${pathname}?${searchParams.toString()}`;
   const prevKey = useRef(routeKey);
 
   useEffect(() => {
     if (prevKey.current !== routeKey) {
-      setActive(false);
+      setNavigationProgressActive(false);
       prevKey.current = routeKey;
     }
   }, [routeKey]);
@@ -31,7 +32,7 @@ function NavigationProgressInner() {
         const here = `${window.location.pathname}${window.location.search}`;
         const dest = `${next.pathname}${next.search}`;
         if (dest === here) return;
-        setActive(true);
+        setNavigationProgressActive(true);
       } catch {
         /* ignore invalid href */
       }
@@ -41,24 +42,13 @@ function NavigationProgressInner() {
   }, []);
 
   useEffect(() => {
-    if (!active) return;
-    const t = window.setTimeout(() => setActive(false), 12_000);
-    return () => window.clearTimeout(t);
-  }, [active, routeKey]);
+    return () => setNavigationProgressActive(false);
+  }, [routeKey]);
 
-  if (!active) return null;
-
-  return (
-    <div
-      className="pointer-events-none fixed inset-x-0 top-0 z-[200] h-[3px] overflow-hidden bg-slate-200/70"
-      aria-hidden
-    >
-      <div className="kg-global-nav-progress h-full w-1/3 rounded-r-full bg-[#2563EB] shadow-sm" />
-    </div>
-  );
+  return null;
 }
 
-/** Top indeterminate bar on internal navigations; pair with root/segment `loading.tsx`. */
+/** Activates the shared top progress bar during internal link navigations. */
 export function NavigationProgress() {
   return (
     <Suspense fallback={null}>

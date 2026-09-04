@@ -1,5 +1,5 @@
-import { ErpComingSoonView } from "@/modules/admin/views/erp-coming-soon-view";
+import { EmployeesListView } from "@/modules/admin/views/hr/employees-list-view";
 
-export default function Page() {
-  return <ErpComingSoonView title="Employees" />;
+export default function EmployeesPage() {
+  return <EmployeesListView />;
 }

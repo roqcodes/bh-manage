@@ -1,4 +1,8 @@
 /** Browser fetch for `/api/admin/*` — cookies sent on same origin. */
+import {
+  beginAsyncProgress,
+  endAsyncProgress,
+} from "@/modules/navigation/lib/async-progress";
 function parseAdminApiError(status: number, statusText: string, body: string): string {
   if (body.trimStart().startsWith("<!DOCTYPE") || body.trimStart().startsWith("<html")) {
     return `${status} ${statusText} — API route not found`;
@@ -16,17 +20,22 @@ async function adminFetch<T>(
   pathAndQuery: string,
   init?: RequestInit,
 ): Promise<T> {
-  const path = pathAndQuery.startsWith("/") ? pathAndQuery.slice(1) : pathAndQuery;
-  const res = await fetch(`/api/admin/${path}`, {
-    credentials: "include",
-    headers: { Accept: "application/json", ...(init?.headers ?? {}) },
-    ...init,
-  });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(parseAdminApiError(res.status, res.statusText, t));
+  beginAsyncProgress();
+  try {
+    const path = pathAndQuery.startsWith("/") ? pathAndQuery.slice(1) : pathAndQuery;
+    const res = await fetch(`/api/admin/${path}`, {
+      credentials: "include",
+      headers: { Accept: "application/json", ...(init?.headers ?? {}) },
+      ...init,
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(parseAdminApiError(res.status, res.statusText, t));
+    }
+    return res.json() as Promise<T>;
+  } finally {
+    endAsyncProgress();
   }
-  return res.json() as Promise<T>;
 }
 
 export async function adminGet<T>(pathAndQuery: string): Promise<T> {
@@ -63,15 +72,20 @@ export async function adminDelete<T = { ok: boolean }>(pathAndQuery: string): Pr
 
 /** Returns `null` when the API responds with 404 (e.g. missing entity). */
 export async function adminGetNullable<T>(pathAndQuery: string): Promise<T | null> {
-  const path = pathAndQuery.startsWith("/") ? pathAndQuery.slice(1) : pathAndQuery;
-  const res = await fetch(`/api/admin/${path}`, {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(parseAdminApiError(res.status, res.statusText, t));
+  beginAsyncProgress();
+  try {
+    const path = pathAndQuery.startsWith("/") ? pathAndQuery.slice(1) : pathAndQuery;
+    const res = await fetch(`/api/admin/${path}`, {
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(parseAdminApiError(res.status, res.statusText, t));
+    }
+    return res.json() as Promise<T>;
+  } finally {
+    endAsyncProgress();
   }
-  return res.json() as Promise<T>;
 }

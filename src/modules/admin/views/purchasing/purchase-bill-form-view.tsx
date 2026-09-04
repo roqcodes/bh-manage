@@ -81,7 +81,7 @@ function poLinesToForm(po: ErpPurchaseOrderDetail): PurchaseLineFormRow[] {
     variantId: item.variant_id,
     productName:
       item.product_variants?.products?.name
-        ? `${item.product_variants.products.name}${item.product_variants.name ? ` — ${item.product_variants.name}` : ""}`
+        ? `${item.product_variants.products.name}${item.product_variants.name ? ` â€” ${item.product_variants.name}` : ""}`
         : "Item",
     barcode: item.product_variants?.barcode ?? "",
     expiryDate: "",
@@ -384,6 +384,7 @@ export function PurchaseBillFormView({
       ]}
       size="landscape"
       formId={formId}
+      pending={pending}
       footer={footer}
       loading={loading}
       loadingFallback={<AdminPageSkeleton />}

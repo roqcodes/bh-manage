@@ -254,7 +254,7 @@ export function InvoiceFormView({
         </Button>
       ) : null}
       <Button disabled={pending} onClick={() => handleSubmit(true)}>
-        {pending ? "Saving…" : mode === "edit" ? "Update invoice" : "Save invoice"}
+        {pending ? "Savingâ€¦" : mode === "edit" ? "Update invoice" : "Save invoice"}
       </Button>
     </>
   ) : undefined;
@@ -273,6 +273,7 @@ export function InvoiceFormView({
       ]}
       size="landscape"
       formId={formId}
+      pending={pending}
       footer={footer}
       loading={loadingInvoice}
       loadingFallback={<AdminPageSkeleton />}
@@ -357,7 +358,7 @@ export function InvoiceFormView({
                 </Button>
               ) : null}
               <Button disabled={pending} onClick={() => handleSubmit(true)}>
-                {pending ? "Saving…" : mode === "edit" ? "Update invoice" : "Save invoice"}
+                {pending ? "Savingâ€¦" : mode === "edit" ? "Update invoice" : "Save invoice"}
               </Button>
             </div>
           ) : null}

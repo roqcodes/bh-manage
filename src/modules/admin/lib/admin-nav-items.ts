@@ -141,11 +141,11 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
     label: "HR",
     icon: Users,
     items: [
-      { name: "Employees", href: "/admin/erp/employees", icon: Users, badge: "Coming soon", keywords: ["staff", "employee"] },
-      { name: "Salary Payments", href: "/admin/erp/salary-payments", icon: Receipt, badge: "Coming soon", keywords: ["salary", "payroll"] },
-      { name: "Salary Bulk Payments", href: "/admin/erp/salary-bulk-payments", icon: Receipt, badge: "Coming soon", keywords: ["bulk salary"] },
-      { name: "Pay Slips", href: "/admin/erp/pay-slips", icon: FileText, badge: "Coming soon", keywords: ["payslip"] },
-      { name: "Opening Balance - Employee", href: "/admin/erp/employee-opening-balances", icon: Wallet, badge: "Coming soon", keywords: ["opening balance", "employee"] },
+      { name: "Employees", href: "/admin/erp/employees", icon: Users, keywords: ["staff", "employee"] },
+      { name: "Salary Payments", href: "/admin/erp/salary-payments", icon: Receipt, keywords: ["salary", "payroll"] },
+      { name: "Salary Bulk Payments", href: "/admin/erp/salary-bulk-payments", icon: Receipt, keywords: ["bulk salary"] },
+      { name: "Pay Slips", href: "/admin/erp/pay-slips", icon: FileText, keywords: ["payslip"] },
+      { name: "Opening Balance - Employee", href: "/admin/erp/employee-opening-balances", icon: Wallet, keywords: ["opening balance", "employee"] },
     ],
   },
   {

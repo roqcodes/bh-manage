@@ -82,6 +82,9 @@ const CREATE_HREF_BY_LIST_PATH: Record<string, string> = {
   "/admin/erp/vat-returns": "/admin/erp/vat-returns?form=new",
   "/admin/erp/vat-payments": "/admin/erp/vat-payments?form=new",
   "/admin/erp/journal-entries": "/admin/erp/journal-entries?form=new",
+  "/admin/erp/employees": "/admin/erp/employees?form=new",
+  "/admin/erp/salary-payments": "/admin/erp/salary-payments?form=new",
+  "/admin/erp/salary-bulk-payments": "/admin/erp/salary-bulk-payments?form=new",
   "/admin/users": "/admin/users",
 };
 
@@ -172,6 +175,11 @@ export const ADMIN_QUICK_CREATE_GROUPS: QuickCreateGroup[] = [
     "/admin/erp/supplier-payments",
     "/admin/erp/supplier-bulk-payments",
     "/admin/erp/vendor-credits",
+  ])),
+  group("hr", "HR", links([
+    "/admin/erp/employees",
+    "/admin/erp/salary-payments",
+    "/admin/erp/salary-bulk-payments",
   ])),
   group("inventory", "Inventory", links([
     "/admin/erp/stock-adjustments",

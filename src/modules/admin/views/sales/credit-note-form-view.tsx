@@ -351,10 +351,10 @@ export function CreditNoteFormView({
         onClick={() => handleSubmit(false)}
         disabled={pending || uploading}
       >
-        {pending ? "Saving…" : "Save as draft"}
+        {pending ? "Savingâ€¦" : "Save as draft"}
       </Button>
       <Button onClick={() => handleSubmit(true)} disabled={pending || uploading}>
-        {pending ? "Saving…" : mode === "edit" ? "Save & issue" : "Save credit note"}
+        {pending ? "Savingâ€¦" : mode === "edit" ? "Save & issue" : "Save credit note"}
       </Button>
     </>
   ) : undefined;
@@ -373,6 +373,7 @@ export function CreditNoteFormView({
       ]}
       size="landscape"
       formId={formId}
+      pending={pending}
       footer={footer}
       loading={loading}
       loadingFallback={<AdminPageSkeleton />}
@@ -479,10 +480,10 @@ export function CreditNoteFormView({
                 onClick={() => handleSubmit(false)}
                 disabled={pending || uploading}
               >
-                {pending ? "Saving…" : "Save as draft"}
+                {pending ? "Savingâ€¦" : "Save as draft"}
               </Button>
               <Button onClick={() => handleSubmit(true)} disabled={pending || uploading}>
-                {pending ? "Saving…" : mode === "edit" ? "Save & issue" : "Save credit note"}
+                {pending ? "Savingâ€¦" : mode === "edit" ? "Save & issue" : "Save credit note"}
               </Button>
             </div>
           ) : null}

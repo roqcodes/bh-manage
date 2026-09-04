@@ -170,7 +170,7 @@ export function TransferRequestFormView({
         Save draft
       </Button>
       <Button type="button" disabled={pending} onClick={() => handleSubmit(true)}>
-        {pending ? "Saving…" : "Submit request"}
+        {pending ? "Savingâ€¦" : "Submit request"}
       </Button>
     </>
   ) : undefined;
@@ -202,7 +202,7 @@ export function TransferRequestFormView({
       <AdminFormSection title="Items">
         <ProductLiveSearch
           catalog="purchase"
-          placeholder="Search product…"
+          placeholder="Search productâ€¦"
           disabled={!fromStoreId}
           onSelect={(row) => addLine(row as ErpVariantSearchRow)}
         />
@@ -303,6 +303,7 @@ export function TransferRequestFormView({
 
   return (
     <AdminFormShell
+      pending={pending}
       variant={variant}
       open={open}
       onOpenChange={onOpenChange}
@@ -331,7 +332,7 @@ export function TransferRequestFormView({
               Save draft
             </Button>
             <Button type="button" disabled={pending} onClick={() => handleSubmit(true)}>
-              {pending ? "Saving…" : "Submit request"}
+              {pending ? "Savingâ€¦" : "Submit request"}
             </Button>
           </div>
         ) : null}

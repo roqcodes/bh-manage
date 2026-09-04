@@ -138,7 +138,7 @@ export function StockAdjustmentFormView({
         Save draft
       </Button>
       <Button type="button" disabled={pending} onClick={() => handleSubmit(true)}>
-        {pending ? "Saving…" : "Save & finalize"}
+        {pending ? "Savingâ€¦" : "Save & finalize"}
       </Button>
     </>
   ) : undefined;
@@ -174,7 +174,7 @@ export function StockAdjustmentFormView({
       <AdminFormSection title="Items">
         <ProductLiveSearch
           catalog="purchase"
-          placeholder="Search product…"
+          placeholder="Search productâ€¦"
           renderResult={(r, dismiss) => (
             <div className="flex items-center justify-between gap-2 rounded border border-border bg-background p-2 text-sm">
               <span>
@@ -264,13 +264,13 @@ export function StockAdjustmentFormView({
                           required
                         />
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">â€”</span>
                       )}
                     </td>
                     <td className="px-3 py-2 tabular-nums">
                       {line.direction === "add"
                         ? formatCurrencyAmount(line.quantity * line.purchaseCost)
-                        : "—"}
+                        : "â€”"}
                     </td>
                     <td className="px-3 py-2">
                       <Button
@@ -294,6 +294,7 @@ export function StockAdjustmentFormView({
 
   return (
     <AdminFormShell
+      pending={pending}
       variant={variant}
       open={open}
       onOpenChange={onOpenChange}
@@ -322,7 +323,7 @@ export function StockAdjustmentFormView({
               Save draft
             </Button>
             <Button type="button" disabled={pending} onClick={() => handleSubmit(true)}>
-              {pending ? "Saving…" : "Save & finalize"}
+              {pending ? "Savingâ€¦" : "Save & finalize"}
             </Button>
           </div>
         ) : null}

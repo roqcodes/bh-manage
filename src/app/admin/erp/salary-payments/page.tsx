@@ -1,5 +1,5 @@
-import { ErpComingSoonView } from "@/modules/admin/views/erp-coming-soon-view";
+import { SalaryPaymentsListView } from "@/modules/admin/views/hr/salary-payments-list-view";
 
-export default function Page() {
-  return <ErpComingSoonView title="Salary payments" />;
+export default function SalaryPaymentsPage() {
+  return <SalaryPaymentsListView />;
 }

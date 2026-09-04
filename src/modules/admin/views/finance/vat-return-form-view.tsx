@@ -179,6 +179,7 @@ export function VatReturnFormView({
       ]}
       size="md"
       formId={formId}
+      pending={isPending}
       footer={footer}
     >
       <form id={formId} onSubmit={handleSubmit} className="space-y-4">

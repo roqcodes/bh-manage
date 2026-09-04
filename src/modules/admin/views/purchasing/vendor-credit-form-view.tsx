@@ -324,7 +324,7 @@ export function VendorCreditFormView({
           >
             <Paperclip className="size-8 text-muted-foreground" aria-hidden />
             <span className="text-sm font-medium text-foreground">
-              {uploading ? "Uploading…" : "Drop file here or click to upload"}
+              {uploading ? "Uploadingâ€¦" : "Drop file here or click to upload"}
             </span>
             <span className="text-xs text-muted-foreground">Images supported</span>
             <input
@@ -374,10 +374,10 @@ export function VendorCreditFormView({
         Cancel
       </Button>
       <Button type="button" variant="outline" disabled={isPending} onClick={() => submit(false)}>
-        {isPending ? "Saving…" : "Save as draft"}
+        {isPending ? "Savingâ€¦" : "Save as draft"}
       </Button>
       <Button type="button" disabled={isPending} onClick={() => submit(true)}>
-        {isPending ? "Saving…" : "Save vendor credit"}
+        {isPending ? "Savingâ€¦" : "Save vendor credit"}
       </Button>
     </>
   ) : undefined;
@@ -396,6 +396,7 @@ export function VendorCreditFormView({
       ]}
       size="landscape"
       formId={formId}
+      pending={isPending}
       footer={footer}
       loading={loading}
       loadingFallback={<AdminPageSkeleton />}
@@ -489,10 +490,10 @@ export function VendorCreditFormView({
                 Cancel
               </Link>
               <Button type="button" variant="outline" disabled={isPending} onClick={() => submit(false)}>
-                {isPending ? "Saving…" : "Save as draft"}
+                {isPending ? "Savingâ€¦" : "Save as draft"}
               </Button>
               <Button type="button" disabled={isPending} onClick={() => submit(true)}>
-                {isPending ? "Saving…" : "Save vendor credit"}
+                {isPending ? "Savingâ€¦" : "Save vendor credit"}
               </Button>
             </div>
           ) : null}

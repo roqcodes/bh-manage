@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/modules/admin/ui/loading-button";
 import {
   Dialog,
   DialogContent,
@@ -104,6 +105,7 @@ export type AdminFormShellProps = {
   formId?: string;
   loading?: boolean;
   loadingFallback?: ReactNode;
+  pending?: boolean;
   footer?: ReactNode;
   children: ReactNode;
 };
@@ -120,6 +122,7 @@ export function AdminFormShell({
   formId,
   loading,
   loadingFallback,
+  pending = false,
   footer,
   children,
 }: AdminFormShellProps) {
@@ -151,7 +154,14 @@ export function AdminFormShell({
         formId={formId}
         footer={footer}
       >
-        {children}
+        <div
+          className={cn(
+            pending && "pointer-events-none opacity-60 transition-opacity",
+          )}
+          aria-busy={pending || undefined}
+        >
+          {children}
+        </div>
       </AdminFormModal>
     );
   }
@@ -164,7 +174,12 @@ export function AdminFormShell({
         backHref={backHref}
         breadcrumb={breadcrumb}
       />
-      {children}
+      <div
+        className={cn(pending && "pointer-events-none opacity-60 transition-opacity")}
+        aria-busy={pending || undefined}
+      >
+        {children}
+      </div>
       {footer && variant === "page" ? (
         <div className="mt-4 flex flex-wrap justify-end gap-2">{footer}</div>
       ) : null}
@@ -229,21 +244,28 @@ export function AdminFormActions({
   cancelLabel = "Cancel",
   pending = false,
   formId,
+  loadingLabel = "Saving…",
 }: {
   onCancel: () => void;
   submitLabel: string;
   cancelLabel?: string;
   pending?: boolean;
   formId?: string;
+  loadingLabel?: string;
 }) {
   return (
     <>
-      <Button type="button" variant="outline" onClick={onCancel}>
+      <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
         {cancelLabel}
       </Button>
-      <Button type="submit" form={formId} disabled={pending}>
-        {pending ? "Saving…" : submitLabel}
-      </Button>
+      <LoadingButton
+        type="submit"
+        form={formId}
+        loading={pending}
+        loadingLabel={loadingLabel}
+      >
+        {submitLabel}
+      </LoadingButton>
     </>
   );
 }

@@ -264,7 +264,7 @@ export function EstimateFormView({
         Save and print
       </Button>
       <Button disabled={pending} onClick={() => handleSubmit("save")}>
-        {pending ? "Saving…" : mode === "edit" ? "Update estimate" : "Save"}
+        {pending ? "Savingâ€¦" : mode === "edit" ? "Update estimate" : "Save"}
       </Button>
     </>
   ) : undefined;
@@ -283,6 +283,7 @@ export function EstimateFormView({
       ]}
       size="landscape"
       formId={formId}
+      pending={pending}
       footer={footer}
       loading={loadingEstimate}
       loadingFallback={<AdminPageSkeleton />}
@@ -353,7 +354,7 @@ export function EstimateFormView({
                 Save and print
               </Button>
               <Button disabled={pending} onClick={() => handleSubmit("save")}>
-                {pending ? "Saving…" : mode === "edit" ? "Update estimate" : "Save"}
+                {pending ? "Savingâ€¦" : mode === "edit" ? "Update estimate" : "Save"}
               </Button>
             </div>
           ) : null}
