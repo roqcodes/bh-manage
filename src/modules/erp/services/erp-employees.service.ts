@@ -188,7 +188,7 @@ export async function createEmployee(input: {
     action: "create",
     entityType: "employee",
     entityId: data as string,
-    summary: `Created employee ${input.fullName}`,
+    description: `Created employee ${input.fullName}`,
   });
 
   return data as string;
@@ -239,7 +239,7 @@ export async function updateEmployee(
     action: "update",
     entityType: "employee",
     entityId: id,
-    summary: "Updated employee",
+    description: "Updated employee",
   });
 }
 
@@ -264,6 +264,6 @@ export async function deleteEmployee(id: string): Promise<void> {
     action: "delete",
     entityType: "employee",
     entityId: id,
-    summary: "Deleted employee",
+    description: "Deleted employee",
   });
 }

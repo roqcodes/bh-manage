@@ -99,7 +99,7 @@ export async function createEmployeeOpeningBalances(input: {
     action: "create",
     entityType: "employee_opening_balance",
     entityId: data as string,
-    summary: "Recorded employee opening balances",
+    description: "Recorded employee opening balances",
   });
 
   return data as string;

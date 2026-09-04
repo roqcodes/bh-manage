@@ -1077,6 +1077,493 @@ export type Database = {
           },
         ]
       }
+      erp_employee_ledger: {
+        Row: {
+          balance_after: number
+          created_at: string
+          description: string
+          employee_id: string
+          entry_date: string
+          entry_type: string
+          id: string
+          payment_debit: number
+          salary_credit: number
+          source_entity_id: string | null
+          source_entity_type: string | null
+          store_id: string
+        }
+        Insert: {
+          balance_after?: number
+          created_at?: string
+          description?: string
+          employee_id: string
+          entry_date?: string
+          entry_type: string
+          id?: string
+          payment_debit?: number
+          salary_credit?: number
+          source_entity_id?: string | null
+          source_entity_type?: string | null
+          store_id: string
+        }
+        Update: {
+          balance_after?: number
+          created_at?: string
+          description?: string
+          employee_id?: string
+          entry_date?: string
+          entry_type?: string
+          id?: string
+          payment_debit?: number
+          salary_credit?: number
+          source_entity_id?: string | null
+          source_entity_type?: string | null
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_employee_ledger_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "erp_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_employee_ledger_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      erp_employee_opening_balance_batches: {
+        Row: {
+          batch_number: string
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          id: string
+          notes: string | null
+          store_id: string
+          total_amount: number
+        }
+        Insert: {
+          batch_number: string
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          notes?: string | null
+          store_id: string
+          total_amount?: number
+        }
+        Update: {
+          batch_number?: string
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          notes?: string | null
+          store_id?: string
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_employee_opening_balance_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_employee_opening_balance_batches_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      erp_employee_opening_balance_lines: {
+        Row: {
+          batch_id: string
+          employee_id: string
+          id: string
+          joining_date: string | null
+          opening_balance: number
+        }
+        Insert: {
+          batch_id: string
+          employee_id: string
+          id?: string
+          joining_date?: string | null
+          opening_balance?: number
+        }
+        Update: {
+          batch_id?: string
+          employee_id?: string
+          id?: string
+          joining_date?: string | null
+          opening_balance?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_employee_opening_balance_lines_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "erp_employee_opening_balance_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_employee_opening_balance_lines_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "erp_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      erp_employees: {
+        Row: {
+          advance_balance: number
+          allowance: number
+          basic_salary: number
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          discontinuation_date: string | null
+          employee_code: string | null
+          employee_number: string
+          full_name: string
+          id: string
+          id_expiry_date: string | null
+          id_number: string | null
+          is_active: boolean
+          joining_date: string
+          mobile: string
+          net_salary: number
+          notes: string | null
+          salary_balance: number
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          advance_balance?: number
+          allowance?: number
+          basic_salary?: number
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          discontinuation_date?: string | null
+          employee_code?: string | null
+          employee_number: string
+          full_name: string
+          id?: string
+          id_expiry_date?: string | null
+          id_number?: string | null
+          is_active?: boolean
+          joining_date?: string
+          mobile?: string
+          net_salary?: number
+          notes?: string | null
+          salary_balance?: number
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          advance_balance?: number
+          allowance?: number
+          basic_salary?: number
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          discontinuation_date?: string | null
+          employee_code?: string | null
+          employee_number?: string
+          full_name?: string
+          id?: string
+          id_expiry_date?: string | null
+          id_number?: string | null
+          is_active?: boolean
+          joining_date?: string
+          mobile?: string
+          net_salary?: number
+          notes?: string | null
+          salary_balance?: number
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_employees_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_employees_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      erp_pay_slips: {
+        Row: {
+          allowance: number
+          basic_salary: number
+          created_at: string
+          created_by: string | null
+          days_count: number
+          employee_id: string
+          from_date: string
+          id: string
+          journal_entry_id: string | null
+          ledger_entry_id: string | null
+          net_salary: number
+          payslip_number: string
+          period_label: string
+          period_month: number
+          period_year: number
+          store_id: string
+          to_date: string
+        }
+        Insert: {
+          allowance?: number
+          basic_salary?: number
+          created_at?: string
+          created_by?: string | null
+          days_count?: number
+          employee_id: string
+          from_date: string
+          id?: string
+          journal_entry_id?: string | null
+          ledger_entry_id?: string | null
+          net_salary?: number
+          payslip_number: string
+          period_label?: string
+          period_month: number
+          period_year: number
+          store_id: string
+          to_date: string
+        }
+        Update: {
+          allowance?: number
+          basic_salary?: number
+          created_at?: string
+          created_by?: string | null
+          days_count?: number
+          employee_id?: string
+          from_date?: string
+          id?: string
+          journal_entry_id?: string | null
+          ledger_entry_id?: string | null
+          net_salary?: number
+          payslip_number?: string
+          period_label?: string
+          period_month?: number
+          period_year?: number
+          store_id?: string
+          to_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_pay_slips_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_pay_slips_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "erp_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_pay_slips_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_pay_slips_ledger_entry_id_fkey"
+            columns: ["ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "erp_employee_ledger"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_pay_slips_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      erp_salary_bulk_payments: {
+        Row: {
+          bulk_number: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          paid_through_account_id: string | null
+          payment_date: string
+          payment_mode: string
+          reference: string | null
+          store_id: string
+          total_amount: number
+        }
+        Insert: {
+          bulk_number: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          paid_through_account_id?: string | null
+          payment_date?: string
+          payment_mode?: string
+          reference?: string | null
+          store_id: string
+          total_amount?: number
+        }
+        Update: {
+          bulk_number?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          paid_through_account_id?: string | null
+          payment_date?: string
+          payment_mode?: string
+          reference?: string | null
+          store_id?: string
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_salary_bulk_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_salary_bulk_payments_paid_through_account_id_fkey"
+            columns: ["paid_through_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_salary_bulk_payments_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      erp_salary_payments: {
+        Row: {
+          advance_balance_after: number
+          advance_payment_amount: number
+          advance_recovery_amount: number
+          bulk_payment_id: string | null
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+          notes: string | null
+          paid_through_account_id: string | null
+          payment_date: string
+          payment_mode: string
+          payment_number: string
+          salary_payment_amount: number
+          store_id: string
+          total_paid_amount: number
+        }
+        Insert: {
+          advance_balance_after?: number
+          advance_payment_amount?: number
+          advance_recovery_amount?: number
+          bulk_payment_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          notes?: string | null
+          paid_through_account_id?: string | null
+          payment_date?: string
+          payment_mode?: string
+          payment_number: string
+          salary_payment_amount?: number
+          store_id: string
+          total_paid_amount?: number
+        }
+        Update: {
+          advance_balance_after?: number
+          advance_payment_amount?: number
+          advance_recovery_amount?: number
+          bulk_payment_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          notes?: string | null
+          paid_through_account_id?: string | null
+          payment_date?: string
+          payment_mode?: string
+          payment_number?: string
+          salary_payment_amount?: number
+          store_id?: string
+          total_paid_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_salary_payments_bulk_payment_id_fkey"
+            columns: ["bulk_payment_id"]
+            isOneToOne: false
+            referencedRelation: "erp_salary_bulk_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_salary_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_salary_payments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "erp_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_salary_payments_paid_through_account_id_fkey"
+            columns: ["paid_through_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_salary_payments_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       erp_expenses: {
         Row: {
           account_id: string
@@ -4697,6 +5184,24 @@ export type Database = {
         }
         Returns: string
       }
+      create_erp_employee: {
+        Args: {
+          p_allowance?: number
+          p_basic_salary?: number
+          p_created_by?: string
+          p_date_of_birth?: string | null
+          p_employee_code?: string | null
+          p_full_name: string
+          p_id_expiry_date?: string | null
+          p_id_number?: string | null
+          p_is_active?: boolean
+          p_joining_date: string
+          p_mobile: string
+          p_notes?: string | null
+          p_store_id: string
+        }
+        Returns: string
+      }
       create_erp_estimate: {
         Args: {
           p_created_by?: string
@@ -4941,6 +5446,10 @@ export type Database = {
         Args: { p_actor?: string; p_credit_note_id: string }
         Returns: undefined
       }
+      delete_erp_salary_payment: {
+        Args: { p_actor?: string; p_payment_id: string }
+        Returns: undefined
+      }
       delete_erp_vat_payment: {
         Args: { p_deleted_by?: string; p_payment_id: string }
         Returns: undefined
@@ -4986,6 +5495,18 @@ export type Database = {
         Returns: Json
       }
       generate_invoice_number: { Args: never; Returns: string }
+      generate_erp_pay_slips: {
+        Args: {
+          p_created_by?: string
+          p_employee_id?: string | null
+          p_from_date?: string | null
+          p_period_month: number
+          p_period_year: number
+          p_store_id: string
+          p_to_date?: string | null
+        }
+        Returns: Json
+      }
       get_account_balance: { Args: { p_account_id: string }; Returns: number }
       get_account_by_code: { Args: { p_code: string }; Returns: string }
       get_addresses_for_user: { Args: { p_user_id: string }; Returns: Json }
@@ -5170,6 +5691,44 @@ export type Database = {
         }
         Returns: string
       }
+      record_erp_employee_opening_balances: {
+        Args: {
+          p_created_by?: string
+          p_entry_date: string
+          p_lines: Json
+          p_notes?: string | null
+          p_store_id: string
+        }
+        Returns: string
+      }
+      record_erp_salary_bulk_payment: {
+        Args: {
+          p_created_by?: string
+          p_lines: Json
+          p_notes?: string | null
+          p_paid_through_account_id?: string | null
+          p_payment_date: string
+          p_payment_mode: string
+          p_reference?: string | null
+          p_store_id: string
+        }
+        Returns: Json
+      }
+      record_erp_salary_payment: {
+        Args: {
+          p_advance_recovery?: number
+          p_bulk_payment_id?: string | null
+          p_created_by?: string
+          p_employee_id: string
+          p_notes?: string | null
+          p_paid_through_account_id?: string | null
+          p_payment_date: string
+          p_payment_mode?: string
+          p_store_id: string
+          p_total_paid: number
+        }
+        Returns: string
+      }
       record_erp_supplier_bulk_payment: {
         Args: {
           p_account_id?: string
@@ -5341,6 +5900,26 @@ export type Database = {
           p_opening_balance: number
           p_store_id: string | null
           p_updated_by?: string
+        }
+        Returns: undefined
+      }
+      update_erp_employee: {
+        Args: {
+          p_actor?: string
+          p_allowance?: number | null
+          p_basic_salary?: number | null
+          p_date_of_birth?: string | null
+          p_discontinuation_date?: string | null
+          p_employee_code?: string | null
+          p_employee_id: string
+          p_full_name?: string | null
+          p_id_expiry_date?: string | null
+          p_id_number?: string | null
+          p_is_active?: boolean | null
+          p_joining_date?: string | null
+          p_mobile?: string | null
+          p_notes?: string | null
+          p_store_id?: string | null
         }
         Returns: undefined
       }

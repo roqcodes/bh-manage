@@ -133,7 +133,7 @@ export async function generatePaySlips(input: {
     action: "create",
     entityType: "pay_slip",
     entityId: storeId,
-    summary: `Generated ${result.created_count} pay slips`,
+    description: `Generated ${result.created_count} pay slips`,
   });
 
   return { createdCount: result.created_count ?? 0 };

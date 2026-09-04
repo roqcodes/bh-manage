@@ -202,7 +202,7 @@ export async function createSalaryPayment(input: {
     action: "create",
     entityType: "salary_payment",
     entityId: data as string,
-    summary: `Salary payment ${input.totalPaid}`,
+    description: `Salary payment ${input.totalPaid}`,
   });
 
   return data as string;
@@ -223,7 +223,7 @@ export async function deleteSalaryPayment(id: string): Promise<void> {
     action: "delete",
     entityType: "salary_payment",
     entityId: id,
-    summary: "Deleted salary payment",
+    description: "Deleted salary payment",
   });
 }
 
@@ -327,7 +327,7 @@ export async function createSalaryBulkPayment(input: {
     action: "create",
     entityType: "salary_bulk_payment",
     entityId: result.bulk_id,
-    summary: `Bulk salary payment ${result.bulk_number}`,
+    description: `Bulk salary payment ${result.bulk_number}`,
   });
 
   return { bulkId: result.bulk_id, bulkNumber: result.bulk_number };
