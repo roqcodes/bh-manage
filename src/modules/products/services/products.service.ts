@@ -94,17 +94,25 @@ async function enrichProductsList(
   const storeStockByVariant = new Map<string, number>();
   let storeName: string | null = null;
   if (storeId && variantIds.length > 0) {
+    const productIds = [...new Set(variants.map((v) => v.product_id).filter(Boolean))] as string[];
     const [{ data: storeRow }, { data: storeInventoryRows }] = await Promise.all([
       supabase.from("stores").select("name").eq("id", storeId).maybeSingle(),
-      supabase
-        .from("store_inventory")
-        .select("variant_id,stock,sales_price")
-        .eq("store_id", storeId)
-        .in("variant_id", variantIds),
+      productIds.length > 0
+        ? supabase
+            .from("store_product_inventory")
+            .select("product_id,stock,sales_price")
+            .eq("store_id", storeId)
+            .in("product_id", productIds)
+        : Promise.resolve({ data: [] as { product_id: string; stock: number | null; sales_price: number | null }[] }),
     ]);
     storeName = storeRow?.name ?? null;
+    const stockByProduct = new Map<string, number>();
     for (const row of storeInventoryRows ?? []) {
-      storeStockByVariant.set(row.variant_id, Number(row.stock ?? 0));
+      stockByProduct.set(row.product_id, Number(row.stock ?? 0));
+    }
+    for (const v of variants) {
+      const pid = v.product_id as string | null;
+      if (pid) storeStockByVariant.set(v.id, stockByProduct.get(pid) ?? 0);
     }
   }
 

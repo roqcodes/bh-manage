@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CustomerSearchSelect } from "@/modules/admin/ui";
+import { CustomerSearchSelect, SortableTableHead, useSortableData } from "@/modules/admin/ui";
 import { BillingMetricsBar } from "@/modules/billing/components/billing-metrics-bar";
 import {
   formatBillingInr,
@@ -99,6 +99,16 @@ export function BillingPanel() {
   }, [cart]);
 
   const hasStockIssue = cart.some((item) => item.cartQuantity > item.stock);
+
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    cart,
+    "productName",
+    "asc",
+    (row, key) => {
+      if (key === "line_total") return row.finalPrice * row.cartQuantity;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  );
 
   function addToCart(variant: BillingVariantSearchResult) {
     setCart((prev) => {
@@ -385,16 +395,48 @@ export function BillingPanel() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead>Product</TableHead>
-                      <TableHead className="w-24">Qty</TableHead>
-                      <TableHead>Unit price</TableHead>
-                      <TableHead>Discount</TableHead>
-                      <TableHead className="text-right">Line total</TableHead>
+                      <SortableTableHead
+                        label="Product"
+                        sortKey="productName"
+                        activeKey={sortKey}
+                        direction={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTableHead
+                        label="Qty"
+                        sortKey="cartQuantity"
+                        activeKey={sortKey}
+                        direction={sortDirection}
+                        onSort={toggleSort}
+                        className="w-24"
+                      />
+                      <SortableTableHead
+                        label="Unit price"
+                        sortKey="price"
+                        activeKey={sortKey}
+                        direction={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTableHead
+                        label="Discount"
+                        sortKey="discount"
+                        activeKey={sortKey}
+                        direction={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTableHead
+                        label="Line total"
+                        sortKey="line_total"
+                        activeKey={sortKey}
+                        direction={sortDirection}
+                        onSort={toggleSort}
+                        align="right"
+                      />
                       <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {cart.map((item) => (
+                    {sorted.map((item) => (
                       <TableRow key={item.variantId}>
                         <TableCell>
                           <div className="min-w-0">

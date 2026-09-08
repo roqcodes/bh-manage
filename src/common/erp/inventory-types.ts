@@ -14,14 +14,14 @@ export interface ErpStoreListRow {
 }
 
 export interface StockAdjustmentLineInput {
-  variantId: string;
+  productId: string;
   direction: "add" | "remove";
   quantity: number;
   purchaseCost: number;
 }
 
 export interface TransferRequestLineInput {
-  variantId: string;
+  productId: string;
   quantity: number;
   sourceAvailable?: number;
   transferPrice?: number;
@@ -31,7 +31,7 @@ export interface TransferRequestLineInput {
 }
 
 export interface StoreTransferLineInput {
-  variantId: string;
+  productId: string;
   quantity: number;
   purchasePrice?: number;
   salesPrice?: number;
@@ -75,7 +75,8 @@ export interface ErpStoreTransferListRow {
 }
 
 export interface StockDetailRow {
-  variant_id: string;
+  product_id: string;
+  variant_id: string | null;
   product_name: string;
   variant_name: string | null;
   central_stock: number;

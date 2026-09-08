@@ -149,7 +149,7 @@ export function StockDetailsListView() {
           </AdminTableHeader>
           <AdminTableBody>
             {filtered.map((r) => (
-              <AdminTableRow key={r.variant_id}>
+              <AdminTableRow key={r.product_id}>
                 <AdminTableCell className="font-medium">{r.product_name}</AdminTableCell>
                 <AdminTableCell>{r.barcode ?? "—"}</AdminTableCell>
                 <AdminTableCell align="right">

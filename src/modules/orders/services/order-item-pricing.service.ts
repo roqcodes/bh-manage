@@ -9,8 +9,10 @@ import {
   resolveReferenceCost,
 } from "@/modules/pricing/pricing.resolver";
 import { assertCompleteOrderItemSnapshotForInsert } from "@/modules/orders/services/order-items-immutable.service";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 
 const OUT_OF_STOCK_MSG = "Not enough stock in central warehouse";
+const ERP_OUT_OF_STOCK_MSG = "Not enough stock at store";
 
 function finalizeSnapshot(snapshot: OrderItemSnapshot): OrderItemSnapshot {
   assertCompleteOrderItemSnapshotForInsert({
@@ -33,14 +35,27 @@ export interface OrderItemSnapshot {
   product_name: string;
 }
 
-async function getCentralStock(
+async function getOnlineAvailableStock(
   supabase: SupabaseClient,
   variantId: string,
 ): Promise<number> {
+  const { data, error } = await invokeRpc(supabase, "get_variant_online_available", {
+    p_variant_id: variantId,
+  });
+  if (error) throw new Error(error.message);
+  return Math.max(0, Math.floor(Number(data ?? 0)));
+}
+
+async function getStoreProductStock(
+  supabase: SupabaseClient,
+  storeId: string,
+  productId: string,
+): Promise<number> {
   const { data, error } = await supabase
-    .from("inventory")
+    .from("store_product_inventory")
     .select("stock")
-    .eq("variant_id", variantId)
+    .eq("store_id", storeId)
+    .eq("product_id", productId)
     .maybeSingle();
   if (error) throw new Error(error.message);
   return Math.max(0, Math.floor(Number(data?.stock ?? 0)));
@@ -95,7 +110,7 @@ export async function buildOrderItemSnapshot(input: {
     throw new Error("Variant or product not found.");
   }
 
-  const centralStock = await getCentralStock(supabase, input.variantId);
+  const centralStock = await getOnlineAvailableStock(supabase, input.variantId);
   if (centralStock < qty) {
     throw new Error(
       centralStock === 0
@@ -128,5 +143,63 @@ export async function buildOrderItemSnapshot(input: {
     margin_amount: computeOrderMargin(finalPrice, referenceCost),
     unit_price: finalPrice,
     product_name,
+  });
+}
+
+/** ERP physical sales: product-level stock and pricing. */
+export async function buildProductOrderItemSnapshot(input: {
+  productId: string;
+  storeId: string;
+  quantity?: number;
+  unitPriceOverride?: number | null;
+}): Promise<OrderItemSnapshot> {
+  const supabase = await createSupabaseServerClient();
+  const qty = Math.max(1, Math.floor(input.quantity ?? 1));
+
+  const { data: productRow, error: pErr } = await supabase
+    .from("products")
+    .select("id, name, price, purchase_price")
+    .eq("id", input.productId)
+    .maybeSingle();
+
+  if (pErr) throw new Error(pErr.message);
+  if (!productRow) {
+    throw new Error("Product not found.");
+  }
+
+  const storeStock = await getStoreProductStock(
+    supabase,
+    input.storeId,
+    input.productId,
+  );
+  if (storeStock < qty) {
+    throw new Error(
+      storeStock === 0
+        ? ERP_OUT_OF_STOCK_MSG
+        : `Only ${storeStock} unit${storeStock !== 1 ? "s" : ""} at store (requested ${qty}).`,
+    );
+  }
+
+  const listPrice = resolveListPrice(productRow.price);
+  if (listPrice <= 0) {
+    throw new Error("This product has no valid selling price.");
+  }
+
+  const finalPrice =
+    input.unitPriceOverride != null && Number.isFinite(input.unitPriceOverride)
+      ? resolveListPrice(input.unitPriceOverride)
+      : listPrice;
+
+  const referenceCost = resolveReferenceCost(
+    productRow.purchase_price != null ? Number(productRow.purchase_price) : null,
+  );
+
+  return finalizeSnapshot({
+    vendor_id: null,
+    base_price: referenceCost,
+    final_price: finalPrice,
+    margin_amount: computeOrderMargin(finalPrice, referenceCost),
+    unit_price: finalPrice,
+    product_name: productRow.name ?? "Product",
   });
 }

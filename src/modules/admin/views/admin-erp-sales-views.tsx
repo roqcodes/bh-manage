@@ -35,7 +35,7 @@ import {
   SalesPageHeader,
   SalesPageLayout,
 } from "@/modules/erp/components/sales-module-ui";
-import { useErpFormModal } from "@/modules/admin/ui";
+import { SortableTableHead, useErpFormModal, useSortableData } from "@/modules/admin/ui";
 import { EstimateFormView } from "@/modules/admin/views/sales/estimate-form-view";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
@@ -63,6 +63,11 @@ export function AdminErpEstimatesView() {
           (r.customer_name?.toLowerCase().includes(search.toLowerCase()) ?? false),
       )
     : rows;
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    filtered,
+    "estimate_date",
+    "desc",
+  );
 
   if (loading) return <SalesLoadingState />;
 
@@ -87,22 +92,60 @@ export function AdminErpEstimatesView() {
         emptyMessage="No estimates found."
         isFiltering={Boolean(search.trim())}
         onClearFilters={() => setSearch("")}
-        footer={<span>{filtered.length} estimates</span>}
+        footer={<span>{sorted.length} estimates</span>}
       >
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Number</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead className="hidden md:table-cell">Store</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead>Date</TableHead>
+              <SortableTableHead
+                label="Number"
+                sortKey="estimate_number"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Customer"
+                sortKey="customer_name"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Store"
+                sortKey="store_name"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+                className="hidden md:table-cell"
+              />
+              <SortableTableHead
+                label="Status"
+                sortKey="status"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Total"
+                sortKey="total_amount"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+                align="right"
+              />
+              <SortableTableHead
+                label="Date"
+                sortKey="estimate_date"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
               <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((row) => (
+            {sorted.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="font-medium">
                   <Link
@@ -188,6 +231,11 @@ export function AdminErpPaymentsView() {
           (r.customer_name?.toLowerCase().includes(search.toLowerCase()) ?? false),
       )
     : rows;
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    filtered,
+    "payment_date",
+    "desc",
+  );
 
   if (loading) return <SalesLoadingState />;
 
@@ -212,23 +260,67 @@ export function AdminErpPaymentsView() {
         emptyMessage="No payments found."
         isFiltering={Boolean(search.trim())}
         onClearFilters={() => setSearch("")}
-        footer={<span>{filtered.length} payments</span>}
+        footer={<span>{sorted.length} payments</span>}
       >
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Number</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead className="hidden md:table-cell">Store</TableHead>
-              <TableHead>Mode</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Bulk</TableHead>
+              <SortableTableHead
+                label="Number"
+                sortKey="payment_number"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Customer"
+                sortKey="customer_name"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Store"
+                sortKey="store_name"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+                className="hidden md:table-cell"
+              />
+              <SortableTableHead
+                label="Mode"
+                sortKey="payment_mode"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Amount"
+                sortKey="total_amount"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+                align="right"
+              />
+              <SortableTableHead
+                label="Date"
+                sortKey="payment_date"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Bulk"
+                sortKey="is_bulk"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
               <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((row) => (
+            {sorted.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="font-medium" title={row.payment_number}>
                   {formatErpDocRef("PR", row.id)}

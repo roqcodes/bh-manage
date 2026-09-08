@@ -132,7 +132,13 @@ export function EmployeeOpeningBalancesListView() {
               direction={sortDirection}
               onSort={toggleSort}
             />
-            <TableHead>Note</TableHead>
+            <SortableTableHead
+              label="Note"
+              sortKey="notes"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
             <SortableTableHead
               label="Total amount"
               sortKey="total_amount"

@@ -41,11 +41,13 @@ export function InventoryPanel({
   total,
   page,
   stats,
+  hideMetrics = false,
 }: {
   inventory: InventoryWithVariant[];
   total: number;
   page: number;
   stats: InventoryCatalogStats;
+  hideMetrics?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [viewFilter, setViewFilter] = useState<InventoryViewFilter>("all");
@@ -76,11 +78,18 @@ export function InventoryPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <InventoryMetricsBar
-        stats={stats}
-        onExport={() => exportInventoryCsv(filtered)}
-      />
-
+      {!hideMetrics ? (
+        <InventoryMetricsBar
+          stats={stats}
+          onExport={() => exportInventoryCsv(filtered)}
+        />
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Online stock is read-only. Increase quantities via{" "}
+          <strong>Store → Online transfer</strong>, then allocate variants under
+          the Pending tab.
+        </p>
+      )}
 
       <Card className="overflow-hidden border border-border py-0 ring-0">
         <CardContent className="flex flex-col gap-0 p-0">

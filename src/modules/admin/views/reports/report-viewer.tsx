@@ -10,6 +10,7 @@ import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { SortableTableHead, useSortableData } from "@/modules/admin/ui";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -154,6 +154,13 @@ export function ReportViewer({ report }: { report: ReportDefinition }) {
           { key: "amount", label: "Amount", align: "right" as const, format: "currency" as const },
         ]
       : report.columns;
+
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    rows,
+    displayColumns[0]?.key ?? "id",
+    "asc",
+    (row, key) => row[key],
+  );
 
   function exportCsv() {
     if (rows.length === 0) return;
@@ -292,17 +299,21 @@ export function ReportViewer({ report }: { report: ReportDefinition }) {
                 <TableHeader>
                   <TableRow>
                     {displayColumns.map((col) => (
-                      <TableHead
+                      <SortableTableHead
                         key={col.key}
+                        label={col.label}
+                        sortKey={col.key}
+                        activeKey={sortKey}
+                        direction={sortDirection}
+                        onSort={toggleSort}
+                        align={col.align === "right" ? "right" : "left"}
                         className={col.align === "right" ? "text-right" : undefined}
-                      >
-                        {col.label}
-                      </TableHead>
+                      />
                     ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row, i) => (
+                  {sorted.map((row, i) => (
                     <TableRow key={i}>
                       {displayColumns.map((col) => (
                         <TableCell

@@ -2036,18 +2036,23 @@ export type Database = {
       }
       erp_purchase_bill_lines: {
         Row: {
+          accepted_qty: number
           barcode: string | null
           expiry_date: string | null
           id: string
           line_total: number
+          original_quantity: number | null
           product_name: string
           purchase_bill_id: string
           purchase_price: number
           quantity: number
+          received_qty: number
+          rejected_qty: number
           tax_amount: number
           tax_rate_percent: number
           unit_id: string | null
           variant_id: string | null
+          product_id: string | null
         }
         Insert: {
           barcode?: string | null
@@ -2062,6 +2067,7 @@ export type Database = {
           tax_rate_percent?: number
           unit_id?: string | null
           variant_id?: string | null
+          product_id?: string | null
         }
         Update: {
           barcode?: string | null
@@ -2076,6 +2082,7 @@ export type Database = {
           tax_rate_percent?: number
           unit_id?: string | null
           variant_id?: string | null
+          product_id?: string | null
         }
         Relationships: [
           {
@@ -2103,6 +2110,7 @@ export type Database = {
       }
       erp_purchase_bills: {
         Row: {
+          accounting_posted: boolean
           amount_paid: number
           balance_due: number
           batch_code: string | null
@@ -2113,10 +2121,12 @@ export type Database = {
           credits_applied: number
           discount: number
           due_date: string | null
+          expected_delivery_date: string | null
           grn_reference: string | null
           id: string
           inventory_committed: boolean
           landed_cost_total: number
+          legacy_stock_via_bill: boolean
           notes: string | null
           po_id: string | null
           purchase_bill_number: string
@@ -2143,10 +2153,12 @@ export type Database = {
           credits_applied?: number
           discount?: number
           due_date?: string | null
+          expected_delivery_date?: string | null
           grn_reference?: string | null
           id?: string
           inventory_committed?: boolean
           landed_cost_total?: number
+          legacy_stock_via_bill?: boolean
           notes?: string | null
           po_id?: string | null
           purchase_bill_number: string
@@ -2173,10 +2185,12 @@ export type Database = {
           credits_applied?: number
           discount?: number
           due_date?: string | null
+          expected_delivery_date?: string | null
           grn_reference?: string | null
           id?: string
           inventory_committed?: boolean
           landed_cost_total?: number
+          legacy_stock_via_bill?: boolean
           notes?: string | null
           po_id?: string | null
           purchase_bill_number?: string
@@ -2223,6 +2237,171 @@ export type Database = {
           },
           {
             foreignKeyName: "erp_purchase_bills_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      erp_purchase_receive_lines: {
+        Row: {
+          accepted_qty: number
+          barcode: string | null
+          batch_code: string | null
+          batch_number: string | null
+          batch_reference: string | null
+          bill_line_id: string | null
+          expiry_date: string | null
+          id: string
+          ordered_qty: number
+          billed_qty: number
+          po_line_id: string | null
+          product_name: string
+          purchase_price: number
+          purchase_receive_id: string
+          received_qty: number
+          rejected_qty: number
+          tax_rate_percent: number
+          variant_id: string | null
+        }
+        Insert: {
+          accepted_qty?: number
+          barcode?: string | null
+          batch_code?: string | null
+          batch_number?: string | null
+          batch_reference?: string | null
+          bill_line_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          ordered_qty?: number
+          billed_qty?: number
+          po_line_id?: string | null
+          product_name: string
+          purchase_price?: number
+          purchase_receive_id: string
+          received_qty?: number
+          rejected_qty?: number
+          tax_rate_percent?: number
+          variant_id?: string | null
+        }
+        Update: {
+          accepted_qty?: number
+          barcode?: string | null
+          batch_code?: string | null
+          batch_number?: string | null
+          batch_reference?: string | null
+          bill_line_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          ordered_qty?: number
+          billed_qty?: number
+          po_line_id?: string | null
+          product_name?: string
+          purchase_price?: number
+          purchase_receive_id?: string
+          received_qty?: number
+          rejected_qty?: number
+          tax_rate_percent?: number
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_purchase_receive_lines_purchase_receive_id_fkey"
+            columns: ["purchase_receive_id"]
+            isOneToOne: false
+            referencedRelation: "erp_purchase_receives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      erp_purchase_receives: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expected_delivery_date: string | null
+          id: string
+          inventory_committed: boolean
+          notes: string | null
+          po_id: string | null
+          purchase_bill_id: string | null
+          document_kind: string
+          receive_date: string
+          receive_number: string
+          reconcile_bill: boolean
+          reference: string | null
+          reversal_of_id: string | null
+          reversal_reason: string | null
+          reversed_by_receive_id: string | null
+          allow_over_authorization: boolean
+          status: string
+          store_id: string
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          inventory_committed?: boolean
+          notes?: string | null
+          po_id?: string | null
+          purchase_bill_id?: string | null
+          receive_date?: string
+          receive_number: string
+          reconcile_bill?: boolean
+          reference?: string | null
+          status?: string
+          store_id: string
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          inventory_committed?: boolean
+          notes?: string | null
+          po_id?: string | null
+          purchase_bill_id?: string | null
+          receive_date?: string
+          receive_number?: string
+          reconcile_bill?: boolean
+          reference?: string | null
+          status?: string
+          store_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_purchase_receives_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_purchase_receives_purchase_bill_id_fkey"
+            columns: ["purchase_bill_id"]
+            isOneToOne: false
+            referencedRelation: "erp_purchase_bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_purchase_receives_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_purchase_receives_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
@@ -2996,6 +3175,7 @@ export type Database = {
           tax_rate_percent: number
           unit_price: number
           variant_id: string | null
+          product_id: string | null
           vendor_credit_id: string
         }
         Insert: {
@@ -3007,6 +3187,7 @@ export type Database = {
           tax_rate_percent?: number
           unit_price?: number
           variant_id?: string | null
+          product_id?: string | null
           vendor_credit_id: string
         }
         Update: {
@@ -3018,6 +3199,7 @@ export type Database = {
           tax_rate_percent?: number
           unit_price?: number
           variant_id?: string | null
+          product_id?: string | null
           vendor_credit_id?: string
         }
         Relationships: [
@@ -3124,7 +3306,9 @@ export type Database = {
           last_reorder_quantity: number | null
           reorder_point: number
           reorder_quantity: number
+          reserved_stock: number
           stock: number
+          store_id: string
           updated_at: string
           variant_id: string
         }
@@ -3132,7 +3316,9 @@ export type Database = {
           last_reorder_quantity?: number | null
           reorder_point?: number
           reorder_quantity?: number
+          reserved_stock?: number
           stock?: number
+          store_id: string
           updated_at?: string
           variant_id: string
         }
@@ -3140,7 +3326,9 @@ export type Database = {
           last_reorder_quantity?: number | null
           reorder_point?: number
           reorder_quantity?: number
+          reserved_stock?: number
           stock?: number
+          store_id?: string
           updated_at?: string
           variant_id?: string
         }
@@ -3907,27 +4095,6 @@ export type Database = {
           },
         ]
       }
-      procurement_settings: {
-        Row: {
-          default_reorder_point: number
-          default_reorder_quantity: number
-          id: number
-          updated_at: string | null
-        }
-        Insert: {
-          default_reorder_point?: number
-          default_reorder_quantity?: number
-          id?: number
-          updated_at?: string | null
-        }
-        Update: {
-          default_reorder_point?: number
-          default_reorder_quantity?: number
-          id?: number
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       product_images: {
         Row: {
           created_at: string | null
@@ -4103,6 +4270,7 @@ export type Database = {
       }
       products: {
         Row: {
+          barcode: string | null
           brand_id: string | null
           category_id: string | null
           created_at: string
@@ -4112,12 +4280,17 @@ export type Database = {
           image_url: string | null
           is_active: boolean
           item_type: string
+          mrp: number | null
           name: string | null
+          price: number | null
+          purchase_price: number | null
           specs: Json
+          tax_rate_percent: number | null
           use_smart_pricing: boolean
           variant_layout: string
         }
         Insert: {
+          barcode?: string | null
           brand_id?: string | null
           category_id?: string | null
           created_at?: string
@@ -4127,12 +4300,17 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           item_type?: string
+          mrp?: number | null
           name?: string | null
+          price?: number | null
+          purchase_price?: number | null
           specs?: Json
+          tax_rate_percent?: number | null
           use_smart_pricing?: boolean
           variant_layout?: string
         }
         Update: {
+          barcode?: string | null
           brand_id?: string | null
           category_id?: string | null
           created_at?: string
@@ -4142,8 +4320,12 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           item_type?: string
+          mrp?: number | null
           name?: string | null
+          price?: number | null
+          purchase_price?: number | null
           specs?: Json
+          tax_rate_percent?: number | null
           use_smart_pricing?: boolean
           variant_layout?: string
         }
@@ -4166,15 +4348,19 @@ export type Database = {
       }
       purchase_order_items: {
         Row: {
+          accepted_qty: number
           discount: number
           id: string
           line_total: number
           po_id: string | null
           price: number | null
           quantity: number | null
+          received_qty: number
+          rejected_qty: number
           tax_amount: number
           tax_rate_percent: number
           variant_id: string | null
+          product_id: string | null
         }
         Insert: {
           discount?: number
@@ -4186,6 +4372,7 @@ export type Database = {
           tax_amount?: number
           tax_rate_percent?: number
           variant_id?: string | null
+          product_id?: string | null
         }
         Update: {
           discount?: number
@@ -4197,6 +4384,7 @@ export type Database = {
           tax_amount?: number
           tax_rate_percent?: number
           variant_id?: string | null
+          product_id?: string | null
         }
         Relationships: [
           {
@@ -4533,6 +4721,99 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      store_product_inventory: {
+        Row: {
+          opening_stock: number
+          product_id: string
+          purchase_price: number | null
+          sales_price: number | null
+          stock: number
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          opening_stock?: number
+          product_id: string
+          purchase_price?: number | null
+          sales_price?: number | null
+          stock?: number
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          opening_stock?: number
+          product_id?: string
+          purchase_price?: number | null
+          sales_price?: number | null
+          stock?: number
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      online_stock_transfers: {
+        Row: {
+          allocated_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          status: string
+          store_id: string
+          transfer_number: string
+          updated_at: string
+        }
+        Insert: {
+          allocated_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          product_id: string
+          quantity: number
+          status?: string
+          store_id: string
+          transfer_number: string
+          updated_at?: string
+        }
+        Update: {
+          allocated_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+          status?: string
+          store_id?: string
+          transfer_number?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      online_stock_transfer_allocations: {
+        Row: {
+          id: string
+          quantity: number
+          transfer_id: string
+          variant_id: string
+        }
+        Insert: {
+          id?: string
+          quantity: number
+          transfer_id: string
+          variant_id: string
+        }
+        Update: {
+          id?: string
+          quantity?: number
+          transfer_id?: string
+          variant_id?: string
+        }
+        Relationships: []
       }
       stores: {
         Row: {
@@ -5473,6 +5754,63 @@ export type Database = {
           p_restore_stock?: boolean
         }
         Returns: undefined
+      }
+      cancel_erp_purchase_receive: {
+        Args: { p_actor?: string; p_receive_id: string }
+        Returns: undefined
+      }
+      create_erp_purchase_receive: {
+        Args: {
+          p_allow_over_authorization?: boolean
+          p_created_by?: string
+          p_expected_delivery_date?: string
+          p_finalize?: boolean
+          p_lines?: Json
+          p_notes?: string
+          p_po_id?: string
+          p_purchase_bill_id?: string
+          p_receive_date: string
+          p_reconcile_bill?: boolean
+          p_reference?: string
+          p_store_id: string
+          p_vendor_id: string
+        }
+        Returns: string
+      }
+      finalize_erp_purchase_receive: {
+        Args: {
+          p_finalized_by?: string
+          p_receive_id: string
+          p_reconcile_bill?: boolean
+        }
+        Returns: undefined
+      }
+      reverse_erp_purchase_receive: {
+        Args: { p_actor?: string; p_reason?: string; p_receive_id: string }
+        Returns: string
+      }
+      submit_erp_po_delivery_and_finalize: {
+        Args: {
+          p_actor?: string
+          p_lines: Json
+          p_notes?: string
+          p_po_id: string
+          p_receive_date?: string
+        }
+        Returns: Json
+      }
+      get_purchase_receive_adjustments: {
+        Args: { p_receive_id: string }
+        Returns: Json
+      }
+      create_vendor_credit_from_receive_adjustment: {
+        Args: {
+          p_actor?: string
+          p_adjustment_kind?: string
+          p_finalize?: boolean
+          p_receive_id: string
+        }
+        Returns: string
       }
       finalize_erp_purchase_bill: {
         Args: { p_bill_id: string; p_finalized_by?: string }

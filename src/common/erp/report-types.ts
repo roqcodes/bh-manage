@@ -166,8 +166,10 @@ export const ERP_REPORTS: ReportDefinition[] = [
     columns: [
       { key: "product_name", label: "Product" },
       { key: "store_name", label: "Store" },
-      { key: "stock", label: "Stock", align: "right", format: "number" },
+      { key: "stock", label: "On hand", align: "right", format: "number" },
       { key: "available_stock", label: "Available", align: "right", format: "number" },
+      { key: "incoming_qty", label: "Incoming", align: "right", format: "number" },
+      { key: "expected_stock", label: "Expected", align: "right", format: "number" },
       { key: "purchase_price", label: "Cost", align: "right", format: "currency" },
     ],
   },

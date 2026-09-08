@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronDown, Download } from "lucide-react";
 
 import type { PurchaseOrderCatalogStats } from "@/common/admin/types";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { PurchaseOrderDeliveryFilter } from "@/common/admin/types";
 import {
   MiniSparkline,
   TrendBadge,
@@ -26,6 +27,8 @@ function MetricSegment({
   sparkSeed,
   sparkTone = "primary",
   flatSpark = false,
+  onClick,
+  active = false,
 }: {
   label: string;
   value: string;
@@ -34,9 +37,11 @@ function MetricSegment({
   sparkSeed: number;
   sparkTone?: "primary" | "neutral" | "green";
   flatSpark?: boolean;
+  onClick?: () => void;
+  active?: boolean;
 }) {
-  return (
-    <div className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3">
+  const content = (
+    <>
       <div className="min-w-0">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -47,28 +52,48 @@ function MetricSegment({
         </div>
       </div>
       <MiniSparkline seed={sparkSeed} tone={sparkTone} flat={flatSpark} />
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 ${
+          active ? "bg-muted/50" : ""
+        }`}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3">
+      {content}
     </div>
   );
 }
 
 export function PurchaseOrdersMetricsBar({
   stats,
+  activeDeliveryFilter,
+  allFiltersClear = true,
+  onDeliveryFilter,
+  onClearFilters,
   onExport,
 }: {
   stats: PurchaseOrderCatalogStats;
+  activeDeliveryFilter?: PurchaseOrderDeliveryFilter | null;
+  allFiltersClear?: boolean;
+  onDeliveryFilter?: (delivery: PurchaseOrderDeliveryFilter | null) => void;
+  onClearFilters?: () => void;
   onExport: () => void;
 }) {
   const vendorQueue = stats.pendingCount + stats.acceptedCount;
   const queueTrend =
     vendorQueue > 0 ? `${stats.pendingCount} pending` : "0 pending";
-  const acceptedTrend =
-    stats.acceptedCount > 0
-      ? `+${Math.min(6.2, 1 + (stats.acceptedCount % 4) * 0.5).toFixed(1)}%`
-      : "0%";
-  const deliveredTrend =
-    stats.deliveredCount > 0
-      ? `+${Math.min(8.4, 1.5 + (stats.deliveredCount % 5) * 0.4).toFixed(1)}%`
-      : "0%";
 
   return (
     <div className="flex flex-col gap-3">
@@ -78,10 +103,13 @@ export function PurchaseOrdersMetricsBar({
             Purchase orders
           </h1>
           <p className="text-sm text-muted-foreground">
-            Vendor supply POs from procurement. Cancel only while pending.
+            Vendor supply POs. Track expected deliveries and submit receipt from PO detail.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link href="/admin/purchase-orders?form=new" className={buttonVariants({ size: "sm" })}>
+            Create purchase order
+          </Link>
           <Button variant="outline" size="sm" onClick={onExport}>
             <Download data-icon="inline-start" />
             Export
@@ -98,9 +126,9 @@ export function PurchaseOrdersMetricsBar({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   nativeButton={false}
-                  render={<Link href="/admin/procurement" />}
+                  render={<Link href="/admin/erp/purchase-orders" />}
                 >
-                  View procurement
+                  ERP purchase orders
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -120,6 +148,8 @@ export function PurchaseOrdersMetricsBar({
             }
             trendTone="neutral"
             sparkSeed={stats.totalPurchaseOrders}
+            onClick={onClearFilters}
+            active={allFiltersClear}
           />
           <MetricSegment
             label="Vendor queue"
@@ -130,18 +160,47 @@ export function PurchaseOrdersMetricsBar({
             sparkTone="neutral"
           />
           <MetricSegment
-            label="Accepted"
-            value={stats.acceptedCount.toLocaleString("en-IN")}
-            trend={acceptedTrend}
-            sparkSeed={stats.acceptedCount + 7}
+            label="Due this week"
+            value={stats.dueThisWeekCount.toLocaleString("en-IN")}
+            trend={stats.dueThisWeekCount > 0 ? "Expected arrivals" : undefined}
+            trendTone="neutral"
+            sparkSeed={stats.dueThisWeekCount + 5}
             sparkTone="primary"
+            onClick={
+              onDeliveryFilter
+                ? () => onDeliveryFilter("due_this_week")
+                : undefined
+            }
+            active={activeDeliveryFilter === "due_this_week"}
           />
           <MetricSegment
-            label="Delivered"
-            value={stats.deliveredCount.toLocaleString("en-IN")}
-            trend={deliveredTrend}
-            sparkSeed={stats.deliveredCount + 11}
+            label="Overdue"
+            value={stats.overdueCount.toLocaleString("en-IN")}
+            trend={stats.overdueCount > 0 ? "Past expected date" : undefined}
+            trendTone={stats.overdueCount > 0 ? "down" : "neutral"}
+            sparkSeed={stats.overdueCount + 9}
+            sparkTone="neutral"
+            flatSpark={stats.overdueCount === 0}
+            onClick={
+              onDeliveryFilter ? () => onDeliveryFilter("overdue") : undefined
+            }
+            active={activeDeliveryFilter === "overdue"}
+          />
+          <MetricSegment
+            label="Awaiting receipt"
+            value={stats.awaitingReceiptCount.toLocaleString("en-IN")}
+            trend={
+              stats.awaitingReceiptCount > 0 ? "Needs internal receive" : undefined
+            }
+            trendTone="neutral"
+            sparkSeed={stats.awaitingReceiptCount + 13}
             sparkTone="green"
+            onClick={
+              onDeliveryFilter
+                ? () => onDeliveryFilter("awaiting_receipt")
+                : undefined
+            }
+            active={activeDeliveryFilter === "awaiting_receipt"}
           />
         </div>
       </Card>

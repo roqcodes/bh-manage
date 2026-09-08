@@ -32,12 +32,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import { cn } from "@/lib/utils";
-import { overrideStockAction, updateReorderPointAction } from "@/modules/inventory/actions/inventory.actions";
+import { updateReorderPointAction } from "@/modules/inventory/actions/inventory.actions";
 import {
+  availableStockUnits,
   formatSku,
   INVENTORY_ACCENT,
   reorderPointFor,
+  reservedStockUnits,
   stockLevelFor,
   stockUnits,
   StockStatusPill,
@@ -120,41 +124,23 @@ function InventoryTableRow({
 }) {
   const queryClient = useQueryClient();
   const [savePending, startSave] = useTransition();
-  const [stockStr, setStockStr] = useState(String(stockUnits(row.stock)));
   const [reorderPointStr, setReorderPointStr] = useState(
     String(reorderPointFor(row.reorder_point)),
   );
 
-  useEffect(() => {
-    setStockStr(String(stockUnits(row.stock)));
-    setReorderPointStr(String(reorderPointFor(row.reorder_point)));
-  }, [row.variant_id, row.stock, row.reorder_point]);
+  const totalStock = stockUnits(row.stock);
+  const reserved = reservedStockUnits(row.reserved_stock);
+  const available = availableStockUnits(row.stock, row.reserved_stock);
 
-  const level = stockLevelFor(row.stock, row.reorder_point);
+  useEffect(() => {
+    setReorderPointStr(String(reorderPointFor(row.reorder_point)));
+  }, [row.variant_id, row.reorder_point]);
+
+  const level = stockLevelFor(available, row.reorder_point);
   const variantLabel = toTitleCase(row.product_variants?.name, "Unnamed variant");
   const productName = toTitleCase(row.product_variants?.products?.name);
   const productId = row.product_variants?.products?.id;
   const previewUrl = previewUrlFromRow(row);
-
-  function saveStock() {
-    const parsed = parseInt(stockStr, 10);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      setStockStr(String(stockUnits(row.stock)));
-      return;
-    }
-    const next = Math.floor(parsed);
-    if (next === stockUnits(row.stock)) return;
-
-    startSave(async () => {
-      await overrideStockAction(row.variant_id, next);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
-      if (productId) {
-        void queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.productDetail(productId),
-        });
-      }
-    });
-  }
 
   function saveReorderPoint() {
     const parsed = parseInt(reorderPointStr, 10);
@@ -201,24 +187,22 @@ function InventoryTableRow({
         </code>
       </TableCell>
       <TableCell>
-        <StockStatusPill stock={row.stock} reorderPoint={row.reorder_point} />
+        <StockStatusPill stock={available} reorderPoint={row.reorder_point} />
       </TableCell>
-      <TableCell>
-        <Input
-          className={cn(
-            "h-7 w-20 tabular-nums",
-            level === "critical" && "text-destructive",
-            level === "low" && "text-amber-700",
-          )}
-          type="number"
-          min={0}
-          step={1}
-          value={stockStr}
-          onChange={(e) => setStockStr(e.target.value)}
-          onBlur={saveStock}
-          disabled={savePending}
-          aria-label={`Stock for ${variantLabel}`}
-        />
+      <TableCell
+        className={cn(
+          "tabular-nums font-medium",
+          level === "critical" && "text-destructive",
+          level === "low" && "text-amber-700",
+        )}
+      >
+        {available}
+      </TableCell>
+      <TableCell className="hidden tabular-nums text-muted-foreground md:table-cell">
+        {reserved > 0 ? reserved : "—"}
+      </TableCell>
+      <TableCell className="hidden tabular-nums text-muted-foreground lg:table-cell">
+        {totalStock}
       </TableCell>
       <TableCell>
         <Input
@@ -329,7 +313,38 @@ export function InventoryDataTable({
   selectedIds: Set<string>;
   onSelectedIdsChange: (ids: Set<string>) => void;
 }) {
-  const pageIds = rows.map((r) => r.variant_id);
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    rows,
+    "variant_name",
+    "asc",
+    (row, key) => {
+      switch (key) {
+        case "variant_name":
+          return toTitleCase(row.product_variants?.name, "Unnamed variant");
+        case "product_name":
+          return toTitleCase(row.product_variants?.products?.name);
+        case "sku":
+          return row.variant_id;
+        case "status":
+          return stockLevelFor(
+            availableStockUnits(row.stock, row.reserved_stock),
+            row.reorder_point,
+          );
+        case "stock":
+          return availableStockUnits(row.stock, row.reserved_stock);
+        case "reserved_stock":
+          return reservedStockUnits(row.reserved_stock);
+        case "total_stock":
+          return stockUnits(row.stock);
+        case "reorder_point":
+          return reorderPointFor(row.reorder_point);
+        default:
+          return (row as unknown as Record<string, unknown>)[key];
+      }
+    },
+  );
+
+  const pageIds = sorted.map((r) => r.variant_id);
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
 
@@ -355,7 +370,7 @@ export function InventoryDataTable({
     );
   }
 
-  if (rows.length === 0) {
+  if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
         <Warehouse className="size-10 text-muted-foreground/40" aria-hidden />
@@ -381,18 +396,80 @@ export function InventoryDataTable({
           <TableHead className="w-12">
             <span className="sr-only">Thumbnail</span>
           </TableHead>
-          <TableHead>Variant</TableHead>
-          <TableHead className="hidden md:table-cell">Product</TableHead>
-          <TableHead className="hidden lg:table-cell">SKU</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Stock</TableHead>
-          <TableHead className="min-w-[5rem]">Min threshold</TableHead>
-          <TableHead className="hidden text-muted-foreground lg:table-cell">Updated</TableHead>
+          <SortableTableHead
+            label="Variant"
+            sortKey="variant_name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Product"
+            sortKey="product_name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="hidden md:table-cell"
+          />
+          <SortableTableHead
+            label="SKU"
+            sortKey="sku"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="hidden lg:table-cell"
+          />
+          <SortableTableHead
+            label="Status"
+            sortKey="status"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Available"
+            sortKey="stock"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Reserved"
+            sortKey="reserved_stock"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="hidden md:table-cell"
+          />
+          <SortableTableHead
+            label="On hand"
+            sortKey="total_stock"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="hidden lg:table-cell"
+          />
+          <SortableTableHead
+            label="Min threshold"
+            sortKey="reorder_point"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="min-w-[5rem]"
+          />
+          <SortableTableHead
+            label="Updated"
+            sortKey="updated_at"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="hidden text-muted-foreground lg:table-cell"
+          />
           <TableHead className="w-10" />
         </TableRow>
       </TableHeader>
       <TableBody>
-        {rows.map((row) => (
+        {sorted.map((row) => (
           <InventoryTableRow
             key={row.variant_id}
             row={row}

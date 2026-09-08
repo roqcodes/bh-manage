@@ -244,8 +244,8 @@ export async function getStoreFinancialDashboard(
         .in("status", ["finalized", "partial", "paid"])
         .gt("balance_due", 0),
       supabase
-        .from("store_inventory")
-        .select("stock, variant_id")
+        .from("store_product_inventory")
+        .select("stock, product_id")
         .eq("store_id", storeId),
       supabase
         .from("invoices")
@@ -272,24 +272,11 @@ export async function getStoreFinancialDashboard(
 
   let lowStockCount = 0;
   const storeStockRows = lowStockResult.data ?? [];
-  if (storeStockRows.length > 0) {
-    const variantIds = storeStockRows.map((row) => row.variant_id);
-    const { data: reorderRows } = await supabase
-      .from("inventory")
-      .select("variant_id, reorder_point")
-      .in("variant_id", variantIds);
-    const reorderByVariant = new Map(
-      (reorderRows ?? []).map((row) => [row.variant_id, Number(row.reorder_point ?? 10)]),
-    );
-    for (const row of storeStockRows) {
-      const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
-      const reorderPoint = Math.max(
-        0,
-        Math.floor(reorderByVariant.get(row.variant_id) ?? 10),
-      );
-      if (stock < 1) lowStockCount += 1;
-      else if (stock < reorderPoint) lowStockCount += 1;
-    }
+  const reorderThreshold = 10;
+  for (const row of storeStockRows) {
+    const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
+    if (stock < 1) lowStockCount += 1;
+    else if (stock < reorderThreshold) lowStockCount += 1;
   }
 
   const statusAgg = new Map<string, { count: number; total: number }>();

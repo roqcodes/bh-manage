@@ -26,7 +26,7 @@ import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleto
 import { ErpDocumentTabsLayout } from "@/modules/erp/components/erp-document-tabs-layout";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { ErpDocumentActions } from "@/modules/erp/components/erp-document-actions";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -64,6 +64,8 @@ type BillDetail = {
   credits_applied: number;
   balance_due: number;
   inventory_committed: boolean;
+  accounting_posted?: boolean;
+  expected_delivery_date?: string | null;
   vendors: { name: string | null; phone: string | null; address: string | null; trn: string | null } | null;
   stores: { name: string | null } | null;
   purchase_orders: { po_number: string | null } | null;
@@ -233,8 +235,12 @@ export function PurchaseBillDetailView({ billId }: { billId: string }) {
     bill.due_date,
   );
   const statusKey = displayStatus.toLowerCase();
-  const canEdit = bill.status === "draft" && !bill.inventory_committed;
-  const canFinalize = bill.status === "draft" && !bill.inventory_committed;
+  const canEdit = bill.status === "draft" && !bill.accounting_posted && !bill.inventory_committed;
+  const canFinalize =
+    bill.status === "draft" &&
+    !bill.accounting_posted &&
+    !bill.inventory_committed &&
+    !bill.po_id;
   const canPay = bill.balance_due > 0 && bill.status !== "draft" && bill.status !== "cancelled";
   const canCancel =
     bill.status !== "cancelled" &&
@@ -277,7 +283,7 @@ export function PurchaseBillDetailView({ billId }: { billId: string }) {
           <div className="flex flex-wrap items-center gap-2">
             {canFinalize ? (
               <Button disabled={pending} onClick={finalize}>
-                {pending ? "Finalizing…" : "Finalize bill"}
+                {pending ? "Finalizing…" : "Post bill (AP only)"}
               </Button>
             ) : null}
             {canPay ? (
@@ -310,7 +316,7 @@ export function PurchaseBillDetailView({ billId }: { billId: string }) {
               canEdit={canEdit}
               canDelete={canCancel}
               deleteLabel="Cancel bill"
-              deleteDescription="Cancels this draft or unpaid bill and reverses stock if already received."
+              deleteDescription="Cancels this bill. Finalized receives must be cancelled first. Legacy bills may reverse stock applied before receive engine."
               onDelete={cancelBill}
             />
           </div>
@@ -353,6 +359,18 @@ export function PurchaseBillDetailView({ billId }: { billId: string }) {
           />
         </div>
       </Card>
+
+      {bill.po_id && bill.status === "draft" ? (
+        <Card className="border-sky-200 bg-sky-50">
+          <CardContent className="py-3 text-sm text-sky-900">
+            Linked to a purchase order — finalize via{" "}
+            <Link href={`/admin/purchase-orders/${bill.po_id}`} className="font-medium underline">
+              Submit deliver & finalize invoice
+            </Link>{" "}
+            on the PO page (posts stock and accounting together).
+          </CardContent>
+        </Card>
+      ) : null}
 
       {error ? (
         <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">

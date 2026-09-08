@@ -42,6 +42,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import { cn } from "@/lib/utils";
 import { currencyLabel } from "@/lib/format-currency";
 import { formatErpDocRef } from "@/lib/erp-document-ref";
@@ -415,7 +417,37 @@ export function OrdersDataTable({
   variant?: "online" | "erp";
   detailBasePath?: string;
 }) {
-  const pageIds = orders.map((o) => o.id);
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    orders,
+    "created_at",
+    "desc",
+    (row, key) => {
+      switch (key) {
+        case "order_ref":
+          return row.sales_order_number ?? row.id;
+        case "customer_name":
+          return row.users?.name ?? row.users?.email ?? "";
+        case "reference_number":
+          return row.reference_number ?? "";
+        case "store_name":
+          return row.store_name ?? "";
+        case "payment_status":
+          return row.payment_status ?? "";
+        case "status":
+          return row.status ?? "";
+        case "item_count":
+          return row.item_count ?? 0;
+        case "total_amount":
+          return Number(row.total_amount ?? 0);
+        case "shipment_date":
+          return row.shipment_date ?? "";
+        default:
+          return (row as unknown as Record<string, unknown>)[key];
+      }
+    },
+  );
+
+  const pageIds = sorted.map((o) => o.id);
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
 
@@ -441,7 +473,7 @@ export function OrdersDataTable({
     );
   }
 
-  if (orders.length === 0) {
+  if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
         <Package className="size-10 text-muted-foreground/40" aria-hidden />
@@ -461,25 +493,89 @@ export function OrdersDataTable({
               onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
             />
           </TableHead>
-          <TableHead>{variant === "erp" ? "SO#" : "Order"}</TableHead>
+          <SortableTableHead
+            label={variant === "erp" ? "SO#" : "Order"}
+            sortKey="order_ref"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
           {variant === "erp" ? (
-            <TableHead className="hidden lg:table-cell">Reference</TableHead>
+            <SortableTableHead
+              label="Reference"
+              sortKey="reference_number"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+              className="hidden lg:table-cell"
+            />
           ) : null}
-          <TableHead>Customer</TableHead>
-          <TableHead>Date</TableHead>
+          <SortableTableHead
+            label="Customer"
+            sortKey="customer_name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Date"
+            sortKey="created_at"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
           {variant === "erp" ? (
-            <TableHead className="hidden xl:table-cell">Shipment</TableHead>
+            <SortableTableHead
+              label="Shipment"
+              sortKey="shipment_date"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+              className="hidden xl:table-cell"
+            />
           ) : null}
-          <TableHead className="hidden md:table-cell">Store</TableHead>
-          <TableHead>Payment</TableHead>
-          <TableHead>{variant === "erp" ? "Status" : "Fulfillment"}</TableHead>
-          <TableHead>Items</TableHead>
-          <TableHead className="text-right">{currencyLabel("Total")}</TableHead>
+          <SortableTableHead
+            label="Store"
+            sortKey="store_name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="hidden md:table-cell"
+          />
+          <SortableTableHead
+            label="Payment"
+            sortKey="payment_status"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label={variant === "erp" ? "Status" : "Fulfillment"}
+            sortKey="status"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Items"
+            sortKey="item_count"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label={currencyLabel("Total")}
+            sortKey="total_amount"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            align="right"
+          />
           <TableHead className="w-10" />
         </TableRow>
       </TableHeader>
       <TableBody>
-        {orders.map((order) => {
+        {sorted.map((order) => {
           const isSelected = selectedIds.has(order.id);
           const total = Number(order.total_amount ?? 0);
 

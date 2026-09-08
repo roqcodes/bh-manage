@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 
-import type { ErpVariantSearchRow } from "@/common/erp/purchasing-types";
+import type { ErpSalesProductSearchRow } from "@/common/erp/sales-types";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
 import {
   AdminFormColumns,
@@ -25,7 +25,7 @@ import { formatCurrencyAmount } from "@/lib/format-currency";
 
 type TransferLine = {
   key: string;
-  variantId: string;
+  productId: string;
   productName: string;
   quantity: number;
   available: number;
@@ -40,18 +40,14 @@ function newKey() {
 
 type TransferRequestLine = {
   id: string;
-  variant_id: string;
+  product_id: string | null;
+  variant_id: string | null;
   quantity: number;
   source_available: number;
   transfer_price: number;
   sales_price: number;
   average_purchase_cost: number;
-  product_variants: {
-    id: string;
-    name: string | null;
-    barcode: string | null;
-    products: { name: string } | null;
-  } | null;
+  products: { name: string | null; barcode: string | null } | null;
 };
 
 type TransferRequestDetail = {
@@ -66,10 +62,13 @@ type TransferRequestDetail = {
 };
 
 function productLabel(line: TransferRequestLine): string {
-  const pv = line.product_variants;
-  if (!pv) return line.variant_id;
-  const base = pv.products?.name ?? pv.name ?? "Product";
-  return pv.barcode ? `${base} (${pv.barcode})` : base;
+  const productId =
+    line.product_id ??
+    line.variant_id ??
+    "unknown";
+  const name = line.products?.name ?? "Product";
+  const barcode = line.products?.barcode;
+  return barcode ? `${name} (${barcode})` : name || productId;
 }
 
 export type StoreTransferFormViewProps = ErpFormViewBaseProps & {
@@ -120,10 +119,13 @@ export function StoreTransferFormView({
 
         const transferLines: TransferLine[] = [];
         for (const line of request.erp_transfer_request_lines ?? []) {
+          const productId = line.product_id ?? line.variant_id;
+          if (!productId) continue;
+
           let available = Number(line.source_available ?? 0);
           try {
             const stockRes = await adminGet<{ stock: number }>(
-              `erp/store-stock?storeId=${request.from_store_id}&variantId=${line.variant_id}`,
+              `erp/store-stock?storeId=${request.from_store_id}&productId=${productId}`,
             );
             available = stockRes.stock;
           } catch {
@@ -132,7 +134,7 @@ export function StoreTransferFormView({
 
           transferLines.push({
             key: newKey(),
-            variantId: line.variant_id,
+            productId,
             productName: productLabel(line),
             quantity: Number(line.quantity),
             available,
@@ -175,11 +177,11 @@ export function StoreTransferFormView({
     router.push(`/admin/erp/store-transfers/${id}`);
   }
 
-  async function addLine(row: ErpVariantSearchRow) {
+  async function addLine(row: ErpSalesProductSearchRow) {
     let available = 0;
     if (fromStoreId) {
       const stockRes = await adminGet<{ stock: number }>(
-        `erp/store-stock?storeId=${fromStoreId}&variantId=${row.id}`,
+        `erp/store-stock?storeId=${fromStoreId}&productId=${row.id}`,
       );
       available = stockRes.stock;
     }
@@ -187,12 +189,12 @@ export function StoreTransferFormView({
       ...lines,
       {
         key: newKey(),
-        variantId: row.id,
+        productId: row.id,
         productName: row.product_name,
         quantity: 1,
         available,
         purchasePrice: row.purchase_price ?? 0,
-        salesPrice: 0,
+        salesPrice: row.sales_price ?? 0,
         transferPrice: row.purchase_price ?? 0,
       },
     ]);
@@ -222,7 +224,7 @@ export function StoreTransferFormView({
           note: note || undefined,
           requestId: linkedRequestId ?? undefined,
           lines: lines.map((l) => ({
-            variantId: l.variantId,
+            productId: l.productId,
             quantity: l.quantity,
             purchasePrice: l.purchasePrice,
             salesPrice: l.salesPrice,
@@ -294,10 +296,11 @@ export function StoreTransferFormView({
 
       <AdminFormSection title="Items">
         <ProductLiveSearch
-          catalog="purchase"
-          placeholder="Search productâ€¦"
+          catalog="sales"
+          storeId={fromStoreId}
+          placeholder="Search product…"
           disabled={!fromStoreId}
-          onSelect={(row) => addLine(row as ErpVariantSearchRow)}
+          onSelect={(row) => addLine(row as ErpSalesProductSearchRow)}
         />
         {!fromStoreId ? (
           <p className="text-sm text-muted-foreground">Select a source store to search products.</p>

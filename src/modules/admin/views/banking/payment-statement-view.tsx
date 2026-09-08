@@ -20,6 +20,7 @@ import {
   SalesPageHeader,
   SalesPageLayout,
 } from "@/modules/erp/components/sales-module-ui";
+import { SortableTableHead, useSortableData } from "@/modules/admin/ui";
 import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 import { formatBankingType } from "@/modules/admin/views/banking/banking-ui";
@@ -94,6 +95,11 @@ export function PaymentStatementView() {
     () => accounts.find((a) => a.id === accountId)?.name ?? "All payment accounts",
     [accounts, accountId],
   );
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    rows,
+    "transaction_date",
+    "desc",
+  );
 
   if (loading && rows.length === 0) return <SalesLoadingState />;
 
@@ -154,15 +160,74 @@ export function PaymentStatementView() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">#</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Store</TableHead>
-              <TableHead>Account</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="hidden lg:table-cell">Details</TableHead>
-              <TableHead className="hidden md:table-cell">Payment type</TableHead>
-              <TableHead className="text-right">Debit</TableHead>
-              <TableHead className="text-right">Credit</TableHead>
-              <TableHead className="text-right">Balance</TableHead>
+              <SortableTableHead
+                label="Date"
+                sortKey="transaction_date"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Store"
+                sortKey="store_name"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Account"
+                sortKey="account_name"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Type"
+                sortKey="transaction_type"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Details"
+                sortKey="details"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+                className="hidden lg:table-cell"
+              />
+              <SortableTableHead
+                label="Payment type"
+                sortKey="payment_type"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+                className="hidden md:table-cell"
+              />
+              <SortableTableHead
+                label="Debit"
+                sortKey="debit_amount"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+                align="right"
+              />
+              <SortableTableHead
+                label="Credit"
+                sortKey="credit_amount"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+                align="right"
+              />
+              <SortableTableHead
+                label="Balance"
+                sortKey="running_balance"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+                align="right"
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -177,7 +242,7 @@ export function PaymentStatementView() {
                 {formatCurrencyAmount(openingBalance)}
               </TableCell>
             </TableRow>
-            {rows.map((row, index) => (
+            {sorted.map((row, index) => (
               <TableRow key={row.id}>
                 <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                 <TableCell className="text-sm">{row.transaction_date}</TableCell>

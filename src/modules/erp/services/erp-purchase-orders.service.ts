@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type {
   ErpPurchaseLineInput,
   ErpPurchaseOrderDetail,
+  ErpPurchaseOrderLineDiscrepancy,
   ErpPurchaseOrderListRow,
 } from "@/common/erp/purchasing-types";
 import { roundMoney } from "@/common/erp/purchasing-types";
@@ -98,7 +99,7 @@ export async function getErpPurchaseOrderDetail(poId: string): Promise<ErpPurcha
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, po_number, vendor_id, store_id, status, reference, po_date, expected_delivery_date, subtotal, tax_total, discount, total_amount, notes, created_at, vendors(id, name, contact, phone, email, address, trn), stores(id, name), purchase_order_items(id, variant_id, quantity, price, tax_rate_percent, tax_amount, line_total, product_variants(id, name, barcode, products(id, name)))",
+      "id, po_number, vendor_id, store_id, status, reference, po_date, expected_delivery_date, subtotal, tax_total, discount, total_amount, notes, created_at, vendors(id, name, contact, phone, email, address, trn), stores(id, name), purchase_order_items(id, product_id, variant_id, quantity, price, tax_rate_percent, tax_amount, line_total, received_qty, accepted_qty, rejected_qty, product_variants(id, name, barcode, product_id, products(id, name)))",
     )
     .eq("id", poId)
     .maybeSingle();
@@ -106,26 +107,90 @@ export async function getErpPurchaseOrderDetail(poId: string): Promise<ErpPurcha
   if (error) throw new Error(error.message);
   if (!data) return null;
 
-  const { data: activeBill } = await supabase
+  const { data: billRow } = await supabase
     .from("erp_purchase_bills")
-    .select("id, purchase_bill_number, status")
+    .select(
+      "id, purchase_bill_number, status, accounting_posted, total_amount, erp_purchase_bill_lines(id, variant_id, product_name, original_quantity, quantity, accepted_qty)",
+    )
     .eq("po_id", poId)
     .neq("status", "cancelled")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const { data: latestBill } = activeBill
-    ? { data: null }
-    : await supabase
-        .from("erp_purchase_bills")
-        .select("id, purchase_bill_number, status")
+  const { data: receiveRow } = billRow
+    ? await supabase
+        .from("erp_purchase_receives")
+        .select("id, receive_number, status")
         .eq("po_id", poId)
+        .eq("purchase_bill_id", billRow.id)
+        .eq("status", "finalized")
         .order("created_at", { ascending: false })
         .limit(1)
-        .maybeSingle();
+        .maybeSingle()
+    : { data: null };
 
-  const bill = activeBill ?? latestBill;
+  const items = (data.purchase_order_items ?? []).map((item) => ({
+    ...item,
+    quantity: Number(item.quantity ?? 0),
+    price: Number(item.price ?? 0),
+    tax_rate_percent: Number(item.tax_rate_percent ?? 0),
+    tax_amount: Number(item.tax_amount ?? 0),
+    line_total: Number(item.line_total ?? 0),
+    received_qty: Number(item.received_qty ?? 0),
+    accepted_qty: Number(item.accepted_qty ?? 0),
+    rejected_qty: Number(item.rejected_qty ?? 0),
+  }));
+
+  const billLines = (billRow?.erp_purchase_bill_lines ?? []).map((line) => ({
+    id: line.id as string,
+    variant_id: line.variant_id as string | null,
+    product_name: line.product_name as string,
+    original_quantity:
+      line.original_quantity != null ? Number(line.original_quantity) : Number(line.quantity ?? 0),
+    quantity: Number(line.quantity ?? 0),
+    accepted_qty: Number(line.accepted_qty ?? 0),
+  }));
+
+  const linkedBill = billRow
+    ? {
+        id: billRow.id as string,
+        purchase_bill_number: billRow.purchase_bill_number as string,
+        status: billRow.status as string,
+        accounting_posted: Boolean(billRow.accounting_posted),
+        total_amount: Number(billRow.total_amount ?? 0),
+        lines: billLines,
+      }
+    : null;
+
+  const deliverySubmitted = Boolean(receiveRow);
+  const hasDraftBill = linkedBill?.status === "draft";
+  const canSubmitDelivery =
+    hasDraftBill &&
+    !deliverySubmitted &&
+    data.status !== "cancelled" &&
+    items.length > 0;
+
+  const discrepancies: ErpPurchaseOrderLineDiscrepancy[] = items.map((line) => {
+    const productName =
+      line.product_variants?.products?.name ??
+      line.product_variants?.name ??
+      "Item";
+    const billLine = billLines.find((bl) => bl.variant_id === line.variant_id);
+    const originalBillQty = billLine?.original_quantity ?? line.quantity;
+    const finalBillQty = billLine?.quantity ?? line.accepted_qty;
+    const deliveredQty = line.accepted_qty;
+    return {
+      poLineId: line.id as string,
+      productName,
+      orderedQty: line.quantity,
+      originalBillQty,
+      deliveredQty,
+      finalBillQty,
+      varianceVsOrder: deliveredQty - line.quantity,
+      varianceVsOriginalBill: finalBillQty - originalBillQty,
+    };
+  });
 
   return {
     ...data,
@@ -133,21 +198,16 @@ export async function getErpPurchaseOrderDetail(poId: string): Promise<ErpPurcha
     tax_total: Number(data.tax_total ?? 0),
     discount: Number(data.discount ?? 0),
     total_amount: data.total_amount != null ? Number(data.total_amount) : null,
-    purchase_order_items: (data.purchase_order_items ?? []).map((item) => ({
-      ...item,
-      quantity: Number(item.quantity ?? 0),
-      price: Number(item.price ?? 0),
-      tax_rate_percent: Number(item.tax_rate_percent ?? 0),
-      tax_amount: Number(item.tax_amount ?? 0),
-      line_total: Number(item.line_total ?? 0),
-    })),
-    linked_bill: bill
-      ? {
-          id: bill.id,
-          purchase_bill_number: bill.purchase_bill_number,
-          status: bill.status,
-        }
-      : null,
+    purchase_order_items: items,
+    linked_bill: linkedBill,
+    delivery: {
+      hasDraftBill,
+      deliverySubmitted,
+      receiveId: receiveRow?.id ?? null,
+      receiveNumber: receiveRow?.receive_number ?? null,
+      canSubmitDelivery,
+    },
+    discrepancies,
   } as ErpPurchaseOrderDetail;
 }
 
@@ -167,7 +227,8 @@ export async function createErpPurchaseOrder(input: {
   if (!input.lines.length) throw new Error("At least one line item is required");
 
   const linesJson: Json = input.lines.map((l) => ({
-    variant_id: l.variantId ?? "",
+    product_id: l.productId ?? null,
+    variant_id: l.variantId ?? null,
     quantity: l.quantity,
     purchase_price: l.purchasePrice,
     tax_rate_percent: l.taxRatePercent,
@@ -259,6 +320,7 @@ export async function updateErpPurchaseOrder(
     const lineTax = roundMoney(taxable * (line.taxRatePercent / 100));
     return {
       po_id: poId,
+      product_id: line.productId ?? null,
       variant_id: line.variantId ?? null,
       quantity: line.quantity,
       price: line.purchasePrice,
@@ -278,4 +340,42 @@ export async function updateErpPurchaseOrder(
     description: "Purchase order updated",
     storeId: input.storeId,
   });
+}
+
+export async function submitPoDeliveryAndFinalize(input: {
+  poId: string;
+  receiveDate?: string;
+  notes?: string | null;
+  lines: Array<{ poLineId: string; deliveredQty: number }>;
+}): Promise<{ receiveId: string; billId: string }> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+
+  const linesJson: Json = input.lines.map((line) => ({
+    po_line_id: line.poLineId,
+    delivered_qty: line.deliveredQty,
+  })) as Json;
+
+  const { data, error } = await supabase.rpc("submit_erp_po_delivery_and_finalize", {
+    p_po_id: input.poId,
+    p_lines: linesJson,
+    p_receive_date: input.receiveDate ?? new Date().toISOString().slice(0, 10),
+    p_notes: input.notes ?? undefined,
+  });
+
+  if (error) throw new Error(error.message);
+
+  const result = data as { receive_id: string; bill_id: string; po_id: string };
+
+  await logAuditEvent({
+    action: "submit_delivery",
+    entityType: "purchase_order",
+    entityId: input.poId,
+    description: "Delivery submitted and invoice finalized",
+  });
+
+  return {
+    receiveId: result.receive_id,
+    billId: result.bill_id,
+  };
 }

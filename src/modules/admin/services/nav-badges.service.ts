@@ -7,7 +7,6 @@ import type {
 } from "@/common/admin/types";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
-import { countVariantsBelowReorderPoint } from "@/modules/procurement/services/procurement.service";
 import { getPendingPortalRequestCount } from "@/modules/users/services/users.service";
 
 function setBadge(
@@ -112,18 +111,6 @@ export async function getAdminNavBadges(): Promise<AdminNavBadgesPayload> {
   );
 
   setBadge(badges, "/admin/users", pendingUsersRes, "warning");
-
-  try {
-    const reorderCount = await countVariantsBelowReorderPoint();
-    setBadge(
-      badges,
-      "/admin/procurement",
-      reorderCount,
-      reorderCount > 0 ? "critical" : "info",
-    );
-  } catch {
-    /* RBAC */
-  }
 
   const dashboardAlerts = Object.entries(badges).filter(
     ([href]) => href !== "/admin",

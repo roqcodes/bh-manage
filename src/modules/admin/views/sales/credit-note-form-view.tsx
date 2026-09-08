@@ -140,6 +140,7 @@ export function CreditNoteFormView({
         setLines(
           detail.erp_credit_note_lines.map((line) => ({
             key: line.id,
+            productId: (line as { product_id?: string | null }).product_id ?? null,
             variantId: line.variant_id,
             productName: line.product_name,
             description: "",
@@ -175,6 +176,7 @@ export function CreditNoteFormView({
       setLines(
         detail.invoice_items.map((item) => ({
           key: newLineKey(),
+          productId: (item as { product_id?: string | null }).product_id ?? null,
           variantId: item.variant_id,
           productName: item.product_name,
           description: item.description ?? "",
@@ -465,7 +467,13 @@ export function CreditNoteFormView({
           </AdminFormSection>
 
           <AdminFormSection title="Refund items">
-            <SalesLinesEditor lines={lines} onChange={setLines} storeId={effectiveStoreId} showSerial />
+            <SalesLinesEditor
+              lines={lines}
+              onChange={setLines}
+              storeId={effectiveStoreId}
+              customerId={customerId}
+              showSerial
+            />
           </AdminFormSection>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

@@ -23,13 +23,23 @@ export const adminQueryKeys = {
   products: (page: number, categoryId: string | null, storeId?: string | null) =>
     ["admin", "products", page, categoryId ?? "all", storeId ?? "all"] as const,
   vendors: (page: number) => ["admin", "vendors", page] as const,
-  inventory: (page: number) => ["admin", "inventory", page] as const,
+  inventory: (page: number, storeId?: string | null) =>
+    ["admin", "inventory", page, storeId ?? "active"] as const,
+  onlineStockTransfers: (storeId?: string | null, status?: string) =>
+    ["admin", "online-stock-transfers", storeId ?? "active", status ?? "all"] as const,
+  onlineToPhysicalTransfers: (storeId?: string | null) =>
+    ["admin", "online-to-physical", storeId ?? "active"] as const,
   orders: (status: string, userId: string | null, page: number) =>
     ["admin", "orders", status, userId ?? "", page] as const,
   salesOrders: (status: string, userId: string | null, page: number, storeId?: string | null) =>
     ["admin", "sales-orders", status, userId ?? "", page, storeId ?? "active"] as const,
-  purchaseOrders: (status: string, vendorId: string | null, page: number) =>
-    ["admin", "purchase-orders", status, vendorId ?? "", page] as const,
+  purchaseOrders: (
+    status: string,
+    delivery: string | null,
+    vendorId: string | null,
+    page: number,
+  ) =>
+    ["admin", "purchase-orders", status, delivery ?? "", vendorId ?? "", page] as const,
   users: (tab: string, segment: string, page: number) =>
     ["admin", "users", tab, segment, page] as const,
   delivery: () => ["admin", "delivery"] as const,
@@ -40,7 +50,6 @@ export const adminQueryKeys = {
   purchaseOrderDetail: (id: string) => ["admin", "purchase-order", id] as const,
   customerDetail: (id: string, txPage: number) => ["admin", "customer", id, txPage] as const,
   customersList: (page: number) => ["admin", "customers", "list", page] as const,
-  procurement: () => ["admin", "procurement"] as const,
   searchIndex: () => ["admin", "search-index"] as const,
   recentActivity: () => ["admin", "recent-activity"] as const,
   taxRates: () => ["admin", "tax-rates"] as const,

@@ -791,11 +791,11 @@ function OrderTimelinePanel({ orders }: { orders: Order[] }) {
 
 function InventoryPanel({
   alerts,
-  procurement,
+  inventory,
   lowStockCount,
 }: {
   alerts: DashboardAlert[];
-  procurement: AdminDashboardPayload["procurement"];
+  inventory: AdminDashboardPayload["inventory"];
   lowStockCount: number;
 }) {
   const stockAlerts = alerts.filter((a) => ["out-of-stock", "low-stock"].includes(a.id));
@@ -832,7 +832,7 @@ function InventoryPanel({
               <span className="text-xs font-medium uppercase tracking-wide">Units on hand</span>
             </div>
             <p className="mt-2 text-2xl font-semibold tabular-nums">
-              {procurement.availableInventoryUnits.toLocaleString()}
+              {inventory.availableInventoryUnits.toLocaleString()}
             </p>
           </Link>
           <Link
@@ -844,19 +844,19 @@ function InventoryPanel({
               <span className="text-xs font-medium uppercase tracking-wide">SKUs to restock</span>
             </div>
             <p className="mt-2 text-2xl font-semibold tabular-nums">
-              {procurement.productsNeedingRestock}
+              {inventory.productsNeedingRestock}
             </p>
           </Link>
           <Link
-            href="/admin/procurement"
+            href="/admin/orders"
             className="rounded-lg border px-3 py-3 hover:bg-muted"
           >
             <div className="flex items-center gap-2 text-sky-600">
               <FileText className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Pipeline shortage</span>
+              <span className="text-xs font-medium uppercase tracking-wide">Demand today</span>
             </div>
             <p className="mt-2 text-2xl font-semibold tabular-nums">
-              {procurement.pipelineShortageVariants}
+              {inventory.demandTodayUnits}
             </p>
           </Link>
         </div>
@@ -936,7 +936,7 @@ export function AdminDashboardView() {
     alerts,
     pipeline,
     business,
-    procurement,
+    inventory,
     recentOrders,
     erpFinancial,
     erpActivity,
@@ -1070,7 +1070,7 @@ export function AdminDashboardView() {
         <SectionHeading title="Inventory" />
         <InventoryPanel
           alerts={alerts}
-          procurement={procurement}
+          inventory={inventory}
           lowStockCount={erpFinancial?.low_stock_count ?? 0}
         />
       </section>

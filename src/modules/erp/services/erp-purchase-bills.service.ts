@@ -14,7 +14,8 @@ import type { Json } from "@/lib/integrations/supabase/types";
 
 function linesToJson(lines: ErpPurchaseLineInput[]): Json {
   return lines.map((l) => ({
-    variant_id: l.variantId ?? "",
+    product_id: l.productId ?? null,
+    variant_id: l.variantId ?? null,
     product_name: l.productName,
     barcode: l.barcode ?? "",
     expiry_date: l.expiryDate ?? "",
@@ -131,6 +132,7 @@ export async function createPurchaseBill(input: {
   batchReference?: string | null;
   reference?: string | null;
   notes?: string | null;
+  expectedDeliveryDate?: string | null;
   finalize?: boolean;
 }): Promise<string> {
   await requireAdminOrManagerProfile();
@@ -153,6 +155,7 @@ export async function createPurchaseBill(input: {
     p_batch_reference: input.batchReference ?? undefined,
     p_reference: input.reference ?? undefined,
     p_notes: input.notes ?? undefined,
+    p_expected_delivery_date: input.expectedDeliveryDate ?? undefined,
     p_finalize: false,
   });
 
@@ -272,6 +275,7 @@ export async function updateDraftPurchaseBill(
     discount?: number;
     poId?: string | null;
     vendorBillNumber?: string | null;
+    expectedDeliveryDate?: string | null;
     grnReference?: string | null;
     batchReference?: string | null;
     reference?: string | null;
@@ -283,12 +287,12 @@ export async function updateDraftPurchaseBill(
 
   const { data: bill, error: fetchError } = await supabase
     .from("erp_purchase_bills")
-    .select("status, inventory_committed")
+    .select("status, accounting_posted, inventory_committed, legacy_stock_via_bill")
     .eq("id", billId)
     .single();
 
   if (fetchError) throw new Error(fetchError.message);
-  if (bill.status !== "draft" || bill.inventory_committed) {
+  if (bill.status !== "draft" || bill.accounting_posted || bill.legacy_stock_via_bill) {
     throw new Error("Only draft purchase bills can be edited");
   }
   if (!input.lines.length) throw new Error("At least one line item is required");
@@ -304,6 +308,7 @@ export async function updateDraftPurchaseBill(
       store_id: input.storeId,
       purchase_date: input.purchaseDate,
       due_date: input.dueDate ?? null,
+      expected_delivery_date: input.expectedDeliveryDate ?? null,
       po_id: input.poId ?? null,
       vendor_bill_number: input.vendorBillNumber ?? null,
       grn_reference: input.grnReference ?? null,
@@ -331,6 +336,7 @@ export async function updateDraftPurchaseBill(
     const lineTax = roundMoney(taxable * (line.taxRatePercent / 100));
     return {
       purchase_bill_id: billId,
+      product_id: line.productId ?? null,
       variant_id: line.variantId ?? null,
       product_name: line.productName,
       barcode: line.barcode ?? null,

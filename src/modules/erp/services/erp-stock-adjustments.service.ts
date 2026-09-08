@@ -80,7 +80,7 @@ export async function createStockAdjustment(input: {
   }
 
   const linesJson: Json = input.lines.map((l) => ({
-    variant_id: l.variantId,
+    product_id: l.productId,
     direction: l.direction,
     quantity: l.quantity,
     purchase_cost: l.direction === "remove" ? 0 : l.purchaseCost,

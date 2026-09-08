@@ -101,7 +101,7 @@ export async function createStoreTransfer(input: {
   const supabase = await createSupabaseServerClient();
 
   const linesJson: Json = input.lines.map((l) => ({
-    variant_id: l.variantId,
+    product_id: l.productId,
     quantity: l.quantity,
     purchase_price: l.purchasePrice ?? 0,
     sales_price: l.salesPrice ?? 0,

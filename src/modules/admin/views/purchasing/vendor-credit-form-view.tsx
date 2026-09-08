@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Paperclip } from "lucide-react";
 
-import type { PurchaseLineFormRow } from "@/common/erp/purchasing-types";
+import type { PurchaseLineFormRow, PurchaseReceiveAdjustments } from "@/common/erp/purchasing-types";
 import { calcPurchaseLine, roundMoney } from "@/common/erp/purchasing-types";
 import { adminGet, adminPost, adminPut } from "@/modules/admin/lib/admin-api-client";
 import {
@@ -36,8 +36,9 @@ import {
   CLOUDINARY_CONFIGURED,
   uploadImageToCloudinary,
 } from "@/modules/products/lib/cloudinary-upload";
-import { cn } from "@/lib/utils";
+import { displayErpDocumentNumber } from "@/lib/erp-document-ref";
 import { formatCurrencyAmount } from "@/lib/format-currency";
+import { cn } from "@/lib/utils";
 
 type BillDetail = {
   id: string;
@@ -59,6 +60,7 @@ function billLinesToForm(
 ): PurchaseLineFormRow[] {
   return lines.map((line) => ({
     key: line.id,
+    productId: (line as { product_id?: string | null }).product_id ?? null,
     variantId: line.variant_id,
     productName: line.product_name,
     barcode: "",
@@ -71,6 +73,7 @@ function billLinesToForm(
 
 function purchaseLinesToVendorCreditInput(lines: PurchaseLineFormRow[]) {
   return linesToApiInput(lines).map((line) => ({
+    productId: line.productId,
     variantId: line.variantId,
     productName: line.productName,
     quantity: line.quantity,
@@ -116,6 +119,8 @@ export function VendorCreditFormView({
   const searchParams = useSearchParams();
   const formId = useId();
   const prefillBillId = searchParams.get("billId") ?? "";
+  const prefillReceiveId = searchParams.get("receiveId") ?? "";
+  const prefillKind = (searchParams.get("kind") ?? "all") as "shortfall" | "rejected" | "all";
   const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
     useActiveStoreFormField({ mode });
   const isModal = variant === "modal";
@@ -162,6 +167,7 @@ export function VendorCreditFormView({
           setLines(
             detail.erp_vendor_credit_lines.map((line) => ({
               key: line.id,
+              productId: (line as { product_id?: string | null }).product_id ?? null,
               variantId: line.variant_id,
               productName: line.product_name,
               barcode: "",
@@ -183,7 +189,7 @@ export function VendorCreditFormView({
   }, [creditId, mode]);
 
   useEffect(() => {
-    if (!sourceBillId || skipBillPrefill) return;
+    if (!sourceBillId || skipBillPrefill || prefillReceiveId) return;
     adminGet<{ bill: BillDetail }>(`erp/purchase-bills/${sourceBillId}`).then((res) => {
       const bill = res.bill;
       setVendorId(bill.vendor_id);
@@ -193,7 +199,82 @@ export function VendorCreditFormView({
         setLines(billLinesToForm(bill.erp_purchase_bill_lines));
       }
     });
-  }, [sourceBillId, skipBillPrefill]);
+  }, [sourceBillId, skipBillPrefill, prefillReceiveId]);
+
+  useEffect(() => {
+    if (!prefillReceiveId || mode !== "create") return;
+    setSkipBillPrefill(true);
+    Promise.all([
+      adminGet<{
+        receive: {
+          vendor_id: string;
+          store_id: string;
+          purchase_bill_id: string | null;
+          receive_number: string;
+          id: string;
+          erp_purchase_bills: { purchase_bill_number: string | null } | null;
+        };
+      }>(`erp/purchase-receives/${prefillReceiveId}`),
+      adminGet<{ adjustments: PurchaseReceiveAdjustments }>(
+        `erp/purchase-receives/${prefillReceiveId}/adjustments`,
+      ),
+    ])
+      .then(([receiveRes, adjRes]) => {
+        const receive = receiveRes.receive;
+        const adjustments = adjRes.adjustments;
+        setVendorId(receive.vendor_id);
+        setStoreId(receive.store_id);
+        if (receive.purchase_bill_id) {
+          setSourceBillId(receive.purchase_bill_id);
+          setBillLabel(receive.erp_purchase_bills?.purchase_bill_number ?? "");
+        }
+        const receiveLabel = displayErpDocumentNumber(
+          receive.receive_number,
+          "PR",
+          receive.id,
+        );
+        setReference(receive.erp_purchase_bills?.purchase_bill_number ?? receiveLabel);
+        setNotes(`Adjustment from purchase receive ${receiveLabel}`);
+
+        const formLines: PurchaseLineFormRow[] = [];
+        if (prefillKind === "shortfall" || prefillKind === "all") {
+          for (const line of adjustments.shortfall_lines) {
+            formLines.push({
+              key: `shortfall-${line.bill_line_id}`,
+              productId: line.product_id ?? null,
+              variantId: line.variant_id,
+              productName: line.product_name,
+              barcode: "",
+              expiryDate: "",
+              quantity: Number(line.shortfall_qty),
+              purchasePrice: Number(line.purchase_price),
+              taxRatePercent: Number(line.tax_rate_percent),
+            });
+          }
+        }
+        if (prefillKind === "rejected" || prefillKind === "all") {
+          for (const line of adjustments.rejected_lines) {
+            formLines.push({
+              key: `rejected-${line.product_name}-${line.rejected_qty}`,
+              productId: line.product_id ?? null,
+              variantId: line.variant_id,
+              productName: line.product_name,
+              barcode: "",
+              expiryDate: "",
+              quantity: Number(line.rejected_qty),
+              purchasePrice: Number(line.purchase_price),
+              taxRatePercent: Number(line.tax_rate_percent),
+            });
+          }
+        }
+        if (formLines.length > 0) {
+          setLines(formLines);
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to prefill from receive");
+      });
+  }, [prefillReceiveId, prefillKind, mode]);
 
   const totals = useMemo(() => {
     let subtotal = 0;
@@ -475,7 +556,13 @@ export function VendorCreditFormView({
           </AdminFormSection>
 
           <AdminFormSection title="Items">
-            <PurchaseLinesEditor lines={lines} onChange={setLines} showSerial />
+            <PurchaseLinesEditor
+              lines={lines}
+              onChange={setLines}
+              showSerial
+              storeId={effectiveStoreId}
+              vendorId={vendorId}
+            />
           </AdminFormSection>
 
           {error ? (

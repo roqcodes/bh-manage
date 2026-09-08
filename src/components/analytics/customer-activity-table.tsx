@@ -39,6 +39,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import { CurrencyAmount } from "@/components/currency-amount";
 import { useCurrencySettings } from "@/modules/settings/providers/currency-settings-provider";
 
@@ -106,6 +108,18 @@ export function CustomerActivityTable({
     }
     return rows;
   }, [rows, tab]);
+
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    filtered,
+    "timestamp",
+    "desc",
+    (row, key) => {
+      if (key === "customer") return row.customerName;
+      if (key === "product") return row.productName;
+      if (key === "qtyValue") return row.value;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  );
 
   const columns = useMemo<ColumnDef<CustomerActivityRow>[]>(
     () => [
@@ -225,7 +239,7 @@ export function CustomerActivityTable({
   );
 
   const table = useReactTable({
-    data: filtered,
+    data: sorted,
     columns,
     state: { globalFilter: query },
     onGlobalFilterChange: setQuery,
@@ -269,17 +283,44 @@ export function CustomerActivityTable({
       <CardContent className="p-0">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
-                {hg.headers.map((h) => (
-                  <TableHead key={h.id}>
-                    {h.isPlaceholder
-                      ? null
-                      : flexRender(h.column.columnDef.header, h.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
+            <TableRow>
+              <SortableTableHead
+                label="Customer"
+                sortKey="customer"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Action"
+                sortKey="actionType"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Product / SKU"
+                sortKey="product"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label={currencyLabel("Qty · Value")}
+                sortKey="qtyValue"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="When"
+                sortKey="timestamp"
+                activeKey={sortKey}
+                direction={sortDirection}
+                onSort={toggleSort}
+              />
+              <TableHead />
+            </TableRow>
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.length === 0 ? (

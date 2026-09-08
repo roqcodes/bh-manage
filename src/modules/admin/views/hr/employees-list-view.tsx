@@ -59,6 +59,10 @@ export function EmployeesListView() {
     rows,
     "full_name",
     "asc",
+    (row, key) => {
+      if (key === "employee_id") return row.employee_code ?? row.employee_number;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
   );
 
   useEffect(() => {
@@ -133,11 +137,43 @@ export function EmployeesListView() {
               direction={sortDirection}
               onSort={toggleSort}
             />
-            <TableHead>ID#</TableHead>
-            <TableHead className="hidden md:table-cell">ID expiry</TableHead>
-            <TableHead>Mobile</TableHead>
-            <TableHead className="hidden lg:table-cell">Joining date</TableHead>
-            <TableHead>Active</TableHead>
+            <SortableTableHead
+              label="ID#"
+              sortKey="employee_id"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              label="ID expiry"
+              sortKey="id_expiry_date"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+              className="hidden md:table-cell"
+            />
+            <SortableTableHead
+              label="Mobile"
+              sortKey="mobile"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              label="Joining date"
+              sortKey="joining_date"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+              className="hidden lg:table-cell"
+            />
+            <SortableTableHead
+              label="Active"
+              sortKey="is_active"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
             <SortableTableHead
               label="Net salary"
               sortKey="net_salary"

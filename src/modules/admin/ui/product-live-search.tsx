@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Loader2, Search } from "lucide-react";
 
-import type { ErpVariantSearchRow } from "@/common/erp/purchasing-types";
-import type { ErpSalesVariantSearchRow } from "@/common/erp/sales-types";
+import type { ErpProductSearchRow } from "@/common/erp/purchasing-types";
+import type { ErpSalesProductSearchRow } from "@/common/erp/sales-types";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { useDebouncedValue } from "@/modules/admin/ui/use-debounced-value";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 
 export type ProductCatalogType = "sales" | "purchase";
-export type ProductLiveSearchRow = ErpVariantSearchRow | ErpSalesVariantSearchRow;
+export type ProductLiveSearchRow = ErpProductSearchRow | ErpSalesProductSearchRow;
 
 type ProductLiveSearchProps = {
   catalog: ProductCatalogType;
@@ -25,7 +25,7 @@ type ProductLiveSearchProps = {
   renderResult?: (row: ProductLiveSearchRow, dismiss: () => void) => ReactNode;
 };
 
-function isSalesRow(row: ProductLiveSearchRow): row is ErpSalesVariantSearchRow {
+function isSalesRow(row: ProductLiveSearchRow): row is ErpSalesProductSearchRow {
   return "available_stock" in row;
 }
 
@@ -51,14 +51,14 @@ export function ProductLiveSearch({
       if (catalog === "sales") {
         const params = new URLSearchParams({ q });
         if (storeId) params.set("storeId", storeId);
-        const res = await adminGet<{ data: ErpSalesVariantSearchRow[] }>(
+        const res = await adminGet<{ data: ErpSalesProductSearchRow[] }>(
           `erp/sales-catalog?${params.toString()}`,
         );
         return res.data;
       }
-      const res = await adminGet<{ data: ErpVariantSearchRow[] }>(
-        `erp/purchase-catalog?q=${encodeURIComponent(q)}`,
-      );
+        const res = await adminGet<{ data: ErpProductSearchRow[] }>(
+          `erp/purchase-catalog?q=${encodeURIComponent(q)}`,
+        );
       return res.data;
     },
     [catalog, storeId],
@@ -163,7 +163,6 @@ export function ProductLiveSearch({
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">
                     {row.product_name}
-                    {row.name ? <span className="font-normal text-muted-foreground"> — {row.name}</span> : null}
                   </p>
                   {row.barcode ? (
                     <p className="truncate text-xs text-muted-foreground">Barcode: {row.barcode}</p>

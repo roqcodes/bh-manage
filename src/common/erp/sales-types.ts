@@ -2,6 +2,7 @@
 
 export interface ErpLineInput {
   variantId?: string | null;
+  productId?: string | null;
   productName: string;
   description?: string | null;
   quantity: number;
@@ -210,6 +211,7 @@ export interface BulkCustomerPaymentAllocationRow {
 
 export interface SalesLineFormRow {
   key: string;
+  productId: string | null;
   variantId: string | null;
   productName: string;
   description: string;
@@ -220,9 +222,8 @@ export interface SalesLineFormRow {
   unitId: string | null;
 }
 
-export interface ErpSalesVariantSearchRow {
+export interface ErpSalesProductSearchRow {
   id: string;
-  name: string | null;
   product_name: string;
   barcode: string | null;
   sales_price: number | null;
@@ -230,6 +231,19 @@ export interface ErpSalesVariantSearchRow {
   tax_rate_percent: number | null;
   available_stock: number;
 }
+
+/** Variant-level row for online → store transfer catalog. */
+export interface OnlineVariantTransferRow {
+  id: string;
+  variant_name: string;
+  product_id: string;
+  product_name: string;
+  barcode: string | null;
+  available_stock: number;
+}
+
+/** @deprecated Use ErpSalesProductSearchRow */
+export type ErpSalesVariantSearchRow = ErpSalesProductSearchRow;
 
 export function calcSalesLine(
   quantity: number,

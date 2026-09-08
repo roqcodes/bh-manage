@@ -12,16 +12,10 @@ import type {
   DashboardFulfillmentCounts,
   DashboardMetrics,
   DashboardMonthlySeriesPoint,
+  InventoryInsights,
   Order,
   VendorSnapshotEntry,
 } from "@/common/admin/types";
-import {
-  aggregatePendingOrderDemand,
-  getInventoryReorderRows,
-  getOpenPurchaseOrderQuantitiesByVariant,
-  getProcurementDefaults,
-} from "@/modules/procurement/services/procurement.service";
-import { computeReorderNeeds } from "@/modules/procurement/procurement.allocate";
 import { listAuditLogs } from "@/modules/erp/services/audit-log.service";
 import {
   buildStorePlSeries,
@@ -148,7 +142,6 @@ export async function getAdminDashboardPayload(
     vendorPricesRaw,
     purchaseOrdersRaw,
     recentResult,
-    pipelineBlock,
     productsCountResult,
     inventoryWithProductRows,
   ] = await Promise.all([
@@ -196,7 +189,7 @@ export async function getAdminDashboardPayload(
       .gte("created_at", startOfDay)
       .neq("status", "cancelled"),
     supabase
-      .from("store_inventory")
+      .from("store_product_inventory")
       .select("stock")
       .eq("store_id", activeStoreId),
     supabase
@@ -216,27 +209,6 @@ export async function getAdminDashboardPayload(
       .eq("store_id", activeStoreId)
       .order("created_at", { ascending: false })
       .limit(8),
-    (async () => {
-      let pipelineDemandUnits = 0;
-      let shortageUnits = 0;
-      let pipelineShortageVariants = 0;
-      try {
-        const demandRows = await aggregatePendingOrderDemand();
-        pipelineDemandUnits = demandRows.reduce((s, r) => s + r.demand_qty, 0);
-        const onOrderByVariant = await getOpenPurchaseOrderQuantitiesByVariant();
-        const inventoryRows = await getInventoryReorderRows(onOrderByVariant);
-        const defaults = await getProcurementDefaults();
-        const reorderNeeds = computeReorderNeeds(
-          inventoryRows,
-          defaults.default_reorder_quantity,
-        );
-        shortageUnits = reorderNeeds.reduce((s, r) => s + r.shortage_qty, 0);
-        pipelineShortageVariants = reorderNeeds.length;
-      } catch {
-        /* RBAC or empty */
-      }
-      return { pipelineDemandUnits, shortageUnits, pipelineShortageVariants };
-    })(),
     supabase.from("products").select("id", { count: "exact", head: true }),
     supabase
       .from("inventory")
@@ -318,8 +290,13 @@ export async function getAdminDashboardPayload(
   }
   const productsNeedingRestock = outOfStockCount + lowStockItems;
 
-  const { pipelineDemandUnits, shortageUnits, pipelineShortageVariants } =
-    pipelineBlock;
+  const inventory: InventoryInsights = {
+    availableInventoryUnits,
+    productsNeedingRestock,
+    demandTodayUnits,
+    outOfStockSkus: outOfStockCount,
+    lowStockSkus: lowStockItems,
+  };
 
   const metrics: DashboardMetrics = {
     dailyRevenue,
@@ -370,15 +347,6 @@ export async function getAdminDashboardPayload(
     marginToday,
     ordersToday,
     averageOrderValue,
-  };
-
-  const procurement = {
-    pipelineDemandUnits,
-    availableInventoryUnits,
-    shortageUnits,
-    pipelineShortageVariants,
-    demandTodayUnits,
-    productsNeedingRestock,
   };
 
   const catalogCoverage = buildCatalogCoverage(
@@ -613,7 +581,7 @@ export async function getAdminDashboardPayload(
     alerts,
     pipeline,
     business,
-    procurement,
+    inventory,
     catalogCoverage,
     vendors,
     recentOrders: (recentResult.data ?? []) as unknown as Order[],

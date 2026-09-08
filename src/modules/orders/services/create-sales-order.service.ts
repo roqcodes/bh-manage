@@ -2,7 +2,9 @@ import "server-only";
 
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
-import { buildOrderItemSnapshot } from "@/modules/orders/services/order-item-pricing.service";
+import {
+  buildProductOrderItemSnapshot,
+} from "@/modules/orders/services/order-item-pricing.service";
 import { commitOrderInventory } from "@/modules/orders/services/order-wallet-inventory.service";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import { requireErpStoreId } from "@/modules/erp/services/store-context.service";
@@ -21,7 +23,7 @@ export interface CreateSalesOrderInput {
   totalAmount: number;
   taxInclusive?: boolean;
   items: {
-    variantId: string;
+    productId: string;
     quantity: number;
     unitPrice?: number;
     taxRatePercent?: number;
@@ -69,13 +71,14 @@ export async function createSalesOrder(input: CreateSalesOrderInput): Promise<{
 
   const orderLineItems = [];
   for (const item of input.items) {
-    const snapshot = await buildOrderItemSnapshot({
-      variantId: item.variantId,
+    const snapshot = await buildProductOrderItemSnapshot({
+      productId: item.productId,
+      storeId,
       quantity: item.quantity,
       unitPriceOverride: item.unitPrice,
     });
     orderLineItems.push({
-      variantId: item.variantId,
+      productId: item.productId,
       quantity: item.quantity,
       vendorId: snapshot.vendor_id,
       basePrice: snapshot.base_price,
@@ -88,7 +91,8 @@ export async function createSalesOrder(input: CreateSalesOrderInput): Promise<{
 
   const orderItemsInsert = orderLineItems.map((item) => ({
     order_id: orderId,
-    variant_id: item.variantId,
+    product_id: item.productId,
+    variant_id: null,
     quantity: item.quantity,
     price: item.finalPrice,
     vendor_id: item.vendorId || null,

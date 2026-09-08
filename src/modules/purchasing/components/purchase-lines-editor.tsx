@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
-import type { PurchaseLineFormRow } from "@/common/erp/purchasing-types";
+import type { ErpProductSearchRow, PurchaseLineFormRow } from "@/common/erp/purchasing-types";
 import { calcPurchaseLine, roundMoney } from "@/common/erp/purchasing-types";
-import type { ErpVariantSearchRow } from "@/common/erp/purchasing-types";
 import { ProductLiveSearch } from "@/modules/admin/ui/product-live-search";
+import {
+  LineProductDetailsPanel,
+  LineProductDetailsToggle,
+} from "@/modules/erp/components/line-product-details-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,6 +29,7 @@ function newLineKey() {
 export function emptyPurchaseLine(): PurchaseLineFormRow {
   return {
     key: newLineKey(),
+    productId: null,
     variantId: null,
     productName: "",
     barcode: "",
@@ -39,14 +43,23 @@ export function emptyPurchaseLine(): PurchaseLineFormRow {
 export function PurchaseLinesEditor({
   lines,
   onChange,
+  storeId,
+  vendorId,
   showExpiry = false,
   showSerial = false,
 }: {
   lines: PurchaseLineFormRow[];
   onChange: (lines: PurchaseLineFormRow[]) => void;
+  storeId?: string;
+  vendorId?: string;
   showExpiry?: boolean;
   showSerial?: boolean;
 }) {
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+  const colSpan =
+    (showSerial ? 1 : 0) + 5 + (showExpiry ? 1 : 0) + 2;
+
   const totals = useMemo(() => {
     let subtotal = 0;
     let tax = 0;
@@ -62,19 +75,28 @@ export function PurchaseLinesEditor({
     return { subtotal: roundMoney(subtotal), tax: roundMoney(tax), total: roundMoney(subtotal + tax) };
   }, [lines]);
 
-  function addVariant(v: ErpVariantSearchRow) {
-    const label = v.name ? `${v.product_name} — ${v.name}` : v.product_name;
+  function toggleDetails(key: string) {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function addProduct(row: ErpProductSearchRow) {
     onChange([
       ...lines,
       {
         key: newLineKey(),
-        variantId: v.id,
-        productName: label,
-        barcode: v.barcode ?? "",
+        productId: row.id,
+        variantId: null,
+        productName: row.product_name,
+        barcode: row.barcode ?? "",
         expiryDate: "",
         quantity: 1,
-        purchasePrice: v.purchase_price ?? 0,
-        taxRatePercent: v.tax_rate_percent ?? 0,
+        purchasePrice: row.purchase_price ?? 0,
+        taxRatePercent: row.tax_rate_percent ?? 0,
       },
     ]);
   }
@@ -86,18 +108,26 @@ export function PurchaseLinesEditor({
   }
 
   function removeLine(index: number) {
+    const key = lines[index]?.key;
     onChange(lines.filter((_, i) => i !== index));
+    if (key) {
+      setExpandedKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
   }
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex min-w-[240px] flex-1 flex-col gap-1">
-          <label className="text-xs font-medium text-slate-600">Search product / variant</label>
+          <label className="text-xs font-medium text-slate-600">Search product</label>
           <ProductLiveSearch
             catalog="purchase"
-            placeholder="Name, barcode, code…"
-            onSelect={(row) => addVariant(row as ErpVariantSearchRow)}
+            placeholder="Name or barcode…"
+            onSelect={(row) => addProduct(row as ErpProductSearchRow)}
           />
         </div>
         <Button type="button" variant="outline" onClick={() => onChange([...lines, emptyPurchaseLine()])}>
@@ -117,7 +147,8 @@ export function PurchaseLinesEditor({
               <TableHead>Tax %</TableHead>
               {showExpiry ? <TableHead>Expiry</TableHead> : null}
               <TableHead className="text-right">Amount</TableHead>
-              <TableHead />
+              <TableHead className="w-[88px]">Details</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -127,72 +158,98 @@ export function PurchaseLinesEditor({
                 line.purchasePrice,
                 line.taxRatePercent,
               );
+              const detailsOpen = expandedKeys.has(line.key);
+              const canShowDetails = Boolean(line.productId && storeId && vendorId);
+
               return (
-                <TableRow key={line.key}>
-                  {showSerial ? (
-                    <TableCell className="text-muted-foreground tabular-nums">{index + 1}</TableCell>
-                  ) : null}
-                  <TableCell className="min-w-[200px]">
-                    <Input
-                      value={line.productName}
-                      onChange={(e) => updateLine(index, { productName: e.target.value })}
-                      placeholder="Product name"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="any"
-                      className="w-20"
-                      value={line.quantity}
-                      onChange={(e) =>
-                        updateLine(index, { quantity: parseFloat(e.target.value) || 0 })
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="any"
-                      className="w-24"
-                      value={line.purchasePrice}
-                      onChange={(e) =>
-                        updateLine(index, { purchasePrice: parseFloat(e.target.value) || 0 })
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="any"
-                      className="w-20"
-                      value={line.taxRatePercent}
-                      onChange={(e) =>
-                        updateLine(index, { taxRatePercent: parseFloat(e.target.value) || 0 })
-                      }
-                    />
-                  </TableCell>
-                  {showExpiry ? (
-                    <TableCell>
+                <Fragment key={line.key}>
+                  <TableRow>
+                    {showSerial ? (
+                      <TableCell className="text-muted-foreground tabular-nums">{index + 1}</TableCell>
+                    ) : null}
+                    <TableCell className="min-w-[200px]">
                       <Input
-                        type="date"
-                        value={line.expiryDate}
-                        onChange={(e) => updateLine(index, { expiryDate: e.target.value })}
+                        value={line.productName}
+                        onChange={(e) => updateLine(index, { productName: e.target.value })}
+                        placeholder="Product name"
                       />
                     </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="any"
+                        className="w-20"
+                        value={line.quantity}
+                        onChange={(e) =>
+                          updateLine(index, { quantity: parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="any"
+                        className="w-24"
+                        value={line.purchasePrice}
+                        onChange={(e) =>
+                          updateLine(index, { purchasePrice: parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="any"
+                        className="w-20"
+                        value={line.taxRatePercent}
+                        onChange={(e) =>
+                          updateLine(index, { taxRatePercent: parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                    </TableCell>
+                    {showExpiry ? (
+                      <TableCell>
+                        <Input
+                          type="date"
+                          value={line.expiryDate}
+                          onChange={(e) => updateLine(index, { expiryDate: e.target.value })}
+                        />
+                      </TableCell>
+                    ) : null}
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrencyAmount(lineTotal)}
+                    </TableCell>
+                    <TableCell>
+                      <LineProductDetailsToggle
+                        open={detailsOpen}
+                        disabled={!canShowDetails}
+                        disabledReason="Select vendor and add a product from search"
+                        onToggle={() => toggleDetails(line.key)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)}>
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  {detailsOpen ? (
+                    <TableRow className="bg-muted/10 hover:bg-muted/10">
+                      <TableCell colSpan={colSpan} className="py-3">
+                        <LineProductDetailsPanel
+                          productId={line.productId!}
+                          storeId={storeId}
+                          vendorId={vendorId}
+                          counterpartyKind="vendor"
+                          enabled={canShowDetails}
+                        />
+                      </TableCell>
+                    </TableRow>
                   ) : null}
-                  <TableCell className="text-right tabular-nums">
-                    {formatCurrencyAmount(lineTotal)}
-                  </TableCell>
-                  <TableCell>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)}>
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                </Fragment>
               );
             })}
           </TableBody>
@@ -221,6 +278,7 @@ export function linesToApiInput(lines: PurchaseLineFormRow[]) {
   return lines
     .filter((l) => l.productName.trim() && l.quantity > 0)
     .map((l) => ({
+      productId: l.productId,
       variantId: l.variantId,
       productName: l.productName.trim(),
       barcode: l.barcode || null,

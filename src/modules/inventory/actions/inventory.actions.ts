@@ -21,5 +21,4 @@ export async function updateReorderPointAction(
 ): Promise<void> {
   await updateInventoryReorderSettings(variantId, reorder_point);
   revalidatePath("/admin/inventory");
-  revalidatePath("/admin/procurement");
 }

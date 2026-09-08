@@ -34,6 +34,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import {
   blockUserAction,
   bulkBlockUsersAction,
@@ -187,7 +189,23 @@ export function CustomersDataTable({
   const queryClient = useQueryClient();
   const { runAction, isPending } = useAdminAction();
 
-  const pageIds = users.map((u) => u.id);
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    users,
+    "name",
+    "asc",
+    (row, key) => {
+      switch (key) {
+        case "customer_number":
+          return row.customer_number ?? row.id;
+        case "status":
+          return isCustomerBlocked(row) ? 1 : 0;
+        default:
+          return (row as unknown as Record<string, unknown>)[key];
+      }
+    },
+  );
+
+  const pageIds = sorted.map((u) => u.id);
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
 
@@ -241,20 +259,82 @@ export function CustomersDataTable({
               onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
             />
           </TableHead>
-          <TableHead className="w-20">Number</TableHead>
-          <TableHead>Customer</TableHead>
-          <TableHead className="hidden md:table-cell">Company</TableHead>
-          <TableHead>Email</TableHead>
-          <TableHead className="hidden sm:table-cell">Mobile</TableHead>
-          <TableHead className="hidden lg:table-cell">Location</TableHead>
-          <TableHead className="hidden md:table-cell text-right">Receivables</TableHead>
-          <TableHead className="hidden xl:table-cell text-right">Credit limit</TableHead>
-          <TableHead>Status</TableHead>
+          <SortableTableHead
+            label="Number"
+            sortKey="customer_number"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="w-20"
+          />
+          <SortableTableHead
+            label="Customer"
+            sortKey="name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Company"
+            sortKey="company_name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="hidden md:table-cell"
+          />
+          <SortableTableHead
+            label="Email"
+            sortKey="email"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Mobile"
+            sortKey="phone"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="hidden sm:table-cell"
+          />
+          <SortableTableHead
+            label="Location"
+            sortKey="location"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="hidden lg:table-cell"
+          />
+          <SortableTableHead
+            label="Receivables"
+            sortKey="receivables"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            align="right"
+            className="hidden md:table-cell"
+          />
+          <SortableTableHead
+            label="Credit limit"
+            sortKey="credit_limit"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            align="right"
+            className="hidden xl:table-cell"
+          />
+          <SortableTableHead
+            label="Status"
+            sortKey="status"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
           <TableHead className="w-24 text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {users.map((user) => {
+        {sorted.map((user) => {
           const isSelected = selectedIds.has(user.id);
           const blocked = isCustomerBlocked(user);
 

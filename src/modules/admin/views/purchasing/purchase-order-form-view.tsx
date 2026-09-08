@@ -84,11 +84,12 @@ export function PurchaseOrderFormView({
           po.purchase_order_items.length
             ? po.purchase_order_items.map((item) => ({
                 key: item.id,
+                productId:
+                  (item as { product_id?: string | null }).product_id ??
+                  item.product_variants?.product_id ??
+                  null,
                 variantId: item.variant_id,
-                productName:
-                  item.product_variants?.products?.name
-                    ? `${item.product_variants.products.name}${item.product_variants.name ? ` — ${item.product_variants.name}` : ""}`
-                    : "Item",
+                productName: item.product_variants?.products?.name ?? "Item",
                 barcode: item.product_variants?.barcode ?? "",
                 expiryDate: "",
                 quantity: item.quantity,
@@ -288,7 +289,12 @@ export function PurchaseOrderFormView({
           </AdminFormSection>
 
           <AdminFormSection title="Line items">
-            <PurchaseLinesEditor lines={lines} onChange={setLines} />
+            <PurchaseLinesEditor
+              lines={lines}
+              onChange={setLines}
+              storeId={effectiveStoreId}
+              vendorId={vendorId}
+            />
           </AdminFormSection>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

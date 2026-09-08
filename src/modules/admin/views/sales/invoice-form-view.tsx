@@ -103,6 +103,7 @@ export function InvoiceFormView({
         setLines(
           detail.invoice_items.map((item) => ({
             key: `line-${item.product_name}-${Math.random().toString(36).slice(2, 7)}`,
+            productId: (item as { product_id?: string | null }).product_id ?? null,
             variantId: item.variant_id,
             productName: item.product_name,
             description: item.description ?? "",
@@ -340,6 +341,7 @@ export function InvoiceFormView({
               lines={lines}
               onChange={setLines}
               storeId={effectiveStoreId}
+              customerId={customerId}
               taxInclusive={taxInclusive}
               showSerial
             />

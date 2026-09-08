@@ -24,8 +24,10 @@ import {
   AdminTableLink,
   AdminTableRow,
   ErpListRowActions,
+  SortableTableHead,
   useDebouncedValue,
   useErpFormModal,
+  useSortableData,
 } from "@/modules/admin/ui";
 import { useActiveStoreScope } from "@/modules/erp/components/use-active-store-scope";
 import { SalaryPaymentFormView } from "@/modules/admin/views/hr/salary-payment-form-view";
@@ -63,6 +65,11 @@ export function SalaryPaymentsListView() {
   const [period, setPeriod] = useState(searchParams.get("period") ?? "this_month");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    rows,
+    "payment_date",
+    "desc",
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -142,17 +149,66 @@ export function SalaryPaymentsListView() {
       >
         <AdminDataTable>
           <AdminTableHeader>
-            <TableHead>Employee</TableHead>
-            <TableHead>Store</TableHead>
-            <TableHead>Payment date</TableHead>
-            <TableHead className="text-right">Total paid</TableHead>
-            <TableHead className="hidden text-right md:table-cell">Salary</TableHead>
-            <TableHead className="hidden text-right lg:table-cell">Advance</TableHead>
-            <TableHead className="hidden text-right xl:table-cell">Adv. balance</TableHead>
+            <SortableTableHead
+              label="Employee"
+              sortKey="employee_name"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              label="Store"
+              sortKey="store_name"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              label="Payment date"
+              sortKey="payment_date"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              label="Total paid"
+              sortKey="total_paid_amount"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+              align="right"
+            />
+            <SortableTableHead
+              label="Salary"
+              sortKey="salary_payment_amount"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+              align="right"
+              className="hidden md:table-cell"
+            />
+            <SortableTableHead
+              label="Advance"
+              sortKey="advance_payment_amount"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+              align="right"
+              className="hidden lg:table-cell"
+            />
+            <SortableTableHead
+              label="Adv. balance"
+              sortKey="advance_balance_after"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+              align="right"
+              className="hidden xl:table-cell"
+            />
             <TableHead className="w-20 text-right" />
           </AdminTableHeader>
           <AdminTableBody>
-            {rows.map((row) => (
+            {sorted.map((row) => (
               <AdminTableRow key={row.id}>
                 <AdminTableCell>
                   <AdminTableLink href={`/admin/erp/employees/${row.employee_id}`}>

@@ -109,15 +109,15 @@ export function SalesOrderFormView({
       return;
     }
     const items = apiLines
-      .filter((l) => l.variantId)
+      .filter((l) => l.productId)
       .map((l) => ({
-        variantId: l.variantId as string,
+        productId: l.productId as string,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
         taxRatePercent: l.taxRatePercent,
       }));
     if (items.length === 0) {
-      setError("Select items from catalog search so variants are linked");
+      setError("Select products from catalog search");
       return;
     }
 
@@ -289,6 +289,7 @@ export function SalesOrderFormView({
               lines={lines}
               onChange={setLines}
               storeId={effectiveStoreId}
+              customerId={customerId}
               taxInclusive={taxInclusive}
               showSerial
             />

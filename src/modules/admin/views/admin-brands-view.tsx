@@ -38,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead, useSortableData } from "@/modules/admin/ui";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface BrandsPayload {
@@ -231,6 +232,18 @@ export function AdminBrandsView() {
     queryFn: () => adminGet<BrandsPayload>("brands"),
   });
 
+  const brands = data?.brands ?? [];
+
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    brands,
+    "sort_order",
+    "asc",
+    (row, key) => {
+      if (key === "status") return row.is_active ? 1 : 0;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  );
+
   if (isPending && !data) return <AdminPageSkeleton />;
   if (isError) {
     return (
@@ -249,8 +262,6 @@ export function AdminBrandsView() {
       </div>
     );
   }
-
-  const brands = data?.brands ?? [];
 
   async function handleDelete(brand: Brand) {
     if (!confirm(`Delete "${brand.name}"? This cannot be undone.`)) {
@@ -311,15 +322,39 @@ export function AdminBrandsView() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-14" />
-                    <TableHead>Name</TableHead>
-                    <TableHead>Slug</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Status</TableHead>
+                    <SortableTableHead
+                      label="Name"
+                      sortKey="name"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
+                    <SortableTableHead
+                      label="Slug"
+                      sortKey="slug"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
+                    <SortableTableHead
+                      label="Order"
+                      sortKey="sort_order"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
+                    <SortableTableHead
+                      label="Status"
+                      sortKey="status"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
                     <TableHead className="w-24" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {brands.map((brand) => (
+                  {sorted.map((brand) => (
                     <TableRow key={brand.id}>
                       <TableCell>
                         <BrandLogo brand={brand} />

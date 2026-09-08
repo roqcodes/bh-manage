@@ -43,6 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead, useSortableData } from "@/modules/admin/ui";
 import { cn } from "@/lib/utils";
 
 type ModalState =
@@ -206,6 +207,16 @@ export function AdminItemUnitsView() {
     );
   }, [units, search]);
 
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    filtered,
+    "sort_order",
+    "asc",
+    (row, key) => {
+      if (key === "status") return row.is_active ? 1 : 0;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  );
+
   if (isPending && !data) return <AdminPageSkeleton />;
   if (isError) {
     return (
@@ -324,15 +335,40 @@ export function AdminItemUnitsView() {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead>Name</TableHead>
-                    <TableHead>Abbreviation</TableHead>
-                    <TableHead className="text-right">Sort</TableHead>
-                    <TableHead>Status</TableHead>
+                    <SortableTableHead
+                      label="Name"
+                      sortKey="name"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
+                    <SortableTableHead
+                      label="Abbreviation"
+                      sortKey="abbreviation"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
+                    <SortableTableHead
+                      label="Sort"
+                      sortKey="sort_order"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                      align="right"
+                    />
+                    <SortableTableHead
+                      label="Status"
+                      sortKey="status"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
                     <TableHead className="w-24" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((unit) => (
+                  {sorted.map((unit) => (
                     <TableRow key={unit.id}>
                       <TableCell className="font-medium">{unit.name}</TableCell>
                       <TableCell>

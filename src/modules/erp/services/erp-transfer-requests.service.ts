@@ -83,7 +83,7 @@ export async function createTransferRequest(input: {
   const supabase = await createSupabaseServerClient();
 
   const linesJson: Json = input.lines.map((l) => ({
-    variant_id: l.variantId,
+    product_id: l.productId,
     quantity: l.quantity,
     source_available: l.sourceAvailable ?? 0,
     transfer_price: l.transferPrice ?? 0,
@@ -120,7 +120,7 @@ export async function getTransferRequestDetail(id: string) {
   const { data, error } = await supabase
     .from("erp_transfer_requests")
     .select(
-      "*, erp_transfer_request_lines(*, product_variants(id, name, barcode, products(name)))",
+      "*, erp_transfer_request_lines(*, products(id, name, barcode))",
     )
     .eq("id", id)
     .single();

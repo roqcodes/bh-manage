@@ -38,10 +38,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import { cn } from "@/lib/utils";
 import { currencyLabel } from "@/lib/format-currency";
 import { displayErpDocumentNumber } from "@/lib/erp-document-ref";
 import {
+  ExpectedDeliveryDate,
   formatInr,
   PO_ACCENT,
   PoStatusPill,
@@ -51,7 +54,8 @@ function exportPurchaseOrdersCsv(orders: AdminPurchaseOrderListRow[]) {
   const headers = [
     "PO ID",
     "Vendor",
-    "Date",
+    "Created",
+    "Expected delivery",
     "Status",
     "Total (INR)",
   ];
@@ -62,6 +66,7 @@ function exportPurchaseOrdersCsv(orders: AdminPurchaseOrderListRow[]) {
     po.created_at
       ? format(new Date(po.created_at), "yyyy-MM-dd HH:mm")
       : "",
+    po.expected_delivery_date ?? "",
     po.status ?? "",
     String(Number(po.total_amount ?? 0)),
   ]);
@@ -189,12 +194,25 @@ export function PurchaseOrdersDataTable({
   orders,
   selectedIds,
   onSelectedIdsChange,
+  sortByExpectedDelivery = false,
 }: {
   orders: AdminPurchaseOrderListRow[];
   selectedIds: Set<string>;
   onSelectedIdsChange: (ids: Set<string>) => void;
+  sortByExpectedDelivery?: boolean;
 }) {
-  const pageIds = orders.map((o) => o.id);
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    orders,
+    sortByExpectedDelivery ? "expected_delivery_date" : "created_at",
+    sortByExpectedDelivery ? "asc" : "desc",
+    (row, key) => {
+      if (key === "vendor_name") return row.vendors?.name ?? "";
+      if (key === "po_number") return row.po_number ?? row.id;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  );
+
+  const pageIds = sorted.map((o) => o.id);
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
 
@@ -220,7 +238,7 @@ export function PurchaseOrdersDataTable({
     );
   }
 
-  if (orders.length === 0) {
+  if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
         <Package className="size-10 text-muted-foreground/40" aria-hidden />
@@ -242,16 +260,54 @@ export function PurchaseOrdersDataTable({
               onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
             />
           </TableHead>
-          <TableHead>PO</TableHead>
-          <TableHead>Vendor</TableHead>
-          <TableHead>Date</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="text-right">{currencyLabel("Total")}</TableHead>
+          <SortableTableHead
+            label="PO"
+            sortKey="po_number"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Vendor"
+            sortKey="vendor_name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Created"
+            sortKey="created_at"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Expected delivery"
+            sortKey="expected_delivery_date"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Status"
+            sortKey="status"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label={currencyLabel("Total")}
+            sortKey="total_amount"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            align="right"
+          />
           <TableHead className="w-10" />
         </TableRow>
       </TableHeader>
       <TableBody>
-        {orders.map((po) => {
+        {sorted.map((po) => {
           const isSelected = selectedIds.has(po.id);
           const total = Number(po.total_amount ?? 0);
 
@@ -288,6 +344,9 @@ export function PurchaseOrdersDataTable({
                 {po.created_at
                   ? format(new Date(po.created_at), "MMM d, yyyy")
                   : "—"}
+              </TableCell>
+              <TableCell>
+                <ExpectedDeliveryDate dateStr={po.expected_delivery_date} />
               </TableCell>
               <TableCell>
                 <PoStatusPill status={po.status} />

@@ -33,6 +33,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import {
   bulkDeleteVendorsAction,
   bulkSetVendorsActiveAction,
@@ -156,7 +158,17 @@ export function VendorsDataTable({
   const queryClient = useQueryClient();
   const { runAction, isPending } = useAdminAction();
 
-  const pageIds = vendors.map((v) => v.id);
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    vendors,
+    "name",
+    "asc",
+    (row, key) => {
+      if (key === "is_active") return row.is_active ? 1 : 0;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  );
+
+  const pageIds = sorted.map((v) => v.id);
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
 
@@ -196,7 +208,7 @@ export function VendorsDataTable({
     }, { errorTitle: "Couldn't delete vendor" });
   }
 
-  if (vendors.length === 0) {
+  if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
         <Building2 className="size-10 text-muted-foreground/40" aria-hidden />
@@ -216,15 +228,39 @@ export function VendorsDataTable({
               onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
             />
           </TableHead>
-          <TableHead>Vendor</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Contact</TableHead>
-          <TableHead>Added</TableHead>
+          <SortableTableHead
+            label="Vendor"
+            sortKey="name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Status"
+            sortKey="is_active"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Contact"
+            sortKey="contact"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Added"
+            sortKey="created_at"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
           <TableHead className="w-24 text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {vendors.map((vendor) => {
+        {sorted.map((vendor) => {
           const isSelected = selectedIds.has(vendor.id);
           const active = vendor.is_active === true;
 

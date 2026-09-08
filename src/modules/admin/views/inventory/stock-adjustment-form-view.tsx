@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 
-import type { ErpVariantSearchRow } from "@/common/erp/purchasing-types";
+import type { ErpSalesProductSearchRow } from "@/common/erp/sales-types";
 import { adminPost } from "@/modules/admin/lib/admin-api-client";
 import {
   AdminFormColumns,
@@ -27,7 +27,7 @@ import { formatCurrencyAmount } from "@/lib/format-currency";
 
 type AdjLine = {
   key: string;
-  variantId: string;
+  productId: string;
   productName: string;
   direction: "add" | "remove";
   quantity: number;
@@ -74,12 +74,12 @@ export function StockAdjustmentFormView({
     router.push(`/admin/erp/stock-adjustments/${id}`);
   }
 
-  function addLine(row: ErpVariantSearchRow, direction: "add" | "remove") {
+  function addLine(row: ErpSalesProductSearchRow, direction: "add" | "remove") {
     setLines([
       ...lines,
       {
         key: newKey(),
-        variantId: row.id,
+        productId: row.id,
         productName: row.product_name,
         direction,
         quantity: 1,
@@ -113,7 +113,7 @@ export function StockAdjustmentFormView({
           note: note || undefined,
           finalize,
           lines: lines.map((l) => ({
-            variantId: l.variantId,
+            productId: l.productId,
             direction: l.direction,
             quantity: l.quantity,
             purchaseCost: l.direction === "remove" ? 0 : l.purchaseCost,
@@ -173,7 +173,8 @@ export function StockAdjustmentFormView({
 
       <AdminFormSection title="Items">
         <ProductLiveSearch
-          catalog="purchase"
+          catalog="sales"
+          storeId={effectiveStoreId}
           placeholder="Search productâ€¦"
           renderResult={(r, dismiss) => (
             <div className="flex items-center justify-between gap-2 rounded border border-border bg-background p-2 text-sm">
@@ -186,7 +187,7 @@ export function StockAdjustmentFormView({
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    addLine(r as ErpVariantSearchRow, "add");
+                    addLine(r as ErpSalesProductSearchRow, "add");
                     dismiss();
                   }}
                 >
@@ -197,7 +198,7 @@ export function StockAdjustmentFormView({
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    addLine(r as ErpVariantSearchRow, "remove");
+                    addLine(r as ErpSalesProductSearchRow, "remove");
                     dismiss();
                   }}
                 >

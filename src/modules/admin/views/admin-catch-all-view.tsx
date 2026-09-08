@@ -10,7 +10,6 @@ import { AdminDeliveryView } from "@/modules/admin/views/admin-delivery-view";
 import { AdminInventoryView } from "@/modules/admin/views/admin-inventory-view";
 import { AdminOrderDetailView } from "@/modules/admin/views/admin-order-detail-view";
 import { AdminOrdersView } from "@/modules/admin/views/admin-orders-view";
-import { AdminProcurementView } from "@/modules/admin/views/admin-procurement-view";
 import { AdminProductDetailView } from "@/modules/admin/views/admin-product-detail-view";
 import { AdminProductsView } from "@/modules/admin/views/admin-products-view";
 import { AdminPurchaseOrdersView } from "@/modules/admin/views/admin-purchase-orders-view";
@@ -49,7 +48,6 @@ export function AdminCatchAllView() {
     else if (seg === "delivery") inner = <AdminDeliveryView />;
     else if (seg === "users") inner = <AdminUsersView />;
     else if (seg === "config") inner = <AdminConfigView />;
-    else if (seg === "procurement") inner = <AdminProcurementView />;
     else if (seg === "purchase-orders") inner = <AdminPurchaseOrdersView />;
     else if (seg === "customers") inner = <AdminCustomersView />;
     else if (seg === "categories") inner = <AdminCategoriesView />;

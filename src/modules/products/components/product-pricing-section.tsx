@@ -226,9 +226,9 @@ export function ProductPricingSection({
           <AlertTitle className="text-sm font-medium">How pricing works</AlertTitle>
           <AlertDescription className="text-sm">
             Customers pay list price; sales require central stock only. Vendor stock is for
-            procurement — refill via{" "}
-            <Link href="/admin/procurement" className="font-medium text-primary">
-              Procurement
+            purchasing — create POs via{" "}
+            <Link href="/admin/erp/purchase-orders" className="font-medium text-primary">
+              Purchase orders
             </Link>
             .
           </AlertDescription>

@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { SortableTableHead, useSortableData } from "@/modules/admin/ui";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -75,6 +75,27 @@ export function AdminReconciliationView() {
     const rows = data?.payment_allocation_checks ?? [];
     return showIssuesOnly ? rows.filter((r) => !r.reconciled) : rows;
   }, [data, showIssuesOnly]);
+
+  const {
+    sorted: sortedInvoices,
+    sortKey: invoiceSortKey,
+    sortDirection: invoiceSortDirection,
+    toggleSort: toggleInvoiceSort,
+  } = useSortableData(invoiceRows, "invoice_number", "asc");
+
+  const {
+    sorted: sortedBills,
+    sortKey: billSortKey,
+    sortDirection: billSortDirection,
+    toggleSort: toggleBillSort,
+  } = useSortableData(billRows, "purchase_bill_number", "asc");
+
+  const {
+    sorted: sortedPayments,
+    sortKey: paymentSortKey,
+    sortDirection: paymentSortDirection,
+    toggleSort: togglePaymentSort,
+  } = useSortableData(paymentRows, "payment_number", "asc");
 
   if (loading) return <p className="p-4 text-sm">Loading reconciliation…</p>;
   if (!data) return <p className="p-4 text-sm text-destructive">Failed to load reconciliation data.</p>;
@@ -160,16 +181,56 @@ export function AdminReconciliationView() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Paid</TableHead>
-                  <TableHead className="text-right">Credits</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead>OK</TableHead>
+                  <SortableTableHead
+                    label="Invoice"
+                    sortKey="invoice_number"
+                    activeKey={invoiceSortKey}
+                    direction={invoiceSortDirection}
+                    onSort={toggleInvoiceSort}
+                  />
+                  <SortableTableHead
+                    label="Total"
+                    sortKey="total_amount"
+                    activeKey={invoiceSortKey}
+                    direction={invoiceSortDirection}
+                    onSort={toggleInvoiceSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="Paid"
+                    sortKey="amount_paid"
+                    activeKey={invoiceSortKey}
+                    direction={invoiceSortDirection}
+                    onSort={toggleInvoiceSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="Credits"
+                    sortKey="credits_applied"
+                    activeKey={invoiceSortKey}
+                    direction={invoiceSortDirection}
+                    onSort={toggleInvoiceSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="Balance"
+                    sortKey="balance_due"
+                    activeKey={invoiceSortKey}
+                    direction={invoiceSortDirection}
+                    onSort={toggleInvoiceSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="OK"
+                    sortKey="reconciled"
+                    activeKey={invoiceSortKey}
+                    direction={invoiceSortDirection}
+                    onSort={toggleInvoiceSort}
+                  />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoiceRows.map((row) => (
+                {sortedInvoices.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell>{row.invoice_number}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrencyAmount(row.total_amount)}</TableCell>
@@ -196,16 +257,56 @@ export function AdminReconciliationView() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Bill</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Paid</TableHead>
-                  <TableHead className="text-right">Credits</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead>OK</TableHead>
+                  <SortableTableHead
+                    label="Bill"
+                    sortKey="purchase_bill_number"
+                    activeKey={billSortKey}
+                    direction={billSortDirection}
+                    onSort={toggleBillSort}
+                  />
+                  <SortableTableHead
+                    label="Total"
+                    sortKey="total_amount"
+                    activeKey={billSortKey}
+                    direction={billSortDirection}
+                    onSort={toggleBillSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="Paid"
+                    sortKey="amount_paid"
+                    activeKey={billSortKey}
+                    direction={billSortDirection}
+                    onSort={toggleBillSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="Credits"
+                    sortKey="credits_applied"
+                    activeKey={billSortKey}
+                    direction={billSortDirection}
+                    onSort={toggleBillSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="Balance"
+                    sortKey="balance_due"
+                    activeKey={billSortKey}
+                    direction={billSortDirection}
+                    onSort={toggleBillSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="OK"
+                    sortKey="reconciled"
+                    activeKey={billSortKey}
+                    direction={billSortDirection}
+                    onSort={toggleBillSort}
+                  />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {billRows.map((row) => (
+                {sortedBills.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell>{row.purchase_bill_number}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrencyAmount(row.total_amount)}</TableCell>
@@ -232,15 +333,48 @@ export function AdminReconciliationView() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Payment</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Allocated</TableHead>
-                  <TableHead className="text-right">Unallocated</TableHead>
-                  <TableHead>OK</TableHead>
+                  <SortableTableHead
+                    label="Payment"
+                    sortKey="payment_number"
+                    activeKey={paymentSortKey}
+                    direction={paymentSortDirection}
+                    onSort={togglePaymentSort}
+                  />
+                  <SortableTableHead
+                    label="Total"
+                    sortKey="total_amount"
+                    activeKey={paymentSortKey}
+                    direction={paymentSortDirection}
+                    onSort={togglePaymentSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="Allocated"
+                    sortKey="allocated"
+                    activeKey={paymentSortKey}
+                    direction={paymentSortDirection}
+                    onSort={togglePaymentSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="Unallocated"
+                    sortKey="unallocated_amount"
+                    activeKey={paymentSortKey}
+                    direction={paymentSortDirection}
+                    onSort={togglePaymentSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="OK"
+                    sortKey="reconciled"
+                    activeKey={paymentSortKey}
+                    direction={paymentSortDirection}
+                    onSort={togglePaymentSort}
+                  />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paymentRows.map((row) => (
+                {sortedPayments.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell>{row.payment_number}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrencyAmount(row.total_amount)}</TableCell>

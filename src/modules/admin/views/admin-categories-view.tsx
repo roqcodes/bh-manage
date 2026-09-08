@@ -38,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead, useSortableData } from "@/modules/admin/ui";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface CategoriesPayload {
@@ -259,6 +260,22 @@ export function AdminCategoriesView() {
     queryFn: () => adminGet<CategoriesPayload>("categories"),
   });
 
+  const categories = data?.categories ?? [];
+
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    categories,
+    "sort_order",
+    "asc",
+    (row, key) => {
+      if (key === "parent") {
+        const parent = categories.find((c) => c.id === row.parent_id);
+        return parent?.name ?? "";
+      }
+      if (key === "status") return row.is_active ? 1 : 0;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  );
+
   if (isPending && !data) return <AdminPageSkeleton />;
   if (isError) {
     return (
@@ -277,8 +294,6 @@ export function AdminCategoriesView() {
       </div>
     );
   }
-
-  const categories = data?.categories ?? [];
 
   async function handleDelete(category: Category) {
     if (
@@ -344,15 +359,39 @@ export function AdminCategoriesView() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-14" />
-                    <TableHead>Name</TableHead>
-                    <TableHead>Parent</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Status</TableHead>
+                    <SortableTableHead
+                      label="Name"
+                      sortKey="name"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
+                    <SortableTableHead
+                      label="Parent"
+                      sortKey="parent"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
+                    <SortableTableHead
+                      label="Order"
+                      sortKey="sort_order"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
+                    <SortableTableHead
+                      label="Status"
+                      sortKey="status"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                    />
                     <TableHead className="w-24" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categories.map((category) => {
+                  {sorted.map((category) => {
                     const parent = categories.find(
                       (c) => c.id === category.parent_id,
                     );

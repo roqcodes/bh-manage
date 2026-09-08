@@ -39,6 +39,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import {
   blockUserAction,
   bulkBlockUsersAction,
@@ -202,7 +204,21 @@ export function StoresUsersDataTable({
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
 
-  const pageIds = users.map((u) => u.id);
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    users,
+    "name",
+    "asc",
+    (row, key) => {
+      switch (key) {
+        case "status":
+          return isUserBlocked(row) ? 1 : 0;
+        default:
+          return (row as unknown as Record<string, unknown>)[key];
+      }
+    },
+  );
+
+  const pageIds = sorted.map((u) => u.id);
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
 
@@ -256,16 +272,46 @@ export function StoresUsersDataTable({
               onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
             />
           </TableHead>
-          <TableHead>User</TableHead>
-          <TableHead>Email</TableHead>
-          <TableHead>Phone</TableHead>
-          <TableHead>Orders</TableHead>
-          <TableHead>Status</TableHead>
+          <SortableTableHead
+            label="User"
+            sortKey="name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Email"
+            sortKey="email"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Phone"
+            sortKey="phone"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Orders"
+            sortKey="order_count"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Status"
+            sortKey="status"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
           <TableHead className="w-24 text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {users.map((user) => {
+        {sorted.map((user) => {
           const isSelected = selectedIds.has(user.id);
           const blocked = isUserBlocked(user);
 
@@ -368,7 +414,13 @@ export function PortalStaffDataTable({
   users: DBUser[];
   onEditRole: (user: DBUser) => void;
 }) {
-  if (users.length === 0) {
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    users,
+    "name",
+    "asc",
+  );
+
+  if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
         <Users className="size-10 text-muted-foreground/40" aria-hidden />
@@ -381,15 +433,39 @@ export function PortalStaffDataTable({
     <Table>
       <TableHeader>
         <TableRow className="border-b border-border/60 hover:bg-transparent">
-          <TableHead>User</TableHead>
-          <TableHead>Email</TableHead>
-          <TableHead>Role</TableHead>
-          <TableHead>Joined</TableHead>
+          <SortableTableHead
+            label="User"
+            sortKey="name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Email"
+            sortKey="email"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Role"
+            sortKey="role"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Joined"
+            sortKey="created_at"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
           <TableHead className="w-24 text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {users.map((user) => (
+        {sorted.map((user) => (
           <TableRow
             key={user.id}
             className="border-b border-border/60 hover:bg-muted/40"
@@ -438,6 +514,12 @@ export function AccessRequestsDataTable({
   const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
 
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    users,
+    "created_at",
+    "desc",
+  );
+
   function runVerify(userId: string) {
     startTransition(async () => {
       await verifyUserAction(userId);
@@ -452,7 +534,7 @@ export function AccessRequestsDataTable({
     });
   }
 
-  if (users.length === 0) {
+  if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
         <Clock className="size-10 text-muted-foreground/40" aria-hidden />
@@ -465,15 +547,39 @@ export function AccessRequestsDataTable({
     <Table>
       <TableHeader>
         <TableRow className="border-b border-border/60 hover:bg-transparent">
-          <TableHead>User</TableHead>
-          <TableHead>Email</TableHead>
-          <TableHead>Requested role</TableHead>
-          <TableHead>Requested</TableHead>
+          <SortableTableHead
+            label="User"
+            sortKey="name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Email"
+            sortKey="email"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Requested role"
+            sortKey="role"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Requested"
+            sortKey="created_at"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {users.map((user) => (
+        {sorted.map((user) => (
           <TableRow
             key={user.id}
             className="border-b border-border/60 hover:bg-muted/40"

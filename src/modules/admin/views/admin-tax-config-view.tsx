@@ -28,6 +28,7 @@ import {
   SecondaryBtn,
   textareaCls,
 } from "@/modules/admin/components/modal";
+import { SortableTableHead, useSortableData } from "@/modules/admin/ui";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 
 interface TaxRate {
@@ -201,6 +202,16 @@ export function AdminTaxConfigView() {
     queryFn: fetchTaxRates,
   });
 
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    data?.rates ?? [],
+    "name",
+    "asc",
+    (row, key) => {
+      if (key === "default") return row.is_default ? 1 : 0;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  );
+
   async function handleSetDefault(taxRateId: string) {
     setSettingDefaultId(taxRateId);
     try {
@@ -307,15 +318,41 @@ export function AdminTaxConfigView() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead>Name</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-center">Default</TableHead>
+                      <SortableTableHead
+                        label="Name"
+                        sortKey="name"
+                        activeKey={sortKey}
+                        direction={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTableHead
+                        label="Rate"
+                        sortKey="rate_percent"
+                        activeKey={sortKey}
+                        direction={sortDirection}
+                        onSort={toggleSort}
+                        align="right"
+                      />
+                      <SortableTableHead
+                        label="Description"
+                        sortKey="description"
+                        activeKey={sortKey}
+                        direction={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTableHead
+                        label="Default"
+                        sortKey="default"
+                        activeKey={sortKey}
+                        direction={sortDirection}
+                        onSort={toggleSort}
+                        align="center"
+                      />
                       <TableHead className="w-16" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.rates.map((rate) => (
+                    {sorted.map((rate) => (
                       <TableRow key={rate.id}>
                         <TableCell className="font-medium">{rate.name}</TableCell>
                         <TableCell className="text-right tabular-nums">

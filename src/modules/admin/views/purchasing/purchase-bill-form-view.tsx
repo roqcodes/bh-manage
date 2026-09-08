@@ -48,6 +48,7 @@ type BillDetail = {
   po_id: string | null;
   purchase_date: string;
   due_date: string | null;
+  expected_delivery_date: string | null;
   vendor_bill_number: string | null;
   grn_reference: string | null;
   batch_reference: string | null;
@@ -78,11 +79,12 @@ type BillDetail = {
 function poLinesToForm(po: ErpPurchaseOrderDetail): PurchaseLineFormRow[] {
   return po.purchase_order_items.map((item) => ({
     key: item.id,
+    productId:
+      (item as { product_id?: string | null }).product_id ??
+      item.product_variants?.product_id ??
+      null,
     variantId: item.variant_id,
-    productName:
-      item.product_variants?.products?.name
-        ? `${item.product_variants.products.name}${item.product_variants.name ? ` â€” ${item.product_variants.name}` : ""}`
-        : "Item",
+    productName: item.product_variants?.products?.name ?? "Item",
     barcode: item.product_variants?.barcode ?? "",
     expiryDate: "",
     quantity: item.quantity,
@@ -131,6 +133,7 @@ export function PurchaseBillFormView({
   const [dueDate, setDueDate] = useState(() =>
     addDays(new Date().toISOString().slice(0, 10), 30),
   );
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState("");
   const [poId, setPoId] = useState<string | null>(poIdParam ?? null);
   const [vendorBillNumber, setVendorBillNumber] = useState("");
   const [grnReference, setGrnReference] = useState("");
@@ -163,6 +166,7 @@ export function PurchaseBillFormView({
         setStoreId(bill.store_id);
         setPurchaseDate(bill.purchase_date);
         setDueDate(bill.due_date ?? "");
+        setExpectedDeliveryDate(bill.expected_delivery_date ?? "");
         setPoId(bill.po_id);
         setVendorBillNumber(bill.vendor_bill_number ?? "");
         setGrnReference(bill.grn_reference ?? "");
@@ -175,6 +179,7 @@ export function PurchaseBillFormView({
           bill.erp_purchase_bill_lines.length
             ? bill.erp_purchase_bill_lines.map((line) => ({
                 key: line.id,
+                productId: (line as { product_id?: string | null }).product_id ?? null,
                 variantId: line.variant_id,
                 productName: line.product_name,
                 barcode: line.barcode ?? "",
@@ -206,6 +211,7 @@ export function PurchaseBillFormView({
       setVendorId(po.vendor_id);
       setStoreId(po.store_id ?? "");
       setPoId(po.id);
+      setExpectedDeliveryDate(po.expected_delivery_date ?? "");
       setReference(po.reference ?? "");
       setNotes(po.notes ?? "");
       setDiscount(po.discount ?? 0);
@@ -257,6 +263,7 @@ export function PurchaseBillFormView({
 
   function submit(finalize: boolean) {
     setError(null);
+    const shouldFinalize = finalize && !poId;
     const apiLines = linesToApiInput(lines);
     if (!vendorId || !effectiveStoreId) {
       setError(
@@ -270,7 +277,7 @@ export function PurchaseBillFormView({
       setError("Add at least one valid line item");
       return;
     }
-    if (finalize && totals.total <= 0) {
+    if (shouldFinalize && totals.total <= 0) {
       setError("Enter line rates so the grand total is greater than zero before finalizing.");
       return;
     }
@@ -280,6 +287,7 @@ export function PurchaseBillFormView({
       storeId: effectiveStoreId,
       purchaseDate,
       dueDate: dueDate || null,
+      expectedDeliveryDate: expectedDeliveryDate || null,
       poId,
       vendorBillNumber: vendorBillNumber || null,
       grnReference: grnReference || null,
@@ -289,7 +297,7 @@ export function PurchaseBillFormView({
       lines: apiLines,
       landedCosts: landedCostsToApiInput(landedCosts),
       discount,
-      finalize,
+      finalize: shouldFinalize,
     };
 
     startTransition(async () => {
@@ -358,9 +366,11 @@ export function PurchaseBillFormView({
           <Button variant="outline" disabled={pending} onClick={() => submit(false)}>
             Save draft
           </Button>
-          <Button disabled={pending} onClick={() => submit(true)}>
-            Save & finalize
-          </Button>
+          {!poId ? (
+            <Button disabled={pending} onClick={() => submit(true)}>
+              Save & finalize
+            </Button>
+          ) : null}
         </>
       ) : (
         <Button disabled={pending} onClick={() => submit(false)}>
@@ -420,6 +430,13 @@ export function PurchaseBillFormView({
               <AdminFormField label="Due date">
                 <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </AdminFormField>
+              <AdminFormField label="Expected delivery">
+                <Input
+                  type="date"
+                  value={expectedDeliveryDate}
+                  onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+                />
+              </AdminFormField>
               <AdminFormField label="Vendor bill number">
                 <Input value={vendorBillNumber} onChange={(e) => setVendorBillNumber(e.target.value)} />
               </AdminFormField>
@@ -446,7 +463,13 @@ export function PurchaseBillFormView({
           </AdminFormSection>
 
           <AdminFormSection title="Purchase items">
-            <PurchaseLinesEditor lines={lines} onChange={setLines} showExpiry />
+            <PurchaseLinesEditor
+              lines={lines}
+              onChange={setLines}
+              showExpiry
+              storeId={effectiveStoreId}
+              vendorId={vendorId}
+            />
           </AdminFormSection>
 
           <AdminFormSection title="Landed costs">

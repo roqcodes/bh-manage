@@ -35,6 +35,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import {
   bulkDeleteProductsAction,
@@ -209,7 +211,23 @@ export function ProductsDataTable({
   const queryClient = useQueryClient();
   const { runAction, isPending } = useAdminAction();
 
-  const pageIds = products.map((p) => p.id);
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    products,
+    "name",
+    "asc",
+    (row, key) => {
+      switch (key) {
+        case "category_name":
+          return row.categories?.name ?? "";
+        case "store_name":
+          return row.store_name ?? "";
+        default:
+          return (row as unknown as Record<string, unknown>)[key];
+      }
+    },
+  );
+
+  const pageIds = sorted.map((p) => p.id);
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
 
@@ -249,7 +267,7 @@ export function ProductsDataTable({
     }, { errorTitle: "Couldn't delete item" });
   }
 
-  if (products.length === 0) {
+  if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
         <Package className="size-10 text-muted-foreground/40" aria-hidden />
@@ -269,20 +287,79 @@ export function ProductsDataTable({
               onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
             />
           </TableHead>
-          <TableHead className="min-w-[200px]">Name</TableHead>
-          <TableHead>Stock</TableHead>
-          <TableHead>Barcode</TableHead>
-          <TableHead>Category</TableHead>
-          <TableHead className="text-right">Tax</TableHead>
-          <TableHead className="text-right">Purchase</TableHead>
-          <TableHead className="text-right">Sales</TableHead>
-          <TableHead className="hidden xl:table-cell">Store</TableHead>
-          <TableHead>Enabled</TableHead>
+          <SortableTableHead
+            label="Name"
+            sortKey="name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="min-w-[200px]"
+          />
+          <SortableTableHead
+            label="Stock"
+            sortKey="stock_total"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Barcode"
+            sortKey="barcode"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Category"
+            sortKey="category_name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
+          <SortableTableHead
+            label="Tax"
+            sortKey="tax_rate_percent"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            align="right"
+          />
+          <SortableTableHead
+            label="Purchase"
+            sortKey="purchase_price"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            align="right"
+          />
+          <SortableTableHead
+            label="Sales"
+            sortKey="price_min"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            align="right"
+          />
+          <SortableTableHead
+            label="Store"
+            sortKey="store_name"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+            className="hidden xl:table-cell"
+          />
+          <SortableTableHead
+            label="Enabled"
+            sortKey="is_active"
+            activeKey={sortKey}
+            direction={sortDirection}
+            onSort={toggleSort}
+          />
           <TableHead className="w-24 text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {products.map((product) => {
+        {sorted.map((product) => {
           const isSelected = selectedIds.has(product.id);
           const displayStore = product.store_name ?? storeName ?? "—";
 

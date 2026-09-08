@@ -213,7 +213,9 @@ export interface VariantWithProduct extends ProductVariant {
 
 export interface InventoryWithVariant {
   variant_id: string;
+  store_id?: string | null;
   stock: number | null;
+  reserved_stock?: number | null;
   reorder_point: number;
   last_reorder_quantity: number | null;
   updated_at: string | null;
@@ -436,6 +438,16 @@ export const PURCHASE_ORDER_STATUS_FILTERS = [
 export type PurchaseOrderStatusFilter =
   (typeof PURCHASE_ORDER_STATUS_FILTERS)[number];
 
+export const PURCHASE_ORDER_DELIVERY_FILTERS = [
+  "upcoming",
+  "due_this_week",
+  "overdue",
+  "awaiting_receipt",
+] as const;
+
+export type PurchaseOrderDeliveryFilter =
+  (typeof PURCHASE_ORDER_DELIVERY_FILTERS)[number];
+
 export interface AdminPurchaseOrderListRow {
   id: string;
   vendor_id: string | null;
@@ -443,7 +455,10 @@ export interface AdminPurchaseOrderListRow {
   total_amount: number | null;
   created_at: string | null;
   po_number?: string | null;
+  po_date?: string | null;
+  expected_delivery_date?: string | null;
   vendors: { name: string | null } | null;
+  stores?: { name: string | null } | null;
 }
 
 /** Admin purchase-order list summary (server-computed, all POs). */
@@ -453,6 +468,9 @@ export interface PurchaseOrderCatalogStats {
   acceptedCount: number;
   deliveredCount: number;
   cancelledCount: number;
+  dueThisWeekCount: number;
+  overdueCount: number;
+  awaitingReceiptCount: number;
 }
 
 export interface AdminPurchaseOrderItemRow {
@@ -526,21 +544,15 @@ export interface BusinessMetrics {
   averageOrderValue: number;
 }
 
-export interface ProcurementInsights {
-  /** Units on pending + processing customer orders (procurement engine demand). */
-  pipelineDemandUnits: number;
-  /** Sum of central inventory stock across tracked variants. */
+export interface InventoryInsights {
+  /** Sum of inventory stock at the active store. */
   availableInventoryUnits: number;
-  /** Units short vs central inventory for pipeline demand by variant. */
-  shortageUnits: number;
-  /** Distinct variants with pipeline shortage (sellable gap). */
-  pipelineShortageVariants: number;
+  /** Product / variant rows needing restock (out or low stock). */
+  productsNeedingRestock: number;
   /** Units sold today (non-cancelled orders). */
   demandTodayUnits: number;
-  /** Product / variant rows needing restock (out or low stock in central inventory). */
-  productsNeedingRestock: number;
-  defaultReorderPoint?: number;
-  defaultReorderQuantity?: number;
+  outOfStockSkus: number;
+  lowStockSkus: number;
 }
 
 export interface VendorSnapshotEntry {
@@ -601,7 +613,7 @@ export interface AdminDashboardPayload {
   alerts: DashboardAlert[];
   pipeline: OrderPipelineCounts;
   business: BusinessMetrics;
-  procurement: ProcurementInsights;
+  inventory: InventoryInsights;
   catalogCoverage: CatalogInventoryCoverage;
   vendors: VendorSnapshot;
   recentOrders: Order[];

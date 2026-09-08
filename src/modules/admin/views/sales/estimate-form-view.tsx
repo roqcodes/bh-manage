@@ -110,6 +110,7 @@ export function EstimateFormView({
         setLines(
           detail.erp_estimate_lines.map((item) => ({
             key: `line-${item.product_name}-${Math.random().toString(36).slice(2, 7)}`,
+            productId: (item as { product_id?: string | null }).product_id ?? null,
             variantId: item.variant_id,
             productName: item.product_name,
             description: item.description ?? "",
@@ -337,7 +338,14 @@ export function EstimateFormView({
           </AdminFormSection>
 
           <AdminFormSection title="Estimate items">
-            <SalesLinesEditor lines={lines} onChange={setLines} storeId={effectiveStoreId} taxInclusive={taxInclusive} showSerial />
+            <SalesLinesEditor
+              lines={lines}
+              onChange={setLines}
+              storeId={effectiveStoreId}
+              customerId={customerId}
+              taxInclusive={taxInclusive}
+              showSerial
+            />
           </AdminFormSection>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

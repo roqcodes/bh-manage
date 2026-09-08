@@ -7,6 +7,7 @@ import { Ban, ChevronDown, Columns3, Search } from "lucide-react";
 import type {
   AdminPurchaseOrderListRow,
   PurchaseOrderCatalogStats,
+  PurchaseOrderDeliveryFilter,
   PurchaseOrderStatusFilter,
   Vendor,
 } from "@/common/admin/types";
@@ -17,15 +18,14 @@ import {
   PurchaseOrdersDataTable,
 } from "@/modules/purchase-orders/components/purchase-orders-data-table";
 import { PurchaseOrdersMetricsBar } from "@/modules/purchase-orders/components/purchase-orders-metrics-bar";
-import Link from "next/link";
 import {
-  matchesPoViewFilter,
+  buildPurchaseOrdersListParams,
   PO_ACCENT,
-  PURCHASE_ORDERS_VIEW_FILTERS,
+  PURCHASE_ORDER_DELIVERY_FILTER_OPTIONS,
+  PURCHASE_ORDER_STATUS_FILTER_OPTIONS,
   shortPoRef,
-  type PurchaseOrdersViewFilter,
 } from "@/modules/purchase-orders/components/purchase-orders-ui";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -42,11 +42,53 @@ import {
 } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 
+function FilterDropdown({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { id: string; label: string }[];
+  onChange: (id: string) => void;
+}) {
+  const activeLabel =
+    options.find((option) => option.id === value)?.label ?? label;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <InputGroupButton
+            variant="ghost"
+            size="sm"
+            className={cn("gap-1 px-2", PO_ACCENT.focus)}
+          />
+        }
+      >
+        {activeLabel}
+        <ChevronDown />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-44">
+        <DropdownMenuGroup>
+          {options.map((option) => (
+            <DropdownMenuItem key={option.id} onClick={() => onChange(option.id)}>
+              {option.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function AdminPurchaseOrdersPanel({
   orders,
   total,
   page,
   statusFilter,
+  deliveryFilter,
   filterVendors: _filterVendors,
   selectedVendorId,
   stats,
@@ -55,6 +97,7 @@ export function AdminPurchaseOrdersPanel({
   total: number;
   page: number;
   statusFilter: PurchaseOrderStatusFilter;
+  deliveryFilter: PurchaseOrderDeliveryFilter | null;
   filterVendors: Pick<Vendor, "id" | "name">[];
   selectedVendorId: string | null;
   stats: PurchaseOrderCatalogStats;
@@ -62,12 +105,39 @@ export function AdminPurchaseOrdersPanel({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [viewFilter, setViewFilter] = useState<PurchaseOrdersViewFilter>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const listParams: Record<string, string> = {};
   if (statusFilter !== "all") listParams.status = statusFilter;
+  if (deliveryFilter) listParams.delivery = deliveryFilter;
   if (selectedVendorId) listParams.vendorId = selectedVendorId;
+
+  function pushFilters(next: {
+    status?: PurchaseOrderStatusFilter;
+    delivery?: PurchaseOrderDeliveryFilter | null;
+  }) {
+    const params = buildPurchaseOrdersListParams({
+      status: next.status ?? statusFilter,
+      delivery: next.delivery !== undefined ? next.delivery : deliveryFilter,
+      vendorId: searchParams.get("vendorId"),
+    });
+    router.push(`/admin/purchase-orders?${params.toString()}`);
+  }
+
+  function handleStatusFilter(nextStatus: PurchaseOrderStatusFilter) {
+    pushFilters({ status: nextStatus });
+  }
+
+  function handleDeliveryFilter(nextDeliveryId: string) {
+    pushFilters({
+      delivery: nextDeliveryId === "all" ? null : (nextDeliveryId as PurchaseOrderDeliveryFilter),
+    });
+  }
+
+  function handleClearFilters() {
+    setSearch("");
+    pushFilters({ status: "all", delivery: null });
+  }
 
   function handleVendorFilter(vendorId: string | null) {
     const params = new URLSearchParams(searchParams.toString());
@@ -79,42 +149,35 @@ export function AdminPurchaseOrdersPanel({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    if (!q) return orders;
 
     return orders.filter((po) => {
-      if (!matchesPoViewFilter(po, viewFilter)) return false;
-
-      if (!q) return true;
-
       const idMatch = po.id.toLowerCase().includes(q);
       const refMatch = shortPoRef(po.id).toLowerCase().includes(q);
+      const poNumber = (po.po_number ?? "").toLowerCase();
       const vendorName = (po.vendors?.name ?? "").toLowerCase();
       const vendorId = (po.vendor_id ?? "").toLowerCase();
       return (
         idMatch ||
         refMatch ||
+        poNumber.includes(q) ||
         vendorName.includes(q) ||
         vendorId.includes(q)
       );
     });
-  }, [orders, search, viewFilter]);
+  }, [orders, search]);
 
-  const isFiltering = search.trim().length > 0 || viewFilter !== "all";
-
-  const activeFilterLabel =
-    PURCHASE_ORDERS_VIEW_FILTERS.find((f) => f.id === viewFilter)?.label ??
-    "All";
+  const isClientFiltering = search.trim().length > 0;
+  const isViewFiltered = statusFilter !== "all" || deliveryFilter !== null;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <h1 className="text-lg font-semibold">Purchase orders</h1>
-        <Link href="/admin/purchase-orders?form=new" className={buttonVariants()}>
-          Create purchase order
-        </Link>
-      </div>
-
       <PurchaseOrdersMetricsBar
         stats={stats}
+        activeDeliveryFilter={deliveryFilter}
+        allFiltersClear={statusFilter === "all" && deliveryFilter === null}
+        onDeliveryFilter={(delivery) => pushFilters({ delivery })}
+        onClearFilters={handleClearFilters}
         onExport={() => exportPurchaseOrdersCsv(filtered)}
       />
 
@@ -123,32 +186,25 @@ export function AdminPurchaseOrdersPanel({
           <div className="border-b p-2">
             <InputGroup className="h-9">
               <InputGroupAddon align="inline-start" className="pl-1">
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <InputGroupButton
-                        variant="ghost"
-                        size="sm"
-                        className={cn("gap-1 px-2", PO_ACCENT.focus)}
-                      />
-                    }
-                  >
-                    {activeFilterLabel}
-                    <ChevronDown />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuGroup>
-                      {PURCHASE_ORDERS_VIEW_FILTERS.map((option) => (
-                        <DropdownMenuItem
-                          key={option.id}
-                          onClick={() => setViewFilter(option.id)}
-                        >
-                          {option.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <FilterDropdown
+                  label="Status"
+                  value={statusFilter}
+                  options={PURCHASE_ORDER_STATUS_FILTER_OPTIONS}
+                  onChange={(id) =>
+                    handleStatusFilter(id as PurchaseOrderStatusFilter)
+                  }
+                />
+              </InputGroupAddon>
+              <InputGroupAddon align="inline-start" className="px-0">
+                <div className="h-4 w-px bg-border" aria-hidden />
+              </InputGroupAddon>
+              <InputGroupAddon align="inline-start">
+                <FilterDropdown
+                  label="Delivery"
+                  value={deliveryFilter ?? "all"}
+                  options={PURCHASE_ORDER_DELIVERY_FILTER_OPTIONS}
+                  onChange={handleDeliveryFilter}
+                />
               </InputGroupAddon>
               <InputGroupAddon align="inline-start" className="px-0">
                 <div className="h-4 w-px bg-border" aria-hidden />
@@ -188,19 +244,12 @@ export function AdminPurchaseOrdersPanel({
             <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
               <Ban className="size-12 text-muted-foreground/30" aria-hidden />
               <p className="text-sm text-muted-foreground">
-                {isFiltering
-                  ? "No purchase orders match your filters on this page."
+                {isClientFiltering || isViewFiltered
+                  ? "No purchase orders match your filters."
                   : "No purchase orders in this view."}
               </p>
-              {isFiltering ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSearch("");
-                    setViewFilter("all");
-                  }}
-                >
+              {isClientFiltering || isViewFiltered ? (
+                <Button variant="outline" size="sm" onClick={handleClearFilters}>
                   Clear filters
                 </Button>
               ) : null}
@@ -210,12 +259,13 @@ export function AdminPurchaseOrdersPanel({
               orders={filtered}
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
+              sortByExpectedDelivery={deliveryFilter !== null}
             />
           )}
 
           <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-xs text-muted-foreground">
             <span>
-              {isFiltering
+              {isClientFiltering
                 ? `${filtered.length} of ${orders.length} on this page`
                 : `Page ${page + 1} · ${total.toLocaleString("en-IN")} matching`}
             </span>
@@ -232,7 +282,7 @@ export function AdminPurchaseOrdersPanel({
         </CardContent>
       </Card>
 
-      {!isFiltering && total > orders.length ? (
+      {!isClientFiltering && total > orders.length ? (
         <Pagination
           total={total}
           page={page}

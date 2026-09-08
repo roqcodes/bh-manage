@@ -52,7 +52,7 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
 
   if (p === "/admin/inventory") {
     return qc.prefetchQuery({
-      queryKey: adminQueryKeys.inventory(0),
+      queryKey: adminQueryKeys.inventory(0, null),
       queryFn: () => adminGet("inventory?page=0"),
       staleTime: STALE,
     });
@@ -84,7 +84,7 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
 
   if (p === "/admin/purchase-orders") {
     return qc.prefetchQuery({
-      queryKey: adminQueryKeys.purchaseOrders("all", null, 0),
+      queryKey: adminQueryKeys.purchaseOrders("all", null, null, 0),
       queryFn: () => adminGet("purchase-orders"),
       staleTime: STALE,
     });

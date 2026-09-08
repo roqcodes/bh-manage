@@ -12,7 +12,6 @@ import { Pagination } from "@/modules/admin/components/pagination";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { Badge } from "@/components/ui/badge";
-import { TableHead } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
   AdminDataTable,
@@ -183,7 +182,13 @@ export function PaySlipsListView() {
               direction={sortDirection}
               onSort={toggleSort}
             />
-            <TableHead>Period</TableHead>
+            <SortableTableHead
+              label="Period"
+              sortKey="period_label"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
             <SortableTableHead
               label="From"
               sortKey="from_date"
@@ -198,7 +203,13 @@ export function PaySlipsListView() {
               direction={sortDirection}
               onSort={toggleSort}
             />
-            <TableHead>Days</TableHead>
+            <SortableTableHead
+              label="Days"
+              sortKey="days_count"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
             <SortableTableHead
               label="Net salary"
               sortKey="net_salary"

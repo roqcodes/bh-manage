@@ -35,7 +35,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -43,6 +42,7 @@ import {
   SalesLoadingState,
   SalesPageLayout,
 } from "@/modules/erp/components/sales-module-ui";
+import { SortableTableHead, useSortableData } from "@/modules/admin/ui";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 import {
   BalanceBadge,
@@ -77,6 +77,16 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
   const [genericDirection, setGenericDirection] = useState<"in" | "out">("in");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
+    transactions,
+    "transaction_date",
+    "desc",
+    (row, key) => {
+      if (key === "reference") return row.reference || row.details || row.transaction_type;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  );
 
   function reload() {
     const q = storeFilter ? `&storeId=${storeFilter}` : "";
@@ -293,16 +303,56 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="hidden md:table-cell">Store</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Deposit</TableHead>
-                  <TableHead className="text-right">Withdrawal</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
+                  <SortableTableHead
+                    label="Date"
+                    sortKey="transaction_date"
+                    activeKey={sortKey}
+                    direction={sortDirection}
+                    onSort={toggleSort}
+                  />
+                  <SortableTableHead
+                    label="Store"
+                    sortKey="store_name"
+                    activeKey={sortKey}
+                    direction={sortDirection}
+                    onSort={toggleSort}
+                    className="hidden md:table-cell"
+                  />
+                  <SortableTableHead
+                    label="Reference"
+                    sortKey="reference"
+                    activeKey={sortKey}
+                    direction={sortDirection}
+                    onSort={toggleSort}
+                  />
+                  <SortableTableHead
+                    label="Deposit"
+                    sortKey="debit_amount"
+                    activeKey={sortKey}
+                    direction={sortDirection}
+                    onSort={toggleSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="Withdrawal"
+                    sortKey="credit_amount"
+                    activeKey={sortKey}
+                    direction={sortDirection}
+                    onSort={toggleSort}
+                    align="right"
+                  />
+                  <SortableTableHead
+                    label="Balance"
+                    sortKey="running_balance"
+                    activeKey={sortKey}
+                    direction={sortDirection}
+                    onSort={toggleSort}
+                    align="right"
+                  />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((tx) => (
+                {sorted.map((tx) => (
                   <TableRow key={tx.id}>
                     <TableCell className="text-sm text-muted-foreground">
                       {tx.transaction_date}

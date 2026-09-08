@@ -11,6 +11,7 @@ import type { Json } from "@/lib/integrations/supabase/types";
 function linesToJson(lines: ErpLineInput[]): Json {
   return lines.map((l) => ({
     variant_id: l.variantId ?? null,
+    product_id: l.productId ?? null,
     product_name: l.productName,
     quantity: l.quantity,
     unit_price: l.unitPrice,

@@ -12,7 +12,6 @@ import { Pagination } from "@/modules/admin/components/pagination";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { Button } from "@/components/ui/button";
-import { TableHead } from "@/components/ui/table";
 import {
   AdminDataTable,
   AdminListCard,
@@ -133,9 +132,28 @@ export function SalaryBulkPaymentsListView() {
               direction={sortDirection}
               onSort={toggleSort}
             />
-            <TableHead>Paid through</TableHead>
-            <TableHead>Payment mode</TableHead>
-            <TableHead className="hidden md:table-cell">Note</TableHead>
+            <SortableTableHead
+              label="Paid through"
+              sortKey="paid_through_name"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              label="Payment mode"
+              sortKey="payment_mode"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+            />
+            <SortableTableHead
+              label="Note"
+              sortKey="notes"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onSort={toggleSort}
+              className="hidden md:table-cell"
+            />
             <SortableTableHead
               label="Total paid"
               sortKey="total_amount"

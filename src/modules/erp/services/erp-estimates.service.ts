@@ -10,6 +10,7 @@ import type { Json } from "@/lib/integrations/supabase/types";
 function linesToJson(lines: ErpLineInput[]): Json {
   return lines.map((l) => ({
     variant_id: l.variantId ?? null,
+    product_id: l.productId ?? null,
     product_name: l.productName,
     description: l.description ?? null,
     quantity: l.quantity,
@@ -224,6 +225,7 @@ export async function convertEstimateToInvoice(estimateId: string): Promise<stri
   }
 
   const lines = (estimate.erp_estimate_lines ?? []).map((line) => ({
+    productId: (line as { product_id?: string | null }).product_id ?? null,
     variantId: line.variant_id,
     productName: line.product_name,
     description: line.description,

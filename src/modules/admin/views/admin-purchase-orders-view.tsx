@@ -5,12 +5,12 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 
-import {
-  PURCHASE_ORDER_STATUS_FILTERS,
-  type AdminPurchaseOrderListRow,
-  type PurchaseOrderCatalogStats,
-  type PurchaseOrderStatusFilter,
-  type Vendor,
+import type {
+  AdminPurchaseOrderListRow,
+  PurchaseOrderCatalogStats,
+  PurchaseOrderDeliveryFilter,
+  PurchaseOrderStatusFilter,
+  Vendor,
 } from "@/common/admin/types";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { AdminPurchaseOrdersPanel } from "@/modules/purchase-orders/components/admin-purchase-orders-panel";
@@ -18,37 +18,40 @@ import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { useErpFormModal } from "@/modules/admin/ui";
 import { PurchaseOrderFormView } from "@/modules/admin/views/purchasing/purchase-order-form-view";
-
-function parsePoStatus(raw: string | null | undefined): PurchaseOrderStatusFilter {
-  const t = raw?.trim();
-  if (t && (PURCHASE_ORDER_STATUS_FILTERS as readonly string[]).includes(t)) {
-    return t as PurchaseOrderStatusFilter;
-  }
-  return "all";
-}
+import {
+  buildPurchaseOrdersListParams,
+  parsePurchaseOrderDeliveryFilter,
+  parsePurchaseOrderStatusFilter,
+} from "@/modules/purchase-orders/components/purchase-orders-ui";
 
 export function AdminPurchaseOrdersView() {
   const { isOpen, mode, editId, modalProps } = useErpFormModal("/admin/purchase-orders");
   const [reloadToken, setReloadToken] = useState(0);
   const searchParams = useSearchParams();
-  const status = parsePoStatus(searchParams.get("status"));
+  const status = parsePurchaseOrderStatusFilter(searchParams.get("status"));
+  const delivery = parsePurchaseOrderDeliveryFilter(searchParams.get("delivery"));
   const rawVendor = searchParams.get("vendorId")?.trim();
   const vendorId = rawVendor && rawVendor.length > 0 ? rawVendor : null;
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
 
   const { data, isPending, isError, error } = useQuery({
-    queryKey: [...adminQueryKeys.purchaseOrders(status, vendorId, page), reloadToken],
+    queryKey: [
+      ...adminQueryKeys.purchaseOrders(status, delivery, vendorId, page),
+      reloadToken,
+    ],
     queryFn: () => {
-      const q = new URLSearchParams();
-      if (status !== "all") q.set("status", status);
-      if (vendorId) q.set("vendorId", vendorId);
-      if (page > 0) q.set("page", String(page));
-      const qs = q.toString();
+      const qs = buildPurchaseOrdersListParams({
+        status,
+        delivery,
+        vendorId,
+        page,
+      }).toString();
       return adminGet<{
         data: AdminPurchaseOrderListRow[];
         total: number;
         page: number;
         status: PurchaseOrderStatusFilter;
+        delivery: PurchaseOrderDeliveryFilter | null;
         vendorId: string | null;
         filterVendors: Pick<Vendor, "id" | "name">[];
         stats: PurchaseOrderCatalogStats;
@@ -83,7 +86,8 @@ export function AdminPurchaseOrdersView() {
         orders={data.data}
         total={data.total}
         page={data.page}
-        statusFilter={data.status}
+        statusFilter={status}
+        deliveryFilter={delivery}
         filterVendors={data.filterVendors}
         selectedVendorId={data.vendorId}
         stats={data.stats}

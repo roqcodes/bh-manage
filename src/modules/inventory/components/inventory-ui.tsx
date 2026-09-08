@@ -32,6 +32,17 @@ export function stockUnits(stock: number | null | undefined) {
   return Math.max(0, Math.floor(Number(stock ?? 0)));
 }
 
+export function reservedStockUnits(reserved: number | null | undefined) {
+  return Math.max(0, Math.floor(Number(reserved ?? 0)));
+}
+
+export function availableStockUnits(
+  stock: number | null | undefined,
+  reserved?: number | null | undefined,
+) {
+  return Math.max(0, stockUnits(stock) - reservedStockUnits(reserved));
+}
+
 export function reorderPointFor(
   reorderPoint: number | null | undefined,
 ): number {
@@ -52,12 +63,14 @@ export function stockLevelFor(
 export function matchesInventoryViewFilter(
   row: {
     stock: number | null | undefined;
+    reserved_stock?: number | null;
     reorder_point?: number | null;
   },
   filter: InventoryViewFilter,
 ): boolean {
   if (filter === "all") return true;
-  return stockLevelFor(row.stock, row.reorder_point) === filter;
+  const available = availableStockUnits(row.stock, row.reserved_stock);
+  return stockLevelFor(available, row.reorder_point) === filter;
 }
 
 const TITLE_CASE_SMALL_WORDS = new Set([

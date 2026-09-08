@@ -14,17 +14,48 @@ export interface StoreInventoryRow {
   stores: { id: string; name: string } | null;
 }
 
+/** Physical stock is product-level; returns product stock per store for the variant's product. */
 export async function listStoreInventoryForVariant(
   variantId: string,
 ): Promise<StoreInventoryRow[]> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
+
+  const { data: variant, error: variantError } = await supabase
+    .from("product_variants")
+    .select("id, product_id")
+    .eq("id", variantId)
+    .maybeSingle();
+  if (variantError) throw new Error(variantError.message);
+  if (!variant?.product_id) return [];
+
   const { data, error } = await supabase
-    .from("store_inventory")
-    .select("store_id, variant_id, stock, purchase_price, sales_price, opening_stock, stores(id, name)")
-    .eq("variant_id", variantId);
+    .from("store_product_inventory")
+    .select("store_id, product_id, stock, purchase_price, sales_price, opening_stock")
+    .eq("product_id", variant.product_id);
   if (error) throw new Error(error.message);
-  return (data ?? []) as StoreInventoryRow[];
+
+  const storeIds = [...new Set((data ?? []).map((row) => row.store_id))];
+  const storeMap = new Map<string, { id: string; name: string }>();
+  if (storeIds.length > 0) {
+    const { data: stores } = await supabase
+      .from("stores")
+      .select("id, name")
+      .in("id", storeIds);
+    for (const store of stores ?? []) {
+      storeMap.set(store.id, { id: store.id, name: store.name });
+    }
+  }
+
+  return (data ?? []).map((row) => ({
+    store_id: row.store_id,
+    variant_id: variantId,
+    stock: Number(row.stock ?? 0),
+    purchase_price: row.purchase_price != null ? Number(row.purchase_price) : null,
+    sales_price: row.sales_price != null ? Number(row.sales_price) : null,
+    opening_stock: Number(row.opening_stock ?? 0),
+    stores: storeMap.get(row.store_id) ?? null,
+  }));
 }
 
 export async function upsertStoreInventoryRow(input: {
@@ -38,10 +69,18 @@ export async function upsertStoreInventoryRow(input: {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
 
+  const { data: variant, error: variantError } = await supabase
+    .from("product_variants")
+    .select("product_id")
+    .eq("id", input.variantId)
+    .maybeSingle();
+  if (variantError) throw new Error(variantError.message);
+  if (!variant?.product_id) throw new Error("Variant not found");
+
   if (input.stock !== undefined) {
-    const { error: stockErr } = await invokeRpc(supabase, "set_store_inventory_stock", {
+    const { error: stockErr } = await invokeRpc(supabase, "set_store_product_inventory_stock", {
       p_store_id: input.storeId,
-      p_variant_id: input.variantId,
+      p_product_id: variant.product_id,
       p_stock: input.stock,
     });
     if (stockErr) throw new Error(stockErr.message);
@@ -53,14 +92,12 @@ export async function upsertStoreInventoryRow(input: {
   if (input.openingStock !== undefined) pricePatch.opening_stock = input.openingStock;
 
   if (Object.keys(pricePatch).length > 1) {
-    const { error } = await supabase
-      .from("store_inventory")
-      .upsert({
-        store_id: input.storeId,
-        variant_id: input.variantId,
-        stock: input.stock ?? 0,
-        ...pricePatch,
-      });
+    const { error } = await supabase.from("store_product_inventory").upsert({
+      store_id: input.storeId,
+      product_id: variant.product_id,
+      stock: input.stock ?? 0,
+      ...pricePatch,
+    });
     if (error) throw new Error(error.message);
   }
 }

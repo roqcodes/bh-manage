@@ -1,6 +1,7 @@
 /** Phase 3 purchasing document types (ERP extension). */
 
 export interface ErpPurchaseLineInput {
+  productId?: string | null;
   variantId?: string | null;
   productName: string;
   barcode?: string | null;
@@ -20,6 +21,7 @@ export interface ErpLandedCostLineInput {
 }
 
 export interface ErpVendorCreditLineInput {
+  productId?: string | null;
   variantId?: string | null;
   productName: string;
   quantity: number;
@@ -72,18 +74,60 @@ export interface ErpPurchaseOrderListRow {
 
 export interface ErpPurchaseOrderLineRow {
   id: string;
+  product_id?: string | null;
   variant_id: string | null;
   quantity: number;
   price: number;
   tax_rate_percent: number;
   tax_amount: number;
   line_total: number;
+  received_qty?: number;
+  accepted_qty?: number;
+  rejected_qty?: number;
   product_variants: {
     id: string;
     name: string | null;
     barcode: string | null;
+    product_id?: string | null;
     products: { id: string; name: string | null } | null;
   } | null;
+}
+
+export interface ErpPurchaseOrderBillLineSummary {
+  id: string;
+  variant_id: string | null;
+  product_name: string;
+  original_quantity: number | null;
+  quantity: number;
+  accepted_qty: number;
+}
+
+export interface ErpPurchaseOrderLinkedBillDetail {
+  id: string;
+  purchase_bill_number: string;
+  status: string;
+  accounting_posted: boolean;
+  total_amount: number;
+  lines: ErpPurchaseOrderBillLineSummary[];
+}
+
+export interface ErpPurchaseOrderDeliverySummary {
+  hasDraftBill: boolean;
+  deliverySubmitted: boolean;
+  receiveId: string | null;
+  receiveNumber: string | null;
+  canSubmitDelivery: boolean;
+}
+
+export interface ErpPurchaseOrderLineDiscrepancy {
+  poLineId: string;
+  productName: string;
+  orderedQty: number;
+  originalBillQty: number;
+  deliveredQty: number;
+  finalBillQty: number;
+  varianceVsOrder: number;
+  varianceVsOriginalBill: number;
 }
 
 export interface ErpPurchaseOrderDetail {
@@ -112,20 +156,25 @@ export interface ErpPurchaseOrderDetail {
   } | null;
   stores: { id: string; name: string | null } | null;
   purchase_order_items: ErpPurchaseOrderLineRow[];
-  linked_bill: { id: string; purchase_bill_number: string; status: string } | null;
+  linked_bill: ErpPurchaseOrderLinkedBillDetail | null;
+  delivery: ErpPurchaseOrderDeliverySummary;
+  discrepancies: ErpPurchaseOrderLineDiscrepancy[];
 }
 
-export interface ErpVariantSearchRow {
+export interface ErpProductSearchRow {
   id: string;
-  name: string | null;
   product_name: string;
   barcode: string | null;
   purchase_price: number | null;
   tax_rate_percent: number | null;
 }
 
+/** @deprecated Use ErpProductSearchRow — ERP purchasing is product-level */
+export type ErpVariantSearchRow = ErpProductSearchRow & { name?: string | null };
+
 export interface PurchaseLineFormRow {
   key: string;
+  productId: string | null;
   variantId: string | null;
   productName: string;
   barcode: string;
@@ -382,4 +431,32 @@ export interface VendorStatementLine {
   amount: number;
   payments: number;
   balance: number;
+}
+
+export interface PurchaseReceiveAdjustments {
+  shortfall_policy: "vendor_credit" | "ignore";
+  bill_posted: boolean;
+  requires_vendor_credit: boolean;
+  shortfall_lines: Array<{
+    bill_line_id: string;
+    product_id?: string | null;
+    variant_id: string | null;
+    product_name: string;
+    billed_qty: number;
+    accepted_qty: number;
+    shortfall_qty: number;
+    purchase_price: number;
+    tax_rate_percent: number;
+    credit_amount: number;
+  }>;
+  rejected_lines: Array<{
+    bill_line_id: string | null;
+    product_id?: string | null;
+    variant_id: string | null;
+    product_name: string;
+    rejected_qty: number;
+    purchase_price: number;
+    tax_rate_percent: number;
+    credit_amount: number;
+  }>;
 }

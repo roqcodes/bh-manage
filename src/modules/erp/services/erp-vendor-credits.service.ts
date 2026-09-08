@@ -75,7 +75,8 @@ export async function createVendorCredit(input: {
   const storeId = await requireErpStoreId(input.storeId);
 
   const linesJson: Json = input.lines.map((l) => ({
-    variant_id: l.variantId ?? "",
+    product_id: l.productId ?? null,
+    variant_id: l.variantId ?? null,
     product_name: l.productName,
     quantity: l.quantity,
     unit_price: l.unitPrice,
@@ -227,6 +228,7 @@ export async function updateDraftVendorCredit(
     const lineTax = roundMoney(taxable * (line.taxRatePercent / 100));
     return {
       vendor_credit_id: creditId,
+      product_id: line.productId ?? null,
       variant_id: line.variantId ?? null,
       product_name: line.productName,
       quantity: line.quantity,
