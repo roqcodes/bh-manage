@@ -1,96 +1,13 @@
 "use client";
 
-import type { ComponentType } from "react";
-import Link from "next/link";
-import {
-  Bell,
-  ChevronRight,
-  HelpCircle,
-  LogOut,
-  Percent,
-  ShieldCheck,
-  User,
-} from "lucide-react";
+import { HelpCircle, LogOut, User } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignOutForm } from "@/modules/auth/components/sign-out-form";
 import { useAdminSession } from "@/modules/admin/providers/admin-session-provider";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
-import { RegionCurrencySettingsCard } from "@/modules/settings/components/region-currency-settings-card";
-import { PaymentSettingsCard } from "@/modules/settings/components/payment-settings-card";
 import { SecuritySettingsCard } from "@/modules/settings/components/security-settings-card";
-import { cn } from "@/lib/utils";
-
-function SettingLinkCard({
-  href,
-  icon: Icon,
-  iconClassName,
-  title,
-  description,
-}: {
-  href: string;
-  icon: ComponentType<{ className?: string }>;
-  iconClassName: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Link href={href} scroll={false} className="group block">
-      <Card
-        className="border border-border py-0 ring-0 transition-colors hover:bg-accent/40"
-      >
-        <CardContent className="flex items-center gap-3 p-4">
-          <div
-            className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-lg",
-              iconClassName,
-            )}
-          >
-            <Icon className="size-4" aria-hidden />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">{title}</p>
-            <p className="text-xs text-muted-foreground">{description}</p>
-          </div>
-          <ChevronRight
-            className="size-4 shrink-0 text-muted-foreground transition group-hover:text-foreground"
-            aria-hidden
-          />
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
-
-function SettingPlaceholderCard({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Card className="border border-border py-0 opacity-60 ring-0">
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-          <Icon className="size-4" aria-hidden />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium">{title}</p>
-            <Badge variant="secondary" className="text-[10px] uppercase">
-              Soon
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 export function AdminConfigView() {
   const profile = useAdminSession();
@@ -104,9 +21,9 @@ export function AdminConfigView() {
   return (
     <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
       <div className="mb-4">
-        <h1 className="text-xl font-semibold tracking-tight">Config</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Account settings</h1>
         <p className="text-sm text-muted-foreground">
-          Account details, system preferences, and session controls.
+          Your profile, password, and session on this device.
         </p>
       </div>
 
@@ -161,43 +78,24 @@ export function AdminConfigView() {
           </CardContent>
         </Card>
 
-        <RegionCurrencySettingsCard />
-
-        <PaymentSettingsCard />
-
         <SecuritySettingsCard />
 
-        <section aria-label="System settings">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            System settings
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <SettingLinkCard
-              href="/admin/config/tax"
-              icon={Percent}
-              iconClassName="bg-violet-100 text-violet-600"
-              title="Tax rates"
-              description="Configure GST rates and tax rules."
-            />
-            <SettingPlaceholderCard
-              icon={Bell}
-              title="Push notifications"
-              description="Alerts and quiet hours."
-            />
-            <SettingLinkCard
-              href="/admin/config/security"
-              icon={ShieldCheck}
-              iconClassName="bg-sky-100 text-sky-600"
-              title="Security"
-              description="Password and account reset options."
-            />
-            <SettingPlaceholderCard
-              icon={HelpCircle}
-              title="Help & support"
-              description="Docs and contact options."
-            />
-          </div>
-        </section>
+        <Card className="border border-border py-0 opacity-60 ring-0">
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <HelpCircle className="size-4" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">Help & support</p>
+                <Badge variant="secondary" className="text-[10px] uppercase">
+                  Soon
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">Docs and contact options.</p>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="border border-border py-0 ring-0">
           <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">

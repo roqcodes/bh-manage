@@ -15,5 +15,6 @@ export async function getAppSettingsAction() {
 export async function updateAppSettingsAction(patch: AppSettingsPatch) {
   const result = await updateAppSettings(patch);
   revalidatePath("/admin/config");
+  revalidatePath("/admin/business");
   return result;
 }

@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import {
   ArrowRightLeft,
+  Bell,
   BookOpen,
   Building2,
   Calculator,
@@ -185,14 +186,37 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
       { name: "Fixed Assets", href: "/admin/erp/fixed-assets", icon: Building2, keywords: ["asset", "equipment", "depreciation"] },
     ],
   },
+
+  {
+    label: "Business",
+    icon: Settings,
+    items: [
+      {
+        name: "Business settings",
+        href: "/admin/business",
+        icon: Settings,
+        keywords: ["currency", "payments", "region", "gst", "store settings"],
+      },
+      {
+        name: "Tax rates",
+        href: "/admin/config/tax",
+        icon: Calculator,
+        keywords: ["gst", "tax rates", "vat"],
+      },
+      {
+        name: "Push notifications",
+        href: "/admin/config/push",
+        icon: Bell,
+        keywords: ["expo", "alerts", "campaign", "offers"],
+      },
+    ],
+  },
 ];
 
 /** Search / command palette only — not shown in the primary sidebar. */
 export const ADMIN_EXTRA_NAV_ITEMS: AdminNavItem[] = [
   { name: "Team & Users", href: "/admin/users", icon: Users, keywords: ["staff", "admin", "delivery", "team"] },
-  { name: "Settings", href: "/admin/config", icon: Settings, keywords: ["settings", "configuration"] },
-  { name: "Tax Configuration", href: "/admin/config/tax", icon: Settings, keywords: ["gst", "tax rates"] },
-  { name: "Security", href: "/admin/config/security", icon: KeyRound, keywords: ["password", "reset", "security"] },
+  { name: "Account settings", href: "/admin/config", icon: KeyRound, keywords: ["account", "password", "profile", "session"] },
 ];
 
 export function getAllAdminNavItems(): AdminNavItem[] {

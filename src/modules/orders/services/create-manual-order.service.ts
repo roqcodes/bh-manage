@@ -8,6 +8,7 @@ import {
   shipOrderFulfillments,
 } from "@/modules/orders/services/order-wallet-inventory.service";
 import { requireErpStoreId } from "@/modules/erp/services/store-context.service";
+import { notifyOrderStatusChange } from "@/modules/admin/services/push-notifications.service";
 import { convertOrderToInvoice } from "@/modules/erp/services/convert-order-to-invoice.service";
 
 export interface CreateManualOrderInput {
@@ -146,6 +147,8 @@ export async function createManualOrder(
       ? invoiceErr
       : new Error("Sale completed but invoice could not be created");
   }
+
+  await notifyOrderStatusChange(orderId, "delivered").catch(() => undefined);
 
   return {
     orderId,

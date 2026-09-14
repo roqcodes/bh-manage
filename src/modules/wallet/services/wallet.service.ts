@@ -1,5 +1,6 @@
 import "server-only";
 
+import { notifyWalletEvent } from "@/modules/admin/services/push-notifications.service";
 import { getCurrentSessionProfile } from "@/modules/auth/services/auth.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 
@@ -99,12 +100,15 @@ export async function topUpWallet(input: WalletTopUpInput): Promise<number> {
     throw new Error(error.message);
   }
 
+  await notifyWalletEvent({
+    userId: user.id,
+    eventKey: "wallet.topup",
+    amount: input.amount,
+    reference: input.reference || "Wallet top-up",
+  }).catch(() => undefined);
+
   return data as number;
 }
-
-/**
- * Debit wallet for payment.
- */
 export async function debitWallet(input: WalletDebitInput): Promise<number> {
   const { user } = await getCurrentSessionProfile();
   if (!user) {
@@ -126,12 +130,15 @@ export async function debitWallet(input: WalletDebitInput): Promise<number> {
     throw new Error(error.message);
   }
 
+  await notifyWalletEvent({
+    userId: user.id,
+    eventKey: "wallet.debited",
+    amount: input.amount,
+    reference: input.reference,
+  }).catch(() => undefined);
+
   return data as number;
 }
-
-/**
- * Get transaction history for current user.
- */
 export async function getTransactions(
   page = 0,
 ): Promise<{

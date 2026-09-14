@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useParams } from "next/navigation";
 
 import { AdminRouteSuspense } from "@/modules/admin/components/admin-route-suspense";
+import { AdminBusinessSettingsView } from "@/modules/admin/views/admin-business-settings-view";
 import { AdminConfigView } from "@/modules/admin/views/admin-config-view";
 import { AdminDashboardView } from "@/modules/admin/views/admin-dashboard-view";
 import { AdminDeliveryView } from "@/modules/admin/views/admin-delivery-view";
@@ -48,6 +49,7 @@ export function AdminCatchAllView() {
     else if (seg === "delivery") inner = <AdminDeliveryView />;
     else if (seg === "users") inner = <AdminUsersView />;
     else if (seg === "config") inner = <AdminConfigView />;
+    else if (seg === "business") inner = <AdminBusinessSettingsView />;
     else if (seg === "purchase-orders") inner = <AdminPurchaseOrdersView />;
     else if (seg === "customers") inner = <AdminCustomersView />;
     else if (seg === "categories") inner = <AdminCategoriesView />;

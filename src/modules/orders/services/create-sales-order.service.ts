@@ -6,6 +6,7 @@ import {
   buildProductOrderItemSnapshot,
 } from "@/modules/orders/services/order-item-pricing.service";
 import { commitOrderInventory } from "@/modules/orders/services/order-wallet-inventory.service";
+import { notifyOrderStatusChange } from "@/modules/admin/services/push-notifications.service";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import { requireErpStoreId } from "@/modules/erp/services/store-context.service";
 
@@ -117,6 +118,8 @@ export async function createSalesOrder(input: CreateSalesOrderInput): Promise<{
     description: `Sales order ${soNumber}`,
     storeId: storeId ?? undefined,
   });
+
+  await notifyOrderStatusChange(orderId, "processing").catch(() => undefined);
 
   return { orderId, salesOrderNumber: soNumber };
 }

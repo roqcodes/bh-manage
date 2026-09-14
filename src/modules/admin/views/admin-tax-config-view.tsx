@@ -261,7 +261,7 @@ export function AdminTaxConfigView() {
       <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4">
         <AdminBreadcrumb
           items={[
-            { label: "Config", href: "/admin/config" },
+            { label: "Business", href: "/admin/business" },
             { label: "Tax rates" },
           ]}
           className="mb-4"

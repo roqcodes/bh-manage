@@ -106,5 +106,21 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
     });
   }
 
+  if (p === "/admin/business") {
+    return qc.prefetchQuery({
+      queryKey: adminQueryKeys.appSettings(),
+      queryFn: () => adminGet("settings"),
+      staleTime: STALE,
+    });
+  }
+
+  if (p === "/admin/config/push") {
+    return qc.prefetchQuery({
+      queryKey: adminQueryKeys.pushNotifications(),
+      queryFn: () => adminGet("push-notifications"),
+      staleTime: STALE,
+    });
+  }
+
   return Promise.resolve();
 }

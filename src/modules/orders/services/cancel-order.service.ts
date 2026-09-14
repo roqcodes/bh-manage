@@ -1,5 +1,6 @@
 import "server-only";
 
+import { notifyOrderStatusChange, notifyWalletEvent } from "@/modules/admin/services/push-notifications.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import {
@@ -73,4 +74,13 @@ export async function cancelOrderAndRefund(orderId: string): Promise<void> {
     .eq("id", orderId);
 
   if (updateErr) throw new Error(updateErr.message);
+  await notifyOrderStatusChange(orderId, "cancelled").catch(() => undefined);
+  if (wasPaid && order.user_id) {
+    await notifyWalletEvent({
+      userId: order.user_id,
+      eventKey: "wallet.credited",
+      amount: refundAmount,
+      reference: `Refund for ${orderId.slice(0, 8).toUpperCase()}`,
+    }).catch(() => undefined);
+  }
 }

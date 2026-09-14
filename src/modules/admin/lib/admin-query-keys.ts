@@ -57,6 +57,7 @@ export const adminQueryKeys = {
   fixedAssets: fixedAssetsListQueryKey,
   fixedAssetDetail: fixedAssetDetailQueryKey,
   appSettings: () => ["admin", "app-settings"] as const,
+  pushNotifications: () => ["admin", "push-notifications"] as const,
   analytics: (queryString: string) =>
     ["admin", "analytics", queryString] as const,
   accountsPicker: (storeId?: string | null) =>

@@ -5297,6 +5297,237 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          badge_enabled: boolean
+          order_updates: boolean
+          promotions: boolean
+          push_enabled: boolean
+          quiet_hours_enabled: boolean
+          quiet_hours_end: string
+          quiet_hours_start: string
+          sound_enabled: boolean
+          updated_at: string
+          user_id: string
+          wallet_updates: boolean
+        }
+        Insert: {
+          badge_enabled?: boolean
+          order_updates?: boolean
+          promotions?: boolean
+          push_enabled?: boolean
+          quiet_hours_enabled?: boolean
+          quiet_hours_end?: string
+          quiet_hours_start?: string
+          sound_enabled?: boolean
+          updated_at?: string
+          user_id: string
+          wallet_updates?: boolean
+        }
+        Update: {
+          badge_enabled?: boolean
+          order_updates?: boolean
+          promotions?: boolean
+          push_enabled?: boolean
+          quiet_hours_enabled?: boolean
+          quiet_hours_end?: string
+          quiet_hours_start?: string
+          sound_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+          wallet_updates?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_campaigns: {
+        Row: {
+          audience: string
+          body: string
+          cancelled_at: string | null
+          created_at: string
+          created_by: string | null
+          failed_count: number
+          href: string | null
+          id: string
+          name: string | null
+          origin: string
+          scheduled_at: string | null
+          sent_at: string | null
+          sent_count: number
+          skipped_count: number
+          sound: string
+          status: string
+          template_id: string | null
+          title: string
+          topic: string
+        }
+        Insert: {
+          audience?: string
+          body: string
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          failed_count?: number
+          href?: string | null
+          id?: string
+          name?: string | null
+          origin?: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          sent_count?: number
+          skipped_count?: number
+          sound?: string
+          status?: string
+          template_id?: string | null
+          title: string
+          topic?: string
+        }
+        Update: {
+          audience?: string
+          body?: string
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          failed_count?: number
+          href?: string | null
+          id?: string
+          name?: string | null
+          origin?: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          sent_count?: number
+          skipped_count?: number
+          sound?: string
+          status?: string
+          template_id?: string | null
+          title?: string
+          topic?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_campaigns_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "push_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_templates: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          event_key: string | null
+          href: string | null
+          id: string
+          kind: string
+          name: string
+          sound: string
+          title: string
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          event_key?: string | null
+          href?: string | null
+          id?: string
+          kind?: string
+          name: string
+          sound?: string
+          title: string
+          topic?: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          event_key?: string | null
+          href?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          sound?: string
+          title?: string
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_tokens: {
+        Row: {
+          created_at: string
+          device_name: string | null
+          expo_push_token: string
+          id: string
+          is_active: boolean
+          last_seen_at: string
+          platform: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_name?: string | null
+          expo_push_token: string
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string
+          platform: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_name?: string | null
+          expo_push_token?: string
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string
+          platform?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wallet: {
         Row: {
           balance: number

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { notifyWalletEvent } from "@/modules/admin/services/push-notifications.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
@@ -66,6 +67,12 @@ export async function creditCustomerWallet(
     p_reference: reference,
   });
   if (error) throw new Error(error.message);
+  await notifyWalletEvent({
+    userId,
+    eventKey: "wallet.credited",
+    amount,
+    reference,
+  }).catch(() => undefined);
 }
 
 /** Debit a customer's wallet (admin/manager only — uses security definer RPC). */
@@ -82,4 +89,10 @@ export async function debitCustomerWallet(
     p_reference: reference,
   });
   if (error) throw new Error(error.message);
+  await notifyWalletEvent({
+    userId,
+    eventKey: "wallet.debited",
+    amount,
+    reference,
+  }).catch(() => undefined);
 }

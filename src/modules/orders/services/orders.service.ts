@@ -17,6 +17,7 @@ import type {
 } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
 import { normalizeOrderAddress } from "@/modules/orders/lib/order-address";
+import { notifyOrderStatusChange } from "@/modules/admin/services/push-notifications.service";
 import { shipOrderFulfillments } from "@/modules/orders/services/order-wallet-inventory.service";
 import { fetchOrderFulfillments } from "@/modules/orders/services/order-fulfillment.service";
 
@@ -486,6 +487,7 @@ export async function updateOrderStatusById(
     !existing.inventory_committed
   ) {
     await shipOrderFulfillments(orderId);
+    await notifyOrderStatusChange(orderId, "shipped").catch(() => undefined);
     return;
   }
 
@@ -497,6 +499,7 @@ export async function updateOrderStatusById(
     })
     .eq("id", orderId);
   if (error) throw new Error(error.message);
+  await notifyOrderStatusChange(orderId, status).catch(() => undefined);
 }
 
 export async function updateOrderDetailsById(
@@ -543,6 +546,9 @@ export async function updateOrderDetailsById(
     .eq("id", orderId);
 
   if (error) throw new Error(error.message);
+  if (input.status) {
+    await notifyOrderStatusChange(orderId, input.status).catch(() => undefined);
+  }
 }
 
 export async function updateOrdersStatusByIds(
@@ -558,4 +564,5 @@ export async function updateOrdersStatusByIds(
     .update({ status })
     .in("id", orderIds);
   if (error) throw new Error(error.message);
+  await Promise.all(orderIds.map((id) => notifyOrderStatusChange(id, status).catch(() => undefined)));
 }
