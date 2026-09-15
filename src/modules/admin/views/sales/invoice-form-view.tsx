@@ -24,6 +24,8 @@ import {
   emptySalesLine,
   salesLinesToApiInput,
 } from "@/modules/erp/components/sales-lines-editor";
+import { validateSalesLinesStoreStock } from "@/modules/erp/lib/sales-line-stock-validation";
+import type { LineProductContextMap } from "@/common/erp/line-product-context";
 import {
   ActiveStoreFormField,
   useActiveStoreFormField,
@@ -176,6 +178,25 @@ export function InvoiceFormView({
 
     startTransition(async () => {
       try {
+        if (finalize) {
+          const productIds = [
+            ...new Set(apiLines.map((line) => line.productId).filter(Boolean) as string[]),
+          ];
+          if (productIds.length > 0 && effectiveStoreId) {
+            const stockCtx = await adminGet<{ data: LineProductContextMap }>(
+              `erp/line-product-context?storeId=${encodeURIComponent(effectiveStoreId)}&productIds=${productIds.join(",")}`,
+            );
+            const stockError = validateSalesLinesStoreStock(lines, stockCtx.data ?? {});
+            if (stockError) {
+              setError(stockError);
+              return;
+            }
+          } else if (apiLines.some((line) => !line.productId)) {
+            setError("Each line must be linked to a product (use product search) before issuing.");
+            return;
+          }
+        }
+
         if (invoiceId) {
           await adminPatch(`erp/invoices/${invoiceId}`, {
             invoiceDate,
