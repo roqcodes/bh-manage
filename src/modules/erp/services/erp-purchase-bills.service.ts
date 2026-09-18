@@ -15,7 +15,7 @@ import type { Json } from "@/lib/integrations/supabase/types";
 function linesToJson(lines: ErpPurchaseLineInput[]): Json {
   return lines.map((l) => ({
     product_id: l.productId ?? null,
-    variant_id: l.variantId ?? null,
+    variant_id: null,
     product_name: l.productName,
     barcode: l.barcode ?? "",
     expiry_date: l.expiryDate ?? "",
@@ -337,7 +337,7 @@ export async function updateDraftPurchaseBill(
     return {
       purchase_bill_id: billId,
       product_id: line.productId ?? null,
-      variant_id: line.variantId ?? null,
+      variant_id: null,
       product_name: line.productName,
       barcode: line.barcode ?? null,
       expiry_date: line.expiryDate ?? null,

@@ -41,6 +41,8 @@ import {
   updateVariantAction,
 } from "@/modules/products/actions/variants.actions";
 import { ProductManageModal } from "@/modules/products/components/product-manage-modal";
+import { ProductSkuCatalogCard } from "@/modules/products/components/product-sku-catalog-card";
+import { getProductCatalogMode } from "@/modules/products/lib/product-sku-catalog";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { useAdminAction } from "@/modules/admin/hooks/use-admin-action";
 import { currencyLabel, formatInr } from "@/lib/format-currency";
@@ -414,10 +416,19 @@ export function ProductDetailPanel({
       formatInr(glance.listPriceMin)
     );
 
+  const catalogMode = getProductCatalogMode(product, variants, variantGroups);
+  const isSimpleProduct = catalogMode === "simple";
+
   const listPriceDescription =
     glance.listPriceMin != null
-      ? `${glance.variantsInStock}/${variants.length || 1} SKUs in stock`
-      : "No central stock — not sellable";
+      ? variants.length > 0
+        ? `${glance.variantsInStock}/${variants.length} SKUs in stock`
+        : glance.centralStockTotal > 0
+          ? "Simple product — online stock available"
+          : "Simple product — allocate store → online stock to sell"
+      : variants.length === 0
+        ? "Set a selling price on the product"
+        : "No central stock — not sellable";
 
   const suggestedDescription =
     smartPricingOn && glance.suggestedPriceMin != null
@@ -511,7 +522,9 @@ export function ProductDetailPanel({
               description={
                 variants.length > 0
                   ? `${variants.length} SKU${variants.length !== 1 ? "s" : ""} configured`
-                  : "Add variants to sell"
+                  : catalogMode === "erp-only"
+                    ? "Optional — skip for ERP-only items"
+                    : "Simple product — price on item"
               }
             />
             <GlanceMetricCard
@@ -551,6 +564,19 @@ export function ProductDetailPanel({
 
         <ProductSpecsSection productId={product.id} initialSpecs={product.specs} />
 
+        <ProductSkuCatalogCard
+          product={product}
+          variants={variants}
+          variantGroups={variantGroups}
+          onAddVariant={handleAddVariant}
+          onEditVariants={() => openManageModal("variants")}
+          onUpgraded={() => {
+            void queryClient.invalidateQueries({
+              queryKey: adminQueryKeys.productDetail(product.id),
+            });
+          }}
+        />
+
         <Card className="border border-border ring-0">
           <CardHeader className="border-b border-border">
             <CardTitle>Variants</CardTitle>
@@ -572,11 +598,13 @@ export function ProductDetailPanel({
               <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 py-8 text-center">
                 <Package className="text-muted-foreground" aria-hidden />
                 <p className="max-w-sm text-sm text-muted-foreground">
-                  No variants yet. Add at least one variant to make this product purchasable.
+                  {catalogMode === "erp-only"
+                    ? "No SKUs yet. Set a selling price for a simple product, or add SKUs for multiple options."
+                    : "No SKUs yet. Online allocation will create a default SKU automatically, or add one here."}
                 </p>
                 <Button onClick={handleAddVariant}>
                   <Plus data-icon="inline-start" />
-                  Add first variant
+                  Add variant
                 </Button>
               </div>
             ) : (

@@ -91,39 +91,20 @@ export async function getLineProductContext(input: {
   const lastPurchaseMap = latestPriceByProduct(lastPurchaseRows);
   const vendorPurchaseMap = latestPriceByProduct(vendorPurchaseRows);
 
-  const { data: variants } = await supabase
-    .from("product_variants")
-    .select("id, product_id")
-    .in("product_id", productIds);
-
-  const variantIds = (variants ?? []).map((v) => v.id);
-  const variantToProduct = new Map(
-    (variants ?? []).map((v) => [v.id, v.product_id]),
-  );
-
-  let invoiceQuery = supabase
+  const { data: invoiceLines } = await supabase
     .from("invoice_items")
     .select(
-      "unit_price, variant_id, invoices!inner(store_id, user_id, created_at, status)",
+      "unit_price, product_id, variant_id, invoices!inner(store_id, user_id, created_at, status)",
     )
     .eq("invoices.store_id", storeId)
-    .neq("invoices.status", "cancelled");
-
-  if (variantIds.length > 0) {
-    invoiceQuery = invoiceQuery.in("variant_id", variantIds);
-  } else {
-    invoiceQuery = invoiceQuery.limit(0);
-  }
-
-  const { data: invoiceLines } = await invoiceQuery;
+    .neq("invoices.status", "cancelled")
+    .in("product_id", productIds);
 
   const lastSellRows: { productId: string; price: number; at: string }[] = [];
   const customerSellRows: { productId: string; price: number; at: string }[] = [];
 
   for (const line of invoiceLines ?? []) {
-    const productId = line.variant_id
-      ? variantToProduct.get(line.variant_id)
-      : undefined;
+    const productId = line.product_id;
     if (!productId || !result[productId]) continue;
 
     const invoice = line.invoices as {

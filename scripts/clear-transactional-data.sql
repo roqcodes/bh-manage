@@ -42,6 +42,7 @@ TRUNCATE TABLE
   public.wallet,
   public.addresses,
   public.notifications,
+  public.push_campaigns,
   public.product_view_reach,
   public.stock_movements,
   public.purchase_order_items,

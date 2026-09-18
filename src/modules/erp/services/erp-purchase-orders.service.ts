@@ -8,6 +8,7 @@ import type {
   ErpPurchaseOrderLineDiscrepancy,
   ErpPurchaseOrderListRow,
 } from "@/common/erp/purchasing-types";
+import { matchPoLineToBillLine } from "@/common/erp/match-po-bill-line";
 import { roundMoney } from "@/common/erp/purchasing-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import { requireErpStoreId, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
@@ -99,7 +100,7 @@ export async function getErpPurchaseOrderDetail(poId: string): Promise<ErpPurcha
   const { data, error } = await supabase
     .from("purchase_orders")
     .select(
-      "id, po_number, vendor_id, store_id, status, reference, po_date, expected_delivery_date, subtotal, tax_total, discount, total_amount, notes, created_at, vendors(id, name, contact, phone, email, address, trn), stores(id, name), purchase_order_items(id, product_id, variant_id, quantity, price, tax_rate_percent, tax_amount, line_total, received_qty, accepted_qty, rejected_qty, product_variants(id, name, barcode, product_id, products(id, name)))",
+      "id, po_number, vendor_id, store_id, status, reference, po_date, expected_delivery_date, subtotal, tax_total, discount, total_amount, notes, created_at, vendors(id, name, contact, phone, email, address, trn), stores(id, name), purchase_order_items(id, product_id, variant_id, quantity, price, tax_rate_percent, tax_amount, line_total, received_qty, accepted_qty, rejected_qty, products(id, name), product_variants(id, name, barcode, product_id, products(id, name)))",
     )
     .eq("id", poId)
     .maybeSingle();
@@ -110,7 +111,7 @@ export async function getErpPurchaseOrderDetail(poId: string): Promise<ErpPurcha
   const { data: billRow } = await supabase
     .from("erp_purchase_bills")
     .select(
-      "id, purchase_bill_number, status, accounting_posted, total_amount, erp_purchase_bill_lines(id, variant_id, product_name, original_quantity, quantity, accepted_qty)",
+      "id, purchase_bill_number, status, accounting_posted, total_amount, erp_purchase_bill_lines(id, variant_id, product_id, product_name, original_quantity, quantity, accepted_qty)",
     )
     .eq("po_id", poId)
     .neq("status", "cancelled")
@@ -145,6 +146,7 @@ export async function getErpPurchaseOrderDetail(poId: string): Promise<ErpPurcha
   const billLines = (billRow?.erp_purchase_bill_lines ?? []).map((line) => ({
     id: line.id as string,
     variant_id: line.variant_id as string | null,
+    product_id: (line as { product_id?: string | null }).product_id ?? null,
     product_name: line.product_name as string,
     original_quantity:
       line.original_quantity != null ? Number(line.original_quantity) : Number(line.quantity ?? 0),
@@ -173,10 +175,11 @@ export async function getErpPurchaseOrderDetail(poId: string): Promise<ErpPurcha
 
   const discrepancies: ErpPurchaseOrderLineDiscrepancy[] = items.map((line) => {
     const productName =
+      (line as { products?: { name?: string | null } | null }).products?.name ??
       line.product_variants?.products?.name ??
       line.product_variants?.name ??
       "Item";
-    const billLine = billLines.find((bl) => bl.variant_id === line.variant_id);
+    const billLine = billLines.find((bl) => matchPoLineToBillLine(line, bl));
     const originalBillQty = billLine?.original_quantity ?? line.quantity;
     const finalBillQty = billLine?.quantity ?? line.accepted_qty;
     const deliveredQty = line.accepted_qty;
@@ -228,7 +231,7 @@ export async function createErpPurchaseOrder(input: {
 
   const linesJson: Json = input.lines.map((l) => ({
     product_id: l.productId ?? null,
-    variant_id: l.variantId ?? null,
+    variant_id: null,
     quantity: l.quantity,
     purchase_price: l.purchasePrice,
     tax_rate_percent: l.taxRatePercent,
@@ -321,7 +324,7 @@ export async function updateErpPurchaseOrder(
     return {
       po_id: poId,
       product_id: line.productId ?? null,
-      variant_id: line.variantId ?? null,
+      variant_id: null,
       quantity: line.quantity,
       price: line.purchasePrice,
       tax_rate_percent: line.taxRatePercent,

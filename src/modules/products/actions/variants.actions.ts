@@ -15,8 +15,6 @@ function roundMoney2(n: number): number {
 
 import { insertVariantGroup } from "@/modules/products/services/variant-groups.service";
 import { updateVariantGroupById } from "@/modules/products/services/variant-groups.service";
-import { upsertInventoryStock } from "@/modules/inventory/services/inventory.service";
-
 export async function updateVariantGroupAction(
   groupId: string,
   productId: string,
@@ -24,16 +22,6 @@ export async function updateVariantGroupAction(
 ): Promise<void> {
   await updateVariantGroupById(groupId, { name: data.name });
   revalidatePath(`/admin/products/${productId}`);
-}
-
-export async function setVariantStockAction(
-  variantId: string,
-  productId: string,
-  stock: number,
-): Promise<void> {
-  await upsertInventoryStock(variantId, Math.max(0, Math.floor(stock)));
-  revalidatePath(`/admin/products/${productId}`);
-  revalidatePath("/admin/inventory");
 }
 
 export type GroupedVariantSaveRow = {
@@ -79,11 +67,9 @@ export async function saveGroupedVariantsAction(
       if (!name) continue;
       const price = roundMoney2(row.price);
       const mrp = roundMoney2(row.mrp);
-      const stock = Math.max(0, Math.floor(row.stock));
 
       if (row.variantId && originalVariantSet.has(row.variantId)) {
         await updateVariantById(row.variantId, { name, price, mrp });
-        await upsertInventoryStock(row.variantId, stock);
         keptVariantIds.add(row.variantId);
       } else {
         const variantId = await insertVariantWithInventory({
@@ -91,7 +77,6 @@ export async function saveGroupedVariantsAction(
           name,
           price,
           mrp,
-          stock,
           variantGroupId: groupId,
         });
         keptVariantIds.add(variantId);

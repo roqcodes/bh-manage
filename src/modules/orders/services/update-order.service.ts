@@ -66,6 +66,7 @@ export async function updateOrderWithItems(
   }
 
   const lineSnapshots: {
+    productId: string;
     variantId: string;
     quantity: number;
     vendorId: string | null;
@@ -88,6 +89,7 @@ export async function updateOrderWithItems(
     });
 
     lineSnapshots.push({
+      productId: snapshot.product_id,
       variantId: item.variantId,
       quantity: qty,
       vendorId: snapshot.vendor_id,
@@ -124,6 +126,7 @@ export async function updateOrderWithItems(
 
     const insertRows = lineSnapshots.map((row) => ({
       order_id: orderId,
+      product_id: row.productId,
       variant_id: row.variantId,
       quantity: row.quantity,
       price: row.finalPrice,

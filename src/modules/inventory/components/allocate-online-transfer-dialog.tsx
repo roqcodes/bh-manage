@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import type { OnlineStockTransferRow } from "@/modules/inventory/services/online-stock-transfers.service";
+import { isDefaultSkuName } from "@/modules/products/lib/product-sku-catalog";
 import { adminGet, adminPatch } from "@/modules/admin/lib/admin-api-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +25,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type AllocationRow = { variantId: string; variantName: string; quantity: number };
+type AllocationRow = {
+  variantId: string;
+  variantName: string;
+  quantity: number;
+  isDefaultSku?: boolean;
+};
 
 export function AllocateOnlineTransferDialog({
   transfer,
@@ -49,33 +55,56 @@ export function AllocateOnlineTransferDialog({
     [allocations],
   );
 
-  function loadVariants(productId: string) {
+  useEffect(() => {
+    if (!open || !transfer) {
+      if (!open) {
+        setAllocations([]);
+        setError(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
     setLoadingVariants(true);
     setError(null);
+    setAllocations([]);
+
     adminGet<{ data: { id: string; name: string | null }[] }>(
-      `products/${productId}/variants`,
+      `products/${transfer.product_id}/variants?ensureDefault=true`,
     )
       .then((res) => {
-        setAllocations(
-          (res.data ?? []).map((v) => ({
-            variantId: v.id,
-            variantName: v.name ?? "Variant",
-            quantity: 0,
-          })),
-        );
+        if (cancelled) return;
+        const rows = (res.data ?? []).map((v) => ({
+          variantId: v.id,
+          variantName: v.name ?? "Default",
+          quantity: 0,
+          isDefaultSku:
+            (res.data ?? []).length === 1 &&
+            isDefaultSkuName(v.name, transfer.product_name),
+        }));
+        if (rows.length === 1) {
+          rows[0] = {
+            ...rows[0],
+            quantity: transfer.quantity,
+          };
+        }
+        setAllocations(rows);
       })
       .catch((e) => {
-        setError(e instanceof Error ? e.message : "Failed to load variants");
+        if (cancelled) return;
+        setAllocations([]);
+        setError(e instanceof Error ? e.message : "Failed to load online SKU");
       })
-      .finally(() => setLoadingVariants(false));
-  }
+      .finally(() => {
+        if (!cancelled) setLoadingVariants(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, transfer?.id, transfer?.product_id, transfer?.quantity]);
 
   function handleOpenChange(next: boolean) {
-    if (next && transfer) {
-      setAllocations([]);
-      setError(null);
-      loadVariants(transfer.product_id);
-    }
     onOpenChange(next);
   }
 
@@ -116,10 +145,13 @@ export function AllocateOnlineTransferDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Allocate variants</DialogTitle>
+          <DialogTitle>
+            {allocations.length <= 1 ? "Allocate stock" : "Allocate variants"}
+          </DialogTitle>
           <DialogDescription>
-            Distribute {transfer.quantity} units of {transfer.product_name} across
-            variants. Total must equal {transfer.quantity}.
+            {allocations.length <= 1
+              ? `Assign ${transfer.quantity} units of ${transfer.product_name} to its online SKU. Simple products use one default SKU (same as Shopify/WooCommerce simple products).`
+              : `Distribute ${transfer.quantity} units of ${transfer.product_name} across variants. Total must equal ${transfer.quantity}.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -127,20 +159,31 @@ export function AllocateOnlineTransferDialog({
           <p className="py-6 text-center text-sm text-muted-foreground">Loading variants…</p>
         ) : allocations.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            No variants found for this product.
+            No online SKU available for this product.
           </p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Variant</TableHead>
+                <TableHead>{allocations.length === 1 ? "SKU" : "Variant"}</TableHead>
                 <TableHead className="w-28">Quantity</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {allocations.map((row, idx) => (
                 <TableRow key={row.variantId}>
-                  <TableCell>{row.variantName}</TableCell>
+                  <TableCell>
+                    {row.isDefaultSku ? (
+                      <span>
+                        {transfer.product_name}
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          (default SKU)
+                        </span>
+                      </span>
+                    ) : (
+                      row.variantName
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Input
                       type="number"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Plus, Search } from "lucide-react";
 
 import type { ErpProductSearchRow } from "@/common/erp/purchasing-types";
 import type { ErpSalesProductSearchRow } from "@/common/erp/sales-types";
@@ -23,6 +23,9 @@ type ProductLiveSearchProps = {
   minChars?: number;
   onSelect?: (row: ProductLiveSearchRow) => void;
   renderResult?: (row: ProductLiveSearchRow, dismiss: () => void) => ReactNode;
+  /** Purchase catalog only — show inline create affordance. */
+  allowCreate?: boolean;
+  onCreateRequest?: (query: string) => void;
 };
 
 function isSalesRow(row: ProductLiveSearchRow): row is ErpSalesProductSearchRow {
@@ -38,6 +41,8 @@ export function ProductLiveSearch({
   minChars = 1,
   onSelect,
   renderResult,
+  allowCreate = false,
+  onCreateRequest,
 }: ProductLiveSearchProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
@@ -107,10 +112,17 @@ export function ProductLiveSearch({
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
 
+  const trimmedQuery = debouncedQuery.trim();
+  const canCreate = allowCreate && Boolean(onCreateRequest) && catalog === "purchase";
   const showDropdown =
     open &&
     !disabled &&
-    (loading || results.length > 0 || debouncedQuery.trim().length >= minChars);
+    (loading || results.length > 0 || trimmedQuery.length >= minChars || canCreate);
+
+  function requestCreate() {
+    onCreateRequest?.(query.trim());
+    dismiss();
+  }
 
   return (
     <div ref={rootRef} className={cn("relative w-full", className)}>
@@ -139,12 +151,41 @@ export function ProductLiveSearch({
               <Loader2 className="size-4 animate-spin" />
               Searching…
             </div>
-          ) : debouncedQuery.trim().length < minChars ? (
-            <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-              Type to search products
-            </p>
+          ) : trimmedQuery.length < minChars ? (
+            canCreate ? (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={requestCreate}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2.5 text-left text-sm font-medium text-primary transition hover:bg-muted"
+              >
+                <Plus className="size-4 shrink-0" />
+                Create new product
+              </button>
+            ) : (
+              <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                Type to search products
+              </p>
+            )
           ) : results.length === 0 ? (
-            <p className="px-3 py-6 text-center text-xs text-muted-foreground">No products found</p>
+            canCreate ? (
+              <div className="py-1">
+                <p className="px-3 py-2 text-center text-xs text-muted-foreground">
+                  No products found for &ldquo;{trimmedQuery}&rdquo;
+                </p>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={requestCreate}
+                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2.5 text-left text-sm font-medium text-primary transition hover:bg-muted"
+                >
+                  <Plus className="size-4 shrink-0" />
+                  Create &ldquo;{trimmedQuery}&rdquo;
+                </button>
+              </div>
+            ) : (
+              <p className="px-3 py-6 text-center text-xs text-muted-foreground">No products found</p>
+            )
           ) : renderResult ? (
             results.map((row) => (
               <div key={row.id} className="rounded-md px-1 py-0.5">
@@ -176,6 +217,19 @@ export function ProductLiveSearch({
               </button>
             ))
           )}
+          {canCreate && results.length > 0 ? (
+            <div className="mt-1 border-t border-border pt-1">
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={requestCreate}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-primary transition hover:bg-muted"
+              >
+                <Plus className="size-3.5 shrink-0" />
+                {trimmedQuery ? `Create "${trimmedQuery}"` : "Create new product"}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

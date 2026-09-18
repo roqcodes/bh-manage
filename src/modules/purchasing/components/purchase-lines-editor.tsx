@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { PackagePlus, Plus, Trash2 } from "lucide-react";
 
 import type { ErpProductSearchRow, PurchaseLineFormRow } from "@/common/erp/purchasing-types";
 import { calcPurchaseLine, roundMoney } from "@/common/erp/purchasing-types";
@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrencyAmount } from "@/lib/format-currency";
+import { QuickProductCreateModal } from "@/modules/products/components/quick-product-create-modal";
 
 function newLineKey() {
   return `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -56,6 +57,8 @@ export function PurchaseLinesEditor({
   showSerial?: boolean;
 }) {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [createProductOpen, setCreateProductOpen] = useState(false);
+  const [createProductName, setCreateProductName] = useState("");
 
   const colSpan =
     (showSerial ? 1 : 0) + 5 + (showExpiry ? 1 : 0) + 2;
@@ -101,6 +104,11 @@ export function PurchaseLinesEditor({
     ]);
   }
 
+  function openCreateProduct(prefill = "") {
+    setCreateProductName(prefill);
+    setCreateProductOpen(true);
+  }
+
   function updateLine(index: number, patch: Partial<PurchaseLineFormRow>) {
     const next = [...lines];
     next[index] = { ...next[index], ...patch };
@@ -127,14 +135,29 @@ export function PurchaseLinesEditor({
           <ProductLiveSearch
             catalog="purchase"
             placeholder="Name or barcode…"
+            allowCreate
+            onCreateRequest={(q) => openCreateProduct(q)}
             onSelect={(row) => addProduct(row as ErpProductSearchRow)}
           />
         </div>
+        <Button type="button" variant="outline" onClick={() => openCreateProduct()}>
+          <PackagePlus className="size-4" />
+          New product
+        </Button>
         <Button type="button" variant="outline" onClick={() => onChange([...lines, emptyPurchaseLine()])}>
           <Plus className="size-4" />
           Add line
         </Button>
       </div>
+
+      {createProductOpen ? (
+        <QuickProductCreateModal
+          nested
+          initialName={createProductName}
+          onClose={() => setCreateProductOpen(false)}
+          onCreated={(product) => addProduct(product)}
+        />
+      ) : null}
 
       <div className="overflow-x-auto rounded-lg border border-slate-200">
         <Table>

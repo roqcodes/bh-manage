@@ -87,16 +87,23 @@ function GroupedOrderBlock({
   imageUrl,
   items,
   groups,
+  layout,
 }: {
   productName: string;
   imageUrl: string | null;
   items: OrderLineItem[];
   groups: OrderWithItems["variant_groups"];
+  layout: "grouped" | "flat";
 }) {
   const productId = items[0]?.variant_meta?.product?.id ?? "";
   const sections = buildOrderItemSections(items, groups?.[productId] ?? []);
   const totalQty = sectionQtyTotal(items);
   const total = blockLineTotal(items);
+  const variantCount = items.length;
+  const metaLabel =
+    layout === "grouped"
+      ? `${totalQty} unit${totalQty === 1 ? "" : "s"} · grouped`
+      : `${variantCount} variant${variantCount === 1 ? "" : "s"} · ${totalQty} unit${totalQty === 1 ? "" : "s"}`;
 
   return (
     <div className="border-b border-border/60 last:border-b-0">
@@ -104,28 +111,30 @@ function GroupedOrderBlock({
         <LineThumb url={imageUrl} />
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold leading-snug">{productName}</p>
-          <p className="text-[11px] text-muted-foreground">
-            {totalQty} unit{totalQty === 1 ? "" : "s"} · grouped
-          </p>
+          <p className="text-[11px] text-muted-foreground">{metaLabel}</p>
         </div>
         <p className="text-sm font-semibold tabular-nums">{formatInr(total)}</p>
       </div>
       <div>
-        {sections.map((section) => (
-          <div key={section.key}>
-            <div className="flex items-center justify-between gap-2 bg-muted/35 px-3 py-1.5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-                {section.title}
-              </p>
-              <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
-                {sectionQtyTotal(section.items)}
-              </span>
+        {layout === "flat" ? (
+          items.map((item) => <OrderLineRowGrid key={item.id} item={item} />)
+        ) : (
+          sections.map((section) => (
+            <div key={section.key}>
+              <div className="flex items-center justify-between gap-2 bg-muted/35 px-3 py-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                  {section.title}
+                </p>
+                <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+                  {sectionQtyTotal(section.items)}
+                </span>
+              </div>
+              {section.items.map((item) => (
+                <OrderLineRowGrid key={item.id} item={item} />
+              ))}
             </div>
-            {section.items.map((item) => (
-              <OrderLineRowGrid key={item.id} item={item} />
-            ))}
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
@@ -193,6 +202,7 @@ export function OrderLineItemsList({
               imageUrl={block.imageUrl}
               items={block.items}
               groups={variantGroups}
+              layout={block.layout}
             />
           );
         })}
@@ -220,10 +230,13 @@ export function OrderLineItemsTableBody({ order }: { order: OrderWithItems }) {
 
   for (const block of blocks) {
     if (block.type === "grouped") {
-      const sections = buildOrderItemSections(
-        block.items,
-        variantGroups[block.productId] ?? [],
-      );
+      const sections =
+        block.layout === "flat"
+          ? [{ key: "__flat", title: "", items: block.items }]
+          : buildOrderItemSections(
+              block.items,
+              variantGroups[block.productId] ?? [],
+            );
       rows.push(
         <tr key={`group-${block.productId}`} className="border-b border-slate-100 bg-slate-50/80">
           <td colSpan={4} className="px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600">
@@ -235,13 +248,15 @@ export function OrderLineItemsTableBody({ order }: { order: OrderWithItems }) {
         </tr>,
       );
       for (const section of sections) {
-        rows.push(
-          <tr key={`section-${block.productId}-${section.key}`} className="border-b border-slate-50">
-            <td colSpan={4} className="px-3 py-1.5 text-[11px] font-semibold text-slate-500">
-              {section.title}
-            </td>
-          </tr>,
-        );
+        if (block.layout === "grouped") {
+          rows.push(
+            <tr key={`section-${block.productId}-${section.key}`} className="border-b border-slate-50">
+              <td colSpan={4} className="px-3 py-1.5 text-[11px] font-semibold text-slate-500">
+                {section.title}
+              </td>
+            </tr>,
+          );
+        }
         for (const item of section.items) {
           rows.push(<InvoiceItemRow key={item.id} item={item} variantOnly />);
         }

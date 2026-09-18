@@ -23,6 +23,8 @@ interface ModalProps {
   size?: "sm" | "md" | "lg" | "xl" | "landscape";
   /** When true, body uses flex column with no default padding (for custom layouts). */
   bareBody?: boolean;
+  /** Raise z-index when opened above another dialog. */
+  nested?: boolean;
 }
 
 const SIZE_CLASSES: Record<NonNullable<ModalProps["size"]>, string> = {
@@ -50,6 +52,7 @@ export function Modal({
   children,
   size = "md",
   bareBody = false,
+  nested = false,
 }: ModalProps) {
   const isLandscape = size === "landscape";
 
@@ -57,6 +60,7 @@ export function Modal({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton
+        stacked={nested}
         className={cn(
           "gap-0 p-0",
           SIZE_CLASSES[size],

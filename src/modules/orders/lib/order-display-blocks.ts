@@ -12,6 +12,8 @@ export type OrderGroupedBlock = {
   productId: string;
   productName: string;
   imageUrl: string | null;
+  /** Grouped = variant-group sections; flat = variant rows under one product header. */
+  layout: "grouped" | "flat";
   items: OrderLineItem[];
 };
 
@@ -23,16 +25,51 @@ export type OrderItemSection = {
   items: OrderLineItem[];
 };
 
-function isGroupedLine(
+function resolveProductId(item: OrderLineItem): string | null {
+  return item.product_id ?? item.variant_meta?.product?.id ?? null;
+}
+
+function countLinesPerProduct(items: OrderLineItem[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const productId = resolveProductId(item);
+    if (productId) counts.set(productId, (counts.get(productId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function resolveBlockLayout(
+  item: OrderLineItem,
+  productId: string,
+  variantGroups: Record<string, VariantGroup[]>,
+): "grouped" | "flat" {
+  const product = item.variant_meta?.product;
+  if (
+    product?.variant_layout === "grouped" &&
+    (variantGroups[productId]?.length ?? 0) > 0
+  ) {
+    return "grouped";
+  }
+  return "flat";
+}
+
+function shouldGroupUnderProduct(
   item: OrderLineItem,
   variantGroups: Record<string, VariantGroup[]>,
+  lineCounts: Map<string, number>,
 ): boolean {
+  const productId = resolveProductId(item);
+  if (!productId) return false;
+
   const product = item.variant_meta?.product;
-  if (!product?.id) return false;
-  return (
-    product.variant_layout === "grouped" &&
-    (variantGroups[product.id]?.length ?? 0) > 0
-  );
+  if (
+    product?.variant_layout === "grouped" &&
+    (variantGroups[productId]?.length ?? 0) > 0
+  ) {
+    return true;
+  }
+
+  return (lineCounts.get(productId) ?? 0) > 1;
 }
 
 export function buildOrderDisplayBlocks(
@@ -41,26 +78,30 @@ export function buildOrderDisplayBlocks(
 ): OrderDisplayBlock[] {
   const blocks: OrderDisplayBlock[] = [];
   const groupedByProduct = new Map<string, OrderGroupedBlock>();
+  const lineCounts = countLinesPerProduct(items);
 
   for (const item of items) {
-    const product = item.variant_meta?.product;
-    if (!product?.id || !isGroupedLine(item, variantGroups)) {
+    const productId = resolveProductId(item);
+    if (!productId || !shouldGroupUnderProduct(item, variantGroups, lineCounts)) {
       blocks.push({ type: "single", item });
       continue;
     }
 
-    const existing = groupedByProduct.get(product.id);
+    const existing = groupedByProduct.get(productId);
     if (existing) {
       existing.items.push(item);
     } else {
+      const product = item.variant_meta?.product;
       const block: OrderGroupedBlock = {
         type: "grouped",
-        productId: product.id,
-        productName: product.name?.trim() || parseProductName(item.product_name).product,
-        imageUrl: item.variant_meta?.image_url ?? product.image_url ?? null,
+        productId,
+        productName:
+          product?.name?.trim() || parseProductName(item.product_name).product,
+        imageUrl: item.variant_meta?.image_url ?? product?.image_url ?? null,
+        layout: resolveBlockLayout(item, productId, variantGroups),
         items: [item],
       };
-      groupedByProduct.set(product.id, block);
+      groupedByProduct.set(productId, block);
       blocks.push(block);
     }
   }

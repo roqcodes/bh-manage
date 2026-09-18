@@ -22,6 +22,7 @@ import { formatActionError } from "@/modules/admin/lib/format-action-error";
 import { useAdminAction } from "@/modules/admin/hooks/use-admin-action";
 import {
   createProductAction,
+  ensureDefaultProductVariantAction,
   updateProductAction,
 } from "@/modules/products/actions/products.actions";
 import {
@@ -52,6 +53,7 @@ import { adminGet, adminGetNullable } from "@/modules/admin/lib/admin-api-client
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { currencyLabel, formatInr } from "@/lib/format-currency";
 import { useCurrencySettings } from "@/modules/settings/providers/currency-settings-provider";
+import { isDefaultSkuName } from "@/modules/products/lib/product-sku-catalog";
 
 const BRAND = "#2563EB";
 
@@ -202,7 +204,13 @@ function productDraftFromDetail(
   const sortedVideos = [...videos].sort(
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
   );
-  const { price: defaultPrice, mrp: defaultMrp } = defaultPricingFromVariants(variants);
+  const { price: defaultPrice, mrp: defaultMrp } =
+    variants.length > 0
+      ? defaultPricingFromVariants(variants)
+      : {
+          price: Number(product.price) || 0,
+          mrp: Number(product.mrp) || 0,
+        };
   const primaryVariant = variants[0];
 
   return {
@@ -212,11 +220,17 @@ function productDraftFromDetail(
     brandId: product.brand_id ?? null,
     itemType: product.item_type ?? "goods",
     hsnSac: product.hsn_sac ?? "",
-    barcode: primaryVariant?.barcode ?? "",
+    barcode: primaryVariant?.barcode ?? product.barcode ?? "",
     productCode: primaryVariant?.product_code ?? "",
     unitId: primaryVariant?.unit_id ?? null,
-    purchasePrice: Number(primaryVariant?.purchase_price) || 0,
-    taxRatePercent: Number(primaryVariant?.tax_rate_percent) || 0,
+    purchasePrice:
+      Number(primaryVariant?.purchase_price) ||
+      Number(product.purchase_price) ||
+      0,
+    taxRatePercent:
+      Number(primaryVariant?.tax_rate_percent) ||
+      Number(product.tax_rate_percent) ||
+      0,
     markupPercent: Number(primaryVariant?.markup_percent) || 0,
     defaultPrice,
     defaultMrp,
@@ -322,11 +336,6 @@ function emptyVariantDraft(name = DEFAULT_SKU_NAME): VariantDraft {
     imageUrls: [],
     previewIndex: 0,
   };
-}
-
-function parseStockInput(value: string): number {
-  const n = parseInt(value, 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 function isPricingValid(price: number, mrp: number, showMrp = true): boolean {
@@ -690,7 +699,7 @@ function DraftVariantEditor({
           type="button"
           onClick={onRemove}
           disabled={!canRemove}
-          title={canRemove ? "Remove SKU" : "At least one SKU required"}
+          title={canRemove ? "Remove SKU" : "Cannot remove"}
           className="inline-flex h-8 items-center gap-1 rounded-lg border border-rose-100 bg-rose-50/80 px-2.5 text-[11px] font-bold text-rose-500 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Trash2 className="size-3" />
@@ -711,7 +720,7 @@ function DraftVariantEditor({
               placeholder="e.g. 128 GB, Red / Large"
             />
           </CompactField>
-          <div className={`grid gap-2 ${showMrp ? "grid-cols-3" : "grid-cols-2"}`}>
+          <div className={`grid gap-2 ${showMrp ? "grid-cols-2" : "grid-cols-1"}`}>
             <CompactField label={currencyLabel("Price")}>
               <input
                 className={compactInputCls}
@@ -741,19 +750,6 @@ function DraftVariantEditor({
                 />
               </CompactField>
             ) : null}
-            <CompactField label="Stock">
-              <input
-                className={compactInputCls}
-                type="number"
-                step="1"
-                min="0"
-                value={draft.stock || ""}
-                onChange={(e) =>
-                  onChange({ ...draft, stock: parseStockInput(e.target.value) })
-                }
-                placeholder="0"
-              />
-            </CompactField>
           </div>
         </div>
       </div>
@@ -796,7 +792,7 @@ function DraftVariantCreatePanel({
             placeholder="e.g. 128 GB, Red / Large"
           />
         </CompactField>
-        <div className={`grid gap-2 ${showMrp ? "grid-cols-3" : "grid-cols-2"}`}>
+        <div className={`grid gap-2 ${showMrp ? "grid-cols-2" : "grid-cols-1"}`}>
           <CompactField label={currencyLabel("Price")}>
             <input
               className={compactInputCls}
@@ -823,19 +819,6 @@ function DraftVariantCreatePanel({
               />
             </CompactField>
           ) : null}
-          <CompactField label="Stock">
-            <input
-              className={compactInputCls}
-              type="number"
-              step="1"
-              min="0"
-              value={draft.stock || ""}
-              onChange={(e) =>
-                setDraft({ ...draft, stock: parseStockInput(e.target.value) })
-              }
-              placeholder="0"
-            />
-          </CompactField>
         </div>
       </div>
 
@@ -939,7 +922,7 @@ function CreateVariantsStep({
               onChange(drafts.map((d) => (d.localId === selected.localId ? next : d)))
             }
             onRemove={() => handleRemove(selected.localId)}
-            canRemove={drafts.length > 1}
+            canRemove={drafts.length > 0}
           />
         ) : (
           <DraftVariantCreatePanel onAdd={handleAdd} />
@@ -975,8 +958,16 @@ function ReviewStep({
     ? groupDrafts.reduce((n, g) => n + g.rows.length, 0)
     : variantDrafts.length;
   const priceLabel = layoutGrouped
-    ? "Grouped SKUs"
-    : formatPriceRange(variantDrafts);
+    ? skuCount > 0
+      ? "Grouped SKUs"
+      : productDraft.defaultPrice > 0
+        ? formatInr(productDraft.defaultPrice)
+        : "—"
+    : skuCount > 0
+      ? formatPriceRange(variantDrafts)
+      : productDraft.defaultPrice > 0
+        ? formatInr(productDraft.defaultPrice)
+        : "—";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
@@ -994,7 +985,9 @@ function ReviewStep({
               </p>
               <p className="mt-1 text-xs font-semibold tabular-nums text-slate-700">{priceLabel}</p>
               <p className="mt-0.5 text-[10px] font-medium text-slate-400">
-                {skuCount} SKU{skuCount !== 1 ? "s" : ""}
+                {skuCount > 0
+                  ? `${skuCount} SKU${skuCount !== 1 ? "s" : ""}`
+                  : "No SKUs yet — add variants later from product edit"}
               </p>
               {productDraft.description ? (
                 <p className="mt-1.5 line-clamp-3 text-xs leading-snug text-slate-600">
@@ -1017,7 +1010,6 @@ function ReviewStep({
                         </p>
                         <p className="text-[11px] font-medium tabular-nums text-slate-500">
                           {r.price > 0 ? formatInr(r.price) : "—"}
-                          {r.stock > 0 ? ` · ${r.stock} in stock` : " · 0 in stock"}
                         </p>
                       </div>
                     </li>
@@ -1039,8 +1031,6 @@ function ReviewStep({
                             {formatInr(v.mrp)}
                           </span>
                         ) : null}
-                        <span className="mx-1.5 text-slate-300">·</span>
-                        {v.stock > 0 ? `${v.stock.toLocaleString("en-IN")} in stock` : "0 in stock"}
                         <span className="mx-1.5 text-slate-300">·</span>
                         {v.imageUrls.length} image{v.imageUrls.length !== 1 ? "s" : ""}
                       </p>
@@ -1237,7 +1227,6 @@ function NewVariantPanel({
     const mrp = showMrp
       ? roundMoney2(parseFloat(fd.get("mrp") as string))
       : 0;
-    const stock = parseStockInput((fd.get("stock") as string) ?? "");
     if (!name || !Number.isFinite(price) || price <= 0) {
       return setError("Name and selling price greater than 0 are required.");
     }
@@ -1251,7 +1240,6 @@ function NewVariantPanel({
           name,
           price,
           mrp,
-          stock,
           imageUrls: hideImages ? [] : orderedImages(images, previewIndex),
         });
         await queryClient.invalidateQueries({
@@ -1290,7 +1278,7 @@ function NewVariantPanel({
         <CompactField label="Variant name">
           <input className={compactInputCls} name="name" placeholder="e.g. 128 GB / Black" required />
         </CompactField>
-        <div className={`grid gap-2 ${showMrp ? "grid-cols-3" : "grid-cols-2"}`}>
+        <div className={`grid gap-2 ${showMrp ? "grid-cols-2" : "grid-cols-1"}`}>
           <CompactField label={currencyLabel("Price")}>
             <input
               className={compactInputCls}
@@ -1314,9 +1302,6 @@ function NewVariantPanel({
               />
             </CompactField>
           ) : null}
-          <CompactField label="Stock">
-            <input className={compactInputCls} name="stock" type="number" step="1" min="0" placeholder="0" />
-          </CompactField>
         </div>
       </div>
 
@@ -1359,6 +1344,7 @@ function resolveInitialVariantSelection(
 
 function EditVariantsStep({
   productId,
+  productName,
   variants,
   isLoading,
   isGroupedLayout = false,
@@ -1369,6 +1355,7 @@ function EditVariantsStep({
   onFormIdChange,
 }: {
   productId: string;
+  productName?: string;
   variants: ProductVariant[];
   isLoading: boolean;
   isGroupedLayout?: boolean;
@@ -1399,6 +1386,11 @@ function EditVariantsStep({
     onFormIdChange?.(selected ? EDIT_VARIANT_FORM_ID : NEW_VARIANT_FORM_ID);
   }, [selected, onFormIdChange]);
 
+  const showSimpleHint =
+    !isGroupedLayout &&
+    variants.length === 1 &&
+    isDefaultSkuName(variants[0]?.name, productName);
+
   if (isLoading) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-slate-400">
@@ -1409,7 +1401,15 @@ function EditVariantsStep({
   }
 
   return (
-    <VariantSplitLayout
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {showSimpleHint ? (
+        <div className="border-b border-slate-200 bg-slate-50 px-6 py-2.5 text-xs leading-relaxed text-slate-600">
+          <strong>Simple product.</strong> This default SKU holds your online stock. Click{" "}
+          <strong>New SKU</strong> to add sizes or models, or use <strong>Use variant groups</strong>{" "}
+          on the product page to organize SKUs for bulk storefront selection.
+        </div>
+      ) : null}
+      <VariantSplitLayout
       list={
         <>
           <div className="shrink-0 border-b border-slate-100 p-2">
@@ -1467,6 +1467,7 @@ function EditVariantsStep({
         )
       }
     />
+    </div>
   );
 }
 
@@ -1510,6 +1511,12 @@ function SkuConfigurationStep({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="border-b border-slate-200 bg-slate-50 px-6 py-2 text-xs text-slate-600">
+        <strong>Simple product:</strong> skip this step — a default SKU is created from item
+        pricing. <strong>Multi-SKU:</strong> add variants here. <strong>Variant groups:</strong>{" "}
+        use the groups tab for bulk storefront selection (e.g. models). You can switch layouts
+        later; existing stock stays on each SKU.
+      </div>
       <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-6 py-2.5">
         <button
           type="button"
@@ -1791,7 +1798,7 @@ function DetailsStepForm({
           <p className="text-[10px] text-slate-400">
             {isGroupedLayout
               ? "Default pricing fills new models on the inventory step."
-              : "Sales price and ERP identifiers apply to the primary SKU. Add variant-specific stock on the inventory step."}
+              : "Sales price and ERP identifiers apply to the primary SKU. Stock is managed via store → online transfers."}
           </p>
 
           <CompactField label="Description">
@@ -1959,14 +1966,12 @@ export function ProductManageModal({
     productDraft.name.trim().length > 0 &&
     (productDraft.defaultPrice > 0 || (!isCreate && variants.length > 0));
 
-  const variantsValid = useMemo(
-    () =>
-      variantDrafts.length >= 1 &&
-      variantDrafts.every(
-        (v) => v.name.trim().length > 0 && isPricingValid(v.price, v.mrp, showMrp),
-      ),
-    [variantDrafts, showMrp],
-  );
+  const variantsValid = useMemo(() => {
+    if (variantDrafts.length === 0) return true;
+    return variantDrafts.every(
+      (v) => v.name.trim().length > 0 && isPricingValid(v.price, v.mrp, showMrp),
+    );
+  }, [variantDrafts, showMrp]);
 
   const groupsValid = useMemo(
     () => isGroupDraftsValid(groupDrafts, showMrp),
@@ -1975,7 +1980,51 @@ export function ProductManageModal({
 
   const layoutGrouped = groupedDirty || (skuTab === "groups" && !flatDirty);
 
-  const skuValid = layoutGrouped ? groupsValid : variantsValid;
+  function handleSkuTabChange(tab: SkuTab) {
+    if (tab === "groups" && variantDrafts.length > 0 && !groupedDirty) {
+      const hasNamedRows = groupDrafts.some((g) =>
+        g.rows.some((r) => r.name.trim().length > 0),
+      );
+      if (!hasNamedRows) {
+        setGroupDrafts([
+          {
+            localId: newLocalId(),
+            name: "Models",
+            rows: variantDrafts.map((v) => ({
+              localId: v.localId,
+              name: v.name,
+              price: v.price,
+              mrp: v.mrp,
+              stock: v.stock,
+            })),
+          },
+        ]);
+        setGroupedDirty(true);
+      }
+    }
+    if (tab === "variants" && !flatDirty) {
+      const rows = groupDrafts.flatMap((g) => g.rows).filter((r) => r.name.trim());
+      if (rows.length > 0 && variantDrafts.length === 0) {
+        setVariantDrafts(
+          rows.map((r) => ({
+            localId: r.localId,
+            name: r.name,
+            price: r.price,
+            mrp: r.mrp,
+            stock: r.stock,
+            imageUrls: [],
+            previewIndex: 0,
+          })),
+        );
+        setFlatDirty(true);
+      }
+    }
+    setSkuTab(tab);
+  }
+
+  const skuValid = layoutGrouped
+    ? groupDrafts.length === 0 || groupsValid
+    : variantsValid;
 
   const isDetailsDirty = useMemo(() => {
     if (isCreate || !initialProductDraft) return true;
@@ -2010,18 +2059,10 @@ export function ProductManageModal({
         return;
       }
       if (isCreate) {
-        const skuDefaults = {
-          price: productDraft.defaultPrice,
-          mrp: productDraft.defaultMrp,
-        };
-        if (groupDrafts.length === 0) {
-          setGroupDrafts([emptyGroupDraft(skuDefaults)]);
-        } else {
+        if (groupDrafts.length > 0) {
           setGroupDrafts(applyGroupDefaults(groupDrafts, productDraft));
         }
-        if (variantDrafts.length === 0) {
-          setVariantDrafts([emptyVariantDraft()]);
-        } else {
+        if (variantDrafts.length > 0) {
           setVariantDrafts(applyVariantDefaults(variantDrafts, productDraft));
         }
         goToStep(1);
@@ -2037,28 +2078,49 @@ export function ProductManageModal({
             productDraft.imageUrls,
             productDraft.imagePreviewIndex,
           );
+          const erpFields = variantErpFieldsFromDraft(productDraft);
+          const primaryVariant = variants[0];
+          const catalogImage =
+            catalogImageFromProductDraft(productDraft) ??
+            catalogImageFromVariantRows(variants);
+
           await updateProductAction(productId!, {
             name: productDraft.name.trim(),
             description: productDraft.description.trim(),
             categoryId: productDraft.categoryId,
             brandId: productDraft.brandId,
-            imageUrl:
-              catalogImageFromProductDraft(productDraft) ??
-              catalogImageFromVariantRows(variants),
+            imageUrl: catalogImage,
             imageUrls: orderedProductImages,
             videoUrls: productDraft.videoUrls,
             imagePreviewIndex: productDraft.imagePreviewIndex,
             itemType: productDraft.itemType,
             hsnSac: productDraft.hsnSac.trim() || null,
+            ...(primaryVariant
+              ? {}
+              : {
+                  price:
+                    productDraft.defaultPrice > 0
+                      ? roundMoney2(productDraft.defaultPrice)
+                      : null,
+                  mrp:
+                    productDraft.defaultMrp > 0
+                      ? roundMoney2(productDraft.defaultMrp)
+                      : null,
+                  barcode: erpFields.barcode,
+                  purchasePrice: erpFields.purchasePrice,
+                  taxRatePercent: erpFields.taxRatePercent,
+                }),
           });
-          const primaryVariant = variants[0];
+
           if (primaryVariant) {
             await updateVariantAction(primaryVariant.id, productId!, {
               name: primaryVariant.name ?? productDraft.name.trim(),
               price: productDraft.defaultPrice > 0 ? productDraft.defaultPrice : Number(primaryVariant.price) || 0,
               mrp: productDraft.defaultMrp > 0 ? productDraft.defaultMrp : Number(primaryVariant.mrp) || 0,
-              ...variantErpFieldsFromDraft(productDraft),
+              ...erpFields,
             });
+          } else if (productDraft.defaultPrice > 0 && variants.length === 0) {
+            await ensureDefaultProductVariantAction(productId!);
           }
           await queryClient.invalidateQueries({
             queryKey: adminQueryKeys.productDetail(productId!),
@@ -2138,7 +2200,7 @@ export function ProductManageModal({
       setError(
         layoutGrouped
           ? "Each group needs a name and models with price > 0."
-          : "Each SKU needs a name and a selling price greater than 0.",
+          : "Each added SKU needs a name and a selling price greater than 0.",
       );
       goToStep(1);
       return;
@@ -2152,6 +2214,11 @@ export function ProductManageModal({
         );
         const catalogImage = catalogImageFromProductDraft(productDraft);
         const erpFields = variantErpFieldsFromDraft(productDraft);
+        const hasVariants =
+          layoutGrouped
+            ? groupDrafts.some((g) => g.rows.length > 0)
+            : variantDrafts.length > 0;
+
         const id = await createProductAction({
           name: productDraft.name.trim(),
           description: productDraft.description.trim(),
@@ -2163,9 +2230,22 @@ export function ProductManageModal({
           videoUrls: productDraft.videoUrls,
           itemType: productDraft.itemType,
           hsnSac: productDraft.hsnSac.trim() || null,
+          price: hasVariants
+            ? null
+            : productDraft.defaultPrice > 0
+              ? roundMoney2(productDraft.defaultPrice)
+              : null,
+          mrp: hasVariants
+            ? null
+            : productDraft.defaultMrp > 0
+              ? roundMoney2(productDraft.defaultMrp)
+              : null,
+          barcode: hasVariants ? null : erpFields.barcode,
+          purchasePrice: hasVariants ? null : erpFields.purchasePrice,
+          taxRatePercent: hasVariants ? null : erpFields.taxRatePercent,
         });
 
-        if (layoutGrouped) {
+        if (layoutGrouped && groupDrafts.some((g) => g.rows.length > 0)) {
           for (let gi = 0; gi < groupDrafts.length; gi++) {
             const g = groupDrafts[gi];
             const groupId = await createVariantGroupAction(id, {
@@ -2178,24 +2258,24 @@ export function ProductManageModal({
                 name: row.name.trim(),
                 price: roundMoney2(row.price),
                 mrp: roundMoney2(row.mrp),
-                stock: row.stock,
                 variantGroupId: groupId,
                 ...(gi === 0 && ri === 0 ? erpFields : {}),
               });
             }
           }
-        } else {
+        } else if (variantDrafts.length > 0) {
           for (let i = 0; i < variantDrafts.length; i++) {
             const v = variantDrafts[i];
-            await createVariantAction(id, {
-              name: v.name.trim() || DEFAULT_SKU_NAME,
-              price: roundMoney2(v.price),
-              mrp: roundMoney2(v.mrp),
-              stock: v.stock,
-              imageUrls: orderedImages(v.imageUrls, v.previewIndex),
-              ...(i === 0 ? erpFields : {}),
-            });
+              await createVariantAction(id, {
+                name: v.name.trim() || DEFAULT_SKU_NAME,
+                price: roundMoney2(v.price),
+                mrp: roundMoney2(v.mrp),
+                imageUrls: orderedImages(v.imageUrls, v.previewIndex),
+                ...(i === 0 ? erpFields : {}),
+              });
           }
+        } else if (productDraft.defaultPrice > 0) {
+          await ensureDefaultProductVariantAction(id);
         }
         await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
         onClose();
@@ -2268,7 +2348,7 @@ export function ProductManageModal({
             {currentStep === "variants" && isCreate ? (
               <SkuConfigurationStep
                 skuTab={skuTab}
-                onSkuTabChange={setSkuTab}
+                onSkuTabChange={handleSkuTabChange}
                 flatTabDisabled={groupedDirty}
                 groupsTabDisabled={flatDirty}
                 variantDrafts={variantDrafts}
@@ -2300,6 +2380,7 @@ export function ProductManageModal({
             {currentStep === "variants" && !isCreate && productId && !isGroupedProduct ? (
               <EditVariantsStep
                 productId={productId}
+                productName={productDraft.name}
                 variants={variants}
                 isLoading={isLoading && !data}
                 isGroupedLayout={false}

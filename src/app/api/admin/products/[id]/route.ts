@@ -10,6 +10,7 @@ import {
   listProductVideos,
 } from "@/modules/products/services/product-media.service";
 import { listVariantGroupsForProduct } from "@/modules/products/services/variant-groups.service";
+import { ensureDefaultProductVariant } from "@/modules/products/services/ensure-default-product-variant.service";
 import {
   getProductById,
   getProductVariants,
@@ -24,9 +25,8 @@ export async function GET(
 
   const { id } = await params;
 
-  const [product, variants, categories, brands, pricingRule] = await Promise.all([
+  const [product, categories, brands, pricingRule] = await Promise.all([
     getProductById(id),
-    getProductVariants(id),
     getCategories(),
     getBrands(),
     getProductPricingRule(id),
@@ -34,6 +34,16 @@ export async function GET(
 
   if (!product) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  let variants = await getProductVariants(id);
+  if (variants.length === 0 && Number(product.price) > 0) {
+    try {
+      await ensureDefaultProductVariant(id);
+      variants = await getProductVariants(id);
+    } catch {
+      /* keep product detail usable if ensure fails */
+    }
   }
 
   let variant_groups: Awaited<ReturnType<typeof listVariantGroupsForProduct>> = [];
@@ -55,6 +65,7 @@ export async function GET(
     id,
     variants.map((v) => v.id),
     product.use_smart_pricing === true,
+    { price: product.price, mrp: product.mrp },
   );
 
   return NextResponse.json({

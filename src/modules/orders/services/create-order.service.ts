@@ -28,6 +28,7 @@ export interface CreateOrderResult {
 }
 
 export interface OrderLineItem {
+  productId: string;
   variantId: string;
   quantity: number;
   vendorId: string;
@@ -97,6 +98,7 @@ export async function createOrderFromCart(
       });
 
       orderLineItems.push({
+        productId: snapshot.product_id,
         variantId: cartItem.variant_id,
         quantity: cartItem.quantity,
         vendorId: snapshot.vendor_id ?? "",
@@ -142,6 +144,7 @@ export async function createOrderFromCart(
   // Step 6: Create order_items records
   const orderItemsInsert = orderLineItems.map((item) => ({
     order_id: orderId,
+    product_id: item.productId,
     variant_id: item.variantId,
     quantity: item.quantity,
     price: item.finalPrice,

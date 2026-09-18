@@ -96,6 +96,7 @@ export interface ErpPurchaseOrderLineRow {
 export interface ErpPurchaseOrderBillLineSummary {
   id: string;
   variant_id: string | null;
+  product_id?: string | null;
   product_name: string;
   original_quantity: number | null;
   quantity: number;

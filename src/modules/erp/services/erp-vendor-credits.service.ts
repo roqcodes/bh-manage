@@ -76,7 +76,7 @@ export async function createVendorCredit(input: {
 
   const linesJson: Json = input.lines.map((l) => ({
     product_id: l.productId ?? null,
-    variant_id: l.variantId ?? null,
+    variant_id: null,
     product_name: l.productName,
     quantity: l.quantity,
     unit_price: l.unitPrice,
@@ -229,7 +229,7 @@ export async function updateDraftVendorCredit(
     return {
       vendor_credit_id: creditId,
       product_id: line.productId ?? null,
-      variant_id: line.variantId ?? null,
+      variant_id: null,
       product_name: line.productName,
       quantity: line.quantity,
       unit_price: line.unitPrice,

@@ -33,6 +33,7 @@ export interface OrderItemSnapshot {
   margin_amount: number;
   unit_price: number;
   product_name: string;
+  product_id: string;
 }
 
 async function getOnlineAvailableStock(
@@ -143,6 +144,7 @@ export async function buildOrderItemSnapshot(input: {
     margin_amount: computeOrderMargin(finalPrice, referenceCost),
     unit_price: finalPrice,
     product_name,
+    product_id: variant.product_id,
   });
 }
 
@@ -201,5 +203,6 @@ export async function buildProductOrderItemSnapshot(input: {
     margin_amount: computeOrderMargin(finalPrice, referenceCost),
     unit_price: finalPrice,
     product_name: productRow.name ?? "Product",
+    product_id: input.productId,
   });
 }

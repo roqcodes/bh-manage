@@ -57,6 +57,7 @@ export async function createManualOrder(
     });
 
     orderLineItems.push({
+      productId: snapshot.product_id,
       variantId: item.variantId,
       quantity: item.quantity,
       vendorId: snapshot.vendor_id,
@@ -100,6 +101,7 @@ export async function createManualOrder(
 
   const orderItemsInsert = orderLineItems.map((item) => ({
     order_id: orderId,
+    product_id: item.productId,
     variant_id: item.variantId,
     quantity: item.quantity,
     price: item.finalPrice,

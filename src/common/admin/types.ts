@@ -104,6 +104,12 @@ export interface Product {
   variant_layout?: "flat" | "grouped" | null;
   item_type?: ProductItemType | null;
   hsn_sac?: string | null;
+  /** Product-level pricing when no variants exist (ERP / manual invoicing). */
+  price?: number | null;
+  mrp?: number | null;
+  barcode?: string | null;
+  purchase_price?: number | null;
+  tax_rate_percent?: number | null;
   created_at: string | null;
 }
 

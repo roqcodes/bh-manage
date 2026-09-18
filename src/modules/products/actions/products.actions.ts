@@ -7,9 +7,12 @@ import {
   insertProduct,
   setProductActive,
   setProductsActiveByIds,
+  downgradeProductToFlatLayout,
+  upgradeProductToGroupedLayout,
   updateProductById,
   updateProductSpecs,
 } from "@/modules/products/services/products.service";
+import { ensureDefaultProductVariant } from "@/modules/products/services/ensure-default-product-variant.service";
 import {
   addProductImages,
   addProductVideos,
@@ -28,6 +31,11 @@ export async function createProductAction(data: {
   videoUrls?: string[];
   itemType?: "goods" | "service";
   hsnSac?: string | null;
+  price?: number | null;
+  mrp?: number | null;
+  barcode?: string | null;
+  purchasePrice?: number | null;
+  taxRatePercent?: number | null;
 }): Promise<string> {
   const id = await insertProduct({
     name: data.name,
@@ -38,6 +46,11 @@ export async function createProductAction(data: {
     variantLayout: data.variantLayout,
     itemType: data.itemType,
     hsnSac: data.hsnSac,
+    price: data.price,
+    mrp: data.mrp,
+    barcode: data.barcode,
+    purchasePrice: data.purchasePrice,
+    taxRatePercent: data.taxRatePercent,
   });
   if (data.imageUrls && data.imageUrls.length > 0) {
     await addProductImages(id, data.imageUrls);
@@ -62,6 +75,11 @@ export async function updateProductAction(
     imagePreviewIndex?: number;
     itemType?: "goods" | "service";
     hsnSac?: string | null;
+    price?: number | null;
+    mrp?: number | null;
+    barcode?: string | null;
+    purchasePrice?: number | null;
+    taxRatePercent?: number | null;
   },
 ): Promise<void> {
   await updateProductById(id, {
@@ -72,6 +90,11 @@ export async function updateProductAction(
     imageUrl: data.imageUrl,
     itemType: data.itemType,
     hsnSac: data.hsnSac,
+    price: data.price,
+    mrp: data.mrp,
+    barcode: data.barcode,
+    purchasePrice: data.purchasePrice,
+    taxRatePercent: data.taxRatePercent,
   });
   if (data.imageUrls !== undefined) {
     await syncProductImages(id, data.imageUrls, data.imagePreviewIndex ?? 0);
@@ -116,6 +139,35 @@ export async function bulkSetProductsActiveAction(
   for (const id of ids) {
     revalidatePath(`/admin/products/${id}`);
   }
+}
+
+/** Create default online SKU for simple products (product-level price, no variants). */
+export async function ensureDefaultProductVariantAction(
+  productId: string,
+): Promise<string> {
+  const variantId = await ensureDefaultProductVariant(productId);
+  revalidatePath("/admin/products");
+  revalidatePath(`/admin/products/${productId}`);
+  return variantId;
+}
+
+/** Upgrade flat/simple catalog to grouped layout; existing SKUs and stock are preserved. */
+export async function upgradeProductToGroupedLayoutAction(
+  productId: string,
+  groupName?: string,
+): Promise<void> {
+  await upgradeProductToGroupedLayout(productId, groupName);
+  revalidatePath("/admin/products");
+  revalidatePath(`/admin/products/${productId}`);
+}
+
+/** Downgrade grouped catalog to flat variants; SKUs and stock are preserved. */
+export async function downgradeProductToFlatLayoutAction(
+  productId: string,
+): Promise<void> {
+  await downgradeProductToFlatLayout(productId);
+  revalidatePath("/admin/products");
+  revalidatePath(`/admin/products/${productId}`);
 }
 
 export async function bulkDeleteProductsAction(ids: string[]): Promise<void> {

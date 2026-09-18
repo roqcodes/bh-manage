@@ -31,7 +31,7 @@ export async function getProducts(
   let query = supabase
     .from("products")
     .select(
-      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,variant_layout,item_type,hsn_sac,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
+      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,variant_layout,item_type,hsn_sac,price,mrp,barcode,purchase_price,tax_rate_percent,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
     );
 
   let countQuery = supabase
@@ -92,27 +92,24 @@ async function enrichProductsList(
   }
 
   const storeStockByVariant = new Map<string, number>();
+  const storeStockByProduct = new Map<string, number>();
   let storeName: string | null = null;
-  if (storeId && variantIds.length > 0) {
-    const productIds = [...new Set(variants.map((v) => v.product_id).filter(Boolean))] as string[];
+  if (storeId) {
     const [{ data: storeRow }, { data: storeInventoryRows }] = await Promise.all([
       supabase.from("stores").select("name").eq("id", storeId).maybeSingle(),
-      productIds.length > 0
-        ? supabase
-            .from("store_product_inventory")
-            .select("product_id,stock,sales_price")
-            .eq("store_id", storeId)
-            .in("product_id", productIds)
-        : Promise.resolve({ data: [] as { product_id: string; stock: number | null; sales_price: number | null }[] }),
+      supabase
+        .from("store_product_inventory")
+        .select("product_id,stock,sales_price")
+        .eq("store_id", storeId)
+        .in("product_id", productIds),
     ]);
     storeName = storeRow?.name ?? null;
-    const stockByProduct = new Map<string, number>();
     for (const row of storeInventoryRows ?? []) {
-      stockByProduct.set(row.product_id, Number(row.stock ?? 0));
+      storeStockByProduct.set(row.product_id, Number(row.stock ?? 0));
     }
     for (const v of variants) {
       const pid = v.product_id as string | null;
-      if (pid) storeStockByVariant.set(v.id, stockByProduct.get(pid) ?? 0);
+      if (pid) storeStockByVariant.set(v.id, storeStockByProduct.get(pid) ?? 0);
     }
   }
 
@@ -183,27 +180,45 @@ async function enrichProductsList(
   }
 
   return products.map((product) => {
-    const summary = summaryByProduct.get(product.id) ?? {
-      stock: 0,
-      storeStock: 0,
-      priceMin: null,
-      mrpMin: null,
-      count: 0,
-      firstSku: null,
-      barcode: null,
-      productCode: null,
-      purchasePrice: null,
-      taxRatePercent: null,
-    };
+    const summary = summaryByProduct.get(product.id);
+    const productPrice =
+      product.price != null ? Number(product.price) : null;
+    const productMrp = product.mrp != null ? Number(product.mrp) : null;
+    const productStoreStock = storeId
+      ? (storeStockByProduct.get(product.id) ?? 0)
+      : 0;
+
+    if (!summary || summary.count === 0) {
+      return {
+        ...product,
+        stock_total: storeId ? productStoreStock : 0,
+        price_min: productPrice,
+        mrp_min: productMrp,
+        variant_count: 0,
+        sku_label: null,
+        barcode: product.barcode ?? null,
+        product_code: null,
+        purchase_price:
+          product.purchase_price != null
+            ? Number(product.purchase_price)
+            : null,
+        tax_rate_percent:
+          product.tax_rate_percent != null
+            ? Number(product.tax_rate_percent)
+            : null,
+        store_stock: storeId ? productStoreStock : null,
+        store_name: storeId ? storeName : null,
+      };
+    }
 
     return {
       ...product,
       stock_total: summary.stock,
-      price_min: summary.priceMin,
-      mrp_min: summary.mrpMin,
+      price_min: summary.priceMin ?? productPrice,
+      mrp_min: summary.mrpMin ?? productMrp,
       variant_count: summary.count,
       sku_label: summary.firstSku,
-      barcode: summary.barcode,
+      barcode: summary.barcode ?? product.barcode ?? null,
       product_code: summary.productCode,
       purchase_price: summary.purchasePrice,
       tax_rate_percent: summary.taxRatePercent,
@@ -299,7 +314,7 @@ export async function getProductById(
   const { data } = await supabase
     .from("products")
     .select(
-      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,variant_layout,item_type,hsn_sac,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
+      "id,name,description,category_id,brand_id,image_url,is_active,use_smart_pricing,specs,variant_layout,item_type,hsn_sac,price,mrp,barcode,purchase_price,tax_rate_percent,created_at,categories(id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at),brands(id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -401,6 +416,11 @@ export async function insertProduct(input: {
   variantLayout?: "flat" | "grouped";
   itemType?: "goods" | "service";
   hsnSac?: string | null;
+  price?: number | null;
+  mrp?: number | null;
+  barcode?: string | null;
+  purchasePrice?: number | null;
+  taxRatePercent?: number | null;
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -415,6 +435,11 @@ export async function insertProduct(input: {
       variant_layout: input.variantLayout ?? "flat",
       item_type: input.itemType ?? "goods",
       hsn_sac: input.hsnSac ?? null,
+      price: input.price ?? null,
+      mrp: input.mrp ?? null,
+      barcode: input.barcode ?? null,
+      purchase_price: input.purchasePrice ?? null,
+      tax_rate_percent: input.taxRatePercent ?? null,
       is_active: true,
     })
     .select("id")
@@ -433,6 +458,11 @@ export async function updateProductById(
     imageUrl: string | null;
     itemType?: "goods" | "service";
     hsnSac?: string | null;
+    price?: number | null;
+    mrp?: number | null;
+    barcode?: string | null;
+    purchasePrice?: number | null;
+    taxRatePercent?: number | null;
   },
 ): Promise<void> {
   await requireAdminOrManagerProfile();
@@ -447,6 +477,15 @@ export async function updateProductById(
       image_url: input.imageUrl,
       ...(input.itemType !== undefined ? { item_type: input.itemType } : {}),
       ...(input.hsnSac !== undefined ? { hsn_sac: input.hsnSac } : {}),
+      ...(input.price !== undefined ? { price: input.price } : {}),
+      ...(input.mrp !== undefined ? { mrp: input.mrp } : {}),
+      ...(input.barcode !== undefined ? { barcode: input.barcode } : {}),
+      ...(input.purchasePrice !== undefined
+        ? { purchase_price: input.purchasePrice }
+        : {}),
+      ...(input.taxRatePercent !== undefined
+        ? { tax_rate_percent: input.taxRatePercent }
+        : {}),
     })
     .eq("id", id);
   if (error) throw new Error(error.message);
@@ -475,6 +514,117 @@ export async function setProductsActiveByIds(
     .update({ is_active: isActive })
     .in("id", ids);
   if (error) throw new Error(error.message);
+}
+
+export async function setProductVariantLayout(
+  productId: string,
+  layout: "flat" | "grouped",
+): Promise<void> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("products")
+    .update({ variant_layout: layout })
+    .eq("id", productId);
+  if (error) throw new Error(error.message);
+}
+
+/** Flat/simple → grouped: keeps existing SKUs, assigns them to a default group. */
+export async function upgradeProductToGroupedLayout(
+  productId: string,
+  groupName = "Models",
+): Promise<void> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: variants, error: variantErr } = await supabase
+    .from("product_variants")
+    .select("id, variant_group_id")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: true });
+
+  if (variantErr) throw new Error(variantErr.message);
+  if (!variants?.length) {
+    throw new Error("Add at least one SKU before organizing into variant groups.");
+  }
+
+  const { data: groups, error: groupErr } = await supabase
+    .from("variant_groups")
+    .select("id")
+    .eq("product_id", productId)
+    .order("sort_order", { ascending: true });
+
+  if (groupErr) throw new Error(groupErr.message);
+
+  let groupId = groups?.[0]?.id;
+  if (!groupId) {
+    const { data: inserted, error: insErr } = await supabase
+      .from("variant_groups")
+      .insert({
+        product_id: productId,
+        name: groupName.trim() || "Models",
+        sort_order: 0,
+      })
+      .select("id")
+      .single();
+    if (insErr) throw new Error(insErr.message);
+    groupId = inserted?.id;
+  }
+
+  if (!groupId) throw new Error("Could not create variant group.");
+
+  const ungroupedIds = variants
+    .filter((v) => !v.variant_group_id)
+    .map((v) => v.id);
+
+  if (ungroupedIds.length > 0) {
+    const { error: assignErr } = await supabase
+      .from("product_variants")
+      .update({ variant_group_id: groupId })
+      .in("id", ungroupedIds);
+    if (assignErr) throw new Error(assignErr.message);
+  }
+
+  const { error: layoutErr } = await supabase
+    .from("products")
+    .update({ variant_layout: "grouped" })
+    .eq("id", productId);
+  if (layoutErr) throw new Error(layoutErr.message);
+}
+
+/** Grouped → flat: keeps all SKUs and stock; removes group organization. */
+export async function downgradeProductToFlatLayout(productId: string): Promise<void> {
+  await requireAdminOrManagerProfile();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: variants, error: variantErr } = await supabase
+    .from("product_variants")
+    .select("id")
+    .eq("product_id", productId);
+
+  if (variantErr) throw new Error(variantErr.message);
+  if (!variants?.length) {
+    throw new Error("Add at least one SKU before changing catalog layout.");
+  }
+
+  const variantIds = variants.map((v) => v.id);
+  const { error: ungroupErr } = await supabase
+    .from("product_variants")
+    .update({ variant_group_id: null })
+    .in("id", variantIds);
+  if (ungroupErr) throw new Error(ungroupErr.message);
+
+  const { error: deleteGroupsErr } = await supabase
+    .from("variant_groups")
+    .delete()
+    .eq("product_id", productId);
+  if (deleteGroupsErr) throw new Error(deleteGroupsErr.message);
+
+  const { error: layoutErr } = await supabase
+    .from("products")
+    .update({ variant_layout: "flat" })
+    .eq("id", productId);
+  if (layoutErr) throw new Error(layoutErr.message);
 }
 
 export async function updateProductSpecs(

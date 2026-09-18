@@ -72,7 +72,8 @@ export function PurchaseOrderFormView({
     adminGet<{ po: ErpPurchaseOrderDetail }>(`erp/purchase-orders/${poId}`)
       .then((res) => {
         const po = res.po;
-        setVendorId(po.vendor_id);
+        setVendorId(po.vendor_id ?? po.vendors?.id ?? "");
+        setVendorLabel(po.vendors?.name ?? "");
         setStoreId(po.store_id ?? "");
         setPoDate(po.po_date ?? new Date().toISOString().slice(0, 10));
         setExpectedDeliveryDate(po.expected_delivery_date ?? "");
@@ -89,7 +90,10 @@ export function PurchaseOrderFormView({
                   item.product_variants?.product_id ??
                   null,
                 variantId: item.variant_id,
-                productName: item.product_variants?.products?.name ?? "Item",
+                productName:
+                  (item as { products?: { name?: string | null } | null }).products?.name ??
+                  item.product_variants?.products?.name ??
+                  "Item",
                 barcode: item.product_variants?.barcode ?? "",
                 expiryDate: "",
                 quantity: item.quantity,

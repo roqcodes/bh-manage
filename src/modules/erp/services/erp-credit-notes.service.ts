@@ -10,7 +10,7 @@ import type { Json } from "@/lib/integrations/supabase/types";
 
 function linesToJson(lines: ErpLineInput[]): Json {
   return lines.map((l) => ({
-    variant_id: l.variantId ?? null,
+    variant_id: null,
     product_id: l.productId ?? null,
     product_name: l.productName,
     quantity: l.quantity,
@@ -233,7 +233,8 @@ export async function updateDraftCreditNote(
     const lineTax = roundMoney(taxable * (line.taxRatePercent / 100));
     return {
       credit_note_id: creditNoteId,
-      variant_id: line.variantId ?? null,
+      product_id: line.productId ?? null,
+      variant_id: null,
       product_name: line.productName,
       quantity: line.quantity,
       unit_price: line.unitPrice,

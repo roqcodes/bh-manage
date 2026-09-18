@@ -124,6 +124,22 @@ export async function updateRecurringSchedule(
   });
 }
 
+async function resolveRecurringProductId(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  line: Record<string, unknown>,
+): Promise<string | undefined> {
+  const productId = line.productId as string | undefined;
+  if (productId) return productId;
+  const variantId = line.variantId as string | undefined;
+  if (!variantId) return undefined;
+  const { data } = await supabase
+    .from("product_variants")
+    .select("product_id")
+    .eq("id", variantId)
+    .maybeSingle();
+  return data?.product_id ?? undefined;
+}
+
 export async function runRecurringSchedule(scheduleId: string): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -142,19 +158,23 @@ export async function runRecurringSchedule(scheduleId: string): Promise<string> 
     const lines = (payload.lines as Array<Record<string, unknown>>) ?? [];
     if (lines.length === 0) throw new Error("Schedule payload must include lines.");
 
-    createdId = await createErpInvoice({
-      userId: schedule.customer_id,
-      storeId: schedule.store_id ?? undefined,
-      invoiceDate: schedule.next_run_date,
-      dueDate: addFrequency(schedule.next_run_date, schedule.frequency as RecurringScheduleRow["frequency"]),
-      lines: lines.map((line) => ({
-        variantId: line.variantId as string | undefined,
+    const invoiceLines = await Promise.all(
+      lines.map(async (line) => ({
+        productId: await resolveRecurringProductId(supabase, line),
         productName: String(line.productName ?? "Recurring item"),
         description: line.description as string | undefined,
         quantity: Number(line.quantity ?? 1),
         unitPrice: Number(line.unitPrice ?? 0),
         taxRatePercent: Number(line.taxRatePercent ?? 0),
       })),
+    );
+
+    createdId = await createErpInvoice({
+      userId: schedule.customer_id,
+      storeId: schedule.store_id ?? undefined,
+      invoiceDate: schedule.next_run_date,
+      dueDate: addFrequency(schedule.next_run_date, schedule.frequency as RecurringScheduleRow["frequency"]),
+      lines: invoiceLines,
       discount: Number(payload.discount ?? 0),
       taxInclusive: Boolean(payload.taxInclusive),
       notes: String(payload.notes ?? `Recurring: ${schedule.name}`),
@@ -166,20 +186,25 @@ export async function runRecurringSchedule(scheduleId: string): Promise<string> 
     const lines = (payload.lines as Array<Record<string, unknown>>) ?? [];
     if (lines.length === 0) throw new Error("Schedule payload must include lines.");
 
-    createdId = await createPurchaseBill({
-      vendorId: schedule.vendor_id,
-      storeId: schedule.store_id ?? undefined,
-      purchaseDate: schedule.next_run_date,
-      dueDate: addFrequency(schedule.next_run_date, schedule.frequency as RecurringScheduleRow["frequency"]),
-      lines: lines.map((line) => {
+    const billLines = await Promise.all(
+      lines.map(async (line) => {
         const purchasePrice = Number(line.purchasePrice ?? line.unitPrice ?? 0);
         return {
+          productId: await resolveRecurringProductId(supabase, line),
           productName: String(line.productName ?? "Recurring item"),
           quantity: Number(line.quantity ?? 1),
           purchasePrice,
           taxRatePercent: Number(line.taxRatePercent ?? 0),
         };
       }),
+    );
+
+    createdId = await createPurchaseBill({
+      vendorId: schedule.vendor_id,
+      storeId: schedule.store_id ?? undefined,
+      purchaseDate: schedule.next_run_date,
+      dueDate: addFrequency(schedule.next_run_date, schedule.frequency as RecurringScheduleRow["frequency"]),
+      lines: billLines,
       notes: String(payload.notes ?? `Recurring: ${schedule.name}`),
       finalize: true,
     });

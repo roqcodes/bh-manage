@@ -44,6 +44,7 @@ type BillDetail = {
   id: string;
   purchase_bill_number: string;
   vendor_id: string;
+  vendors?: { name: string | null } | null;
   store_id: string;
   po_id: string | null;
   purchase_date: string;
@@ -84,7 +85,10 @@ function poLinesToForm(po: ErpPurchaseOrderDetail): PurchaseLineFormRow[] {
       item.product_variants?.product_id ??
       null,
     variantId: item.variant_id,
-    productName: item.product_variants?.products?.name ?? "Item",
+    productName:
+      (item as { products?: { name?: string | null } | null }).products?.name ??
+      item.product_variants?.products?.name ??
+      "Item",
     barcode: item.product_variants?.barcode ?? "",
     expiryDate: "",
     quantity: item.quantity,
@@ -163,6 +167,7 @@ export function PurchaseBillFormView({
       .then((res) => {
         const bill = res.bill;
         setVendorId(bill.vendor_id);
+        setVendorLabel(bill.vendors?.name ?? "");
         setStoreId(bill.store_id);
         setPurchaseDate(bill.purchase_date);
         setDueDate(bill.due_date ?? "");
@@ -208,7 +213,8 @@ export function PurchaseBillFormView({
     if (mode !== "create" || !poIdParam) return;
     adminGet<{ po: ErpPurchaseOrderDetail }>(`erp/purchase-orders/${poIdParam}`).then((res) => {
       const po = res.po;
-      setVendorId(po.vendor_id);
+      setVendorId(po.vendor_id ?? po.vendors?.id ?? "");
+      setVendorLabel(po.vendors?.name ?? "");
       setStoreId(po.store_id ?? "");
       setPoId(po.id);
       setExpectedDeliveryDate(po.expected_delivery_date ?? "");
@@ -408,6 +414,7 @@ export function PurchaseBillFormView({
                 <VendorSearchSelect
                   value={vendorId || null}
                   selectedLabel={vendorLabel || undefined}
+                  disabled={Boolean(poId)}
                   onChange={(id, option) => {
                     setVendorId(id ?? "");
                     setVendorLabel(option?.label ?? "");

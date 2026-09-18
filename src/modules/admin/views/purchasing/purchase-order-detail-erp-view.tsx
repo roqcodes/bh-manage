@@ -6,6 +6,7 @@ import Link from "next/link";
 import { formatAuditLogUserDetail } from "@/modules/erp/lib/audit-log-display";
 import type { AuditLogEntry } from "@/common/erp/types";
 import type { ErpPurchaseOrderDetail } from "@/common/erp/purchasing-types";
+import { matchPoLineToBillLine } from "@/common/erp/match-po-bill-line";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
 import { cancelAdminPurchaseOrderAction } from "@/modules/purchase-orders/actions/admin-purchase-orders.actions";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
@@ -20,7 +21,10 @@ import { cn } from "@/lib/utils";
 function lineProductName(
   line: ErpPurchaseOrderDetail["purchase_order_items"][number],
 ): string {
-  const base = line.product_variants?.products?.name ?? "Item";
+  const base =
+    (line as { products?: { name?: string | null } | null }).products?.name ??
+    line.product_variants?.products?.name ??
+    "Item";
   const variant = line.product_variants?.name;
   return variant ? `${base} — ${variant}` : base;
 }
@@ -140,7 +144,7 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
   const previewDiscrepancies = useMemo(() => {
     if (!po?.delivery.canSubmitDelivery) return [];
     return po.purchase_order_items.map((line) => {
-      const billLine = po.linked_bill?.lines.find((bl) => bl.variant_id === line.variant_id);
+      const billLine = po.linked_bill?.lines.find((bl) => matchPoLineToBillLine(line, bl));
       const originalBillQty = billLine?.original_quantity ?? line.quantity;
       const delivered = deliveredQty[line.id] ?? 0;
       return {

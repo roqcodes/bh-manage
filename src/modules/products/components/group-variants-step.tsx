@@ -48,11 +48,6 @@ export function emptyGroupDraft(defaults?: GroupSkuDefaults): GroupDraft {
   };
 }
 
-function parseStockInput(value: string): number {
-  const n = parseInt(value, 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
 function isPricingValid(
   price: number,
   mrp: number,
@@ -185,7 +180,7 @@ export function GroupVariantsStep({
     updateGroup(groupId, { rows: g.rows.filter((r) => r.localId !== rowId) });
   }
 
-  function handleStockTab(
+  function handleModelRowTab(
     e: React.KeyboardEvent<HTMLInputElement>,
     rowIndex: number,
     groupId: string,
@@ -267,7 +262,6 @@ export function GroupVariantsStep({
                     {showMrp ? (
                       <th className="px-3 py-2 w-[88px]">{currencyLabel("MRP")}</th>
                     ) : null}
-                    <th className="px-3 py-2 w-[72px]">Stock</th>
                     <th className="px-3 py-2 w-10" />
                   </tr>
                 </thead>
@@ -284,6 +278,9 @@ export function GroupVariantsStep({
                           value={row.name}
                           onChange={(e) =>
                             updateRow(selected.localId, row.localId, { name: e.target.value })
+                          }
+                          onKeyDown={(e) =>
+                            handleModelRowTab(e, rowIndex, selected.localId)
                           }
                           placeholder="e.g. S24 Ultra"
                         />
@@ -320,22 +317,6 @@ export function GroupVariantsStep({
                           />
                         </td>
                       ) : null}
-                      <td className="px-3 py-1.5">
-                        <input
-                          className={compactInputCls}
-                          type="number"
-                          step="1"
-                          min="0"
-                          value={row.stock || ""}
-                          onChange={(e) =>
-                            updateRow(selected.localId, row.localId, {
-                              stock: parseStockInput(e.target.value),
-                            })
-                          }
-                          onKeyDown={(e) => handleStockTab(e, rowIndex, selected.localId)}
-                          placeholder="0"
-                        />
-                      </td>
                       <td className="px-3 py-1.5">
                         <button
                           type="button"

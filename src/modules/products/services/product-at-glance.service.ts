@@ -19,6 +19,7 @@ export async function getProductAtGlanceMetrics(
   productId: string,
   variantIds: string[],
   useSmartPricing: boolean,
+  productLevel?: { price?: number | null; mrp?: number | null },
 ): Promise<ProductAtGlanceMetrics> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -35,7 +36,14 @@ export async function getProductAtGlanceMetrics(
     vendorStockTotal: 0,
   };
 
-  if (variantIds.length === 0) return empty;
+  if (variantIds.length === 0) {
+    const listPrice = resolveListPrice(productLevel?.price ?? null);
+    return {
+      ...empty,
+      listPriceMin: listPrice > 0 ? listPrice : null,
+      listPriceMax: listPrice > 0 ? listPrice : null,
+    };
+  }
 
   const [rule, invRes, variantRes, offersRes] = await Promise.all([
     useSmartPricing ? getActivePricingRuleForProduct(productId) : Promise.resolve(null),
