@@ -670,6 +670,7 @@ export type Database = {
           credit_note_id: string
           id: string
           line_total: number
+          product_id: string | null
           product_name: string
           quantity: number
           tax_amount: number
@@ -681,6 +682,7 @@ export type Database = {
           credit_note_id: string
           id?: string
           line_total?: number
+          product_id?: string | null
           product_name: string
           quantity?: number
           tax_amount?: number
@@ -692,6 +694,7 @@ export type Database = {
           credit_note_id?: string
           id?: string
           line_total?: number
+          product_id?: string | null
           product_name?: string
           quantity?: number
           tax_amount?: number
@@ -924,6 +927,7 @@ export type Database = {
           estimate_id: string
           id: string
           line_total: number
+          product_id: string | null
           product_name: string
           quantity: number
           tax_amount: number
@@ -937,6 +941,7 @@ export type Database = {
           estimate_id: string
           id?: string
           line_total?: number
+          product_id?: string | null
           product_name: string
           quantity?: number
           tax_amount?: number
@@ -950,6 +955,7 @@ export type Database = {
           estimate_id?: string
           id?: string
           line_total?: number
+          product_id?: string | null
           product_name?: string
           quantity?: number
           tax_amount?: number
@@ -3350,6 +3356,7 @@ export type Database = {
           gst_rate: number
           id: string
           invoice_id: string
+          product_id: string | null
           product_name: string
           quantity: number
           taxable_amount: number
@@ -3366,6 +3373,7 @@ export type Database = {
           gst_rate?: number
           id?: string
           invoice_id: string
+          product_id?: string | null
           product_name: string
           quantity?: number
           taxable_amount?: number
@@ -3382,6 +3390,7 @@ export type Database = {
           gst_rate?: number
           id?: string
           invoice_id?: string
+          product_id?: string | null
           product_name?: string
           quantity?: number
           taxable_amount?: number
@@ -5973,6 +5982,10 @@ export type Database = {
       delete_erp_vat_return: {
         Args: { p_deleted_by?: string; p_return_id: string }
         Returns: undefined
+      }
+      ensure_product_default_variant: {
+        Args: { p_product_id: string }
+        Returns: string
       }
       file_erp_vat_return: {
         Args: { p_filed_by?: string; p_return_id: string }

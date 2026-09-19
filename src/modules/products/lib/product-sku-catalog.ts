@@ -21,7 +21,7 @@ export function isDefaultSkuName(
 }
 
 export function getProductCatalogMode(
-  product: Pick<ProductWithCategory, "variant_layout" | "price">,
+  product: Pick<ProductWithCategory, "variant_layout" | "price" | "name">,
   variants: ProductVariant[],
   variantGroups: VariantGroup[] = [],
 ): ProductCatalogMode {

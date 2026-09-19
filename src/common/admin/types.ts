@@ -314,6 +314,7 @@ export interface OrderCatalogStats {
 export interface OrderItem {
   id: string;
   order_id: string | null;
+  product_id?: string | null;
   variant_id: string | null;
   quantity: number | null;
   price: number | null;
