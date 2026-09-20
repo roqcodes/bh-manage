@@ -48,15 +48,6 @@ export function emptyGroupDraft(defaults?: GroupSkuDefaults): GroupDraft {
   };
 }
 
-function isPricingValid(
-  price: number,
-  mrp: number,
-  showMrp: boolean,
-): boolean {
-  if (!Number.isFinite(price) || price <= 0) return false;
-  if (!showMrp) return true;
-  return Number.isFinite(mrp) && mrp >= 0;
-}
 
 const compactInputCls =
   "h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-[12px] text-slate-900 outline-none transition focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10";
@@ -73,8 +64,7 @@ export function isGroupDraftsValid(
         g.rows.length >= 1 &&
         g.rows.every(
           (r) =>
-            r.name.trim().length > 0 &&
-            isPricingValid(r.price, r.mrp, showMrp),
+            r.name.trim().length > 0,
         ),
     )
   );
@@ -180,20 +170,41 @@ export function GroupVariantsStep({
     updateGroup(groupId, { rows: g.rows.filter((r) => r.localId !== rowId) });
   }
 
-  function handleModelRowTab(
+  function handleModelRowKeyDown(
     e: React.KeyboardEvent<HTMLInputElement>,
     rowIndex: number,
     groupId: string,
   ) {
-    if (e.key !== "Tab" || e.shiftKey || !selected) return;
-    if (rowIndex !== selected.rows.length - 1) return;
-    e.preventDefault();
-    addRow(groupId, true);
+    if (!selected || e.nativeEvent.isComposing) return;
+
+    const isTabForward = e.key === "Tab" && !e.shiftKey;
+    const isEnter =
+      e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
+
+    if (!isTabForward && !isEnter) return;
+
+    const isLastRow = rowIndex === selected.rows.length - 1;
+
+    if (isLastRow) {
+      e.preventDefault();
+      addRow(groupId, true);
+      return;
+    }
+
+    if (isEnter) {
+      e.preventDefault();
+      const nextRow = selected.rows[rowIndex + 1];
+      nameRefs.current.get(nextRow.localId)?.focus();
+    }
   }
 
   return (
-    <div className="flex min-h-0 flex-1 gap-4 px-6 py-4">
-      <aside className="flex w-[220px] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div
+      className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-2 p-2 sm:gap-3 sm:p-3 min-[1100px]:grid-cols-[minmax(160px,200px)_1fr] min-[1100px]:grid-rows-1 min-[1100px]:gap-4 min-[1100px]:p-4"
+    >
+      <aside
+        className="flex min-h-0 max-h-[min(28vh,160px)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white min-[1100px]:max-h-none"
+      >
         <div className="border-b border-slate-100 px-3 py-2">
           <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">Groups</p>
         </div>
@@ -229,8 +240,8 @@ export function GroupVariantsStep({
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
         {selected ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-            <div className="mb-3 flex items-center gap-2">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2.5 sm:p-3 min-[1100px]:p-4">
+            <div className="mb-2 flex flex-wrap items-end gap-2 min-[1100px]:mb-3">
               <label className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
                   Group name
@@ -258,10 +269,6 @@ export function GroupVariantsStep({
                 <thead className="sticky top-0 bg-slate-50 text-[10px] font-bold uppercase tracking-[0.06em] text-slate-500">
                   <tr>
                     <th className="px-3 py-2">Model</th>
-                    <th className="px-3 py-2 w-[88px]">{currencyLabel("Price")}</th>
-                    {showMrp ? (
-                      <th className="px-3 py-2 w-[88px]">{currencyLabel("MRP")}</th>
-                    ) : null}
                     <th className="px-3 py-2 w-10" />
                   </tr>
                 </thead>
@@ -274,49 +281,18 @@ export function GroupVariantsStep({
                             if (el) nameRefs.current.set(row.localId, el);
                             else nameRefs.current.delete(row.localId);
                           }}
+                          data-group-model-input
                           className={compactInputCls}
                           value={row.name}
                           onChange={(e) =>
                             updateRow(selected.localId, row.localId, { name: e.target.value })
                           }
                           onKeyDown={(e) =>
-                            handleModelRowTab(e, rowIndex, selected.localId)
+                            handleModelRowKeyDown(e, rowIndex, selected.localId)
                           }
                           placeholder="e.g. S24 Ultra"
                         />
                       </td>
-                      <td className="px-3 py-1.5">
-                        <input
-                          className={compactInputCls}
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          tabIndex={-1}
-                          value={row.price || ""}
-                          onChange={(e) =>
-                            updateRow(selected.localId, row.localId, {
-                              price: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                        />
-                      </td>
-                      {showMrp ? (
-                        <td className="px-3 py-1.5">
-                          <input
-                            className={compactInputCls}
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            tabIndex={-1}
-                            value={row.mrp || ""}
-                            onChange={(e) =>
-                              updateRow(selected.localId, row.localId, {
-                                mrp: parseFloat(e.target.value) || 0,
-                              })
-                            }
-                          />
-                        </td>
-                      ) : null}
                       <td className="px-3 py-1.5">
                         <button
                           type="button"
@@ -334,7 +310,7 @@ export function GroupVariantsStep({
               </table>
             </div>
 
-            <div className="mt-3 flex justify-end">
+            <div className="mt-2 flex justify-end min-[1100px]:mt-3">
               <PrimaryBtn onClick={() => addRow(selected.localId, true)}>Add model row</PrimaryBtn>
             </div>
           </div>

@@ -5,6 +5,7 @@ import {
   type AuthScreenViewProps,
 } from "@/common/auth/types";
 
+import { RequiredFieldMark } from "@/lib/required-field-label";
 import { BuyHubLogo } from "@/modules/brand/components/buyhub-logo";
 
 function ArrowRightIcon() {
@@ -170,6 +171,7 @@ export function AuthScreenView({
                   <label className="space-y-2">
                     <span className="text-[13px] font-bold text-slate-900">
                       Full Name
+                      <RequiredFieldMark />
                     </span>
                     <input
                       autoComplete="name"
@@ -179,12 +181,14 @@ export function AuthScreenView({
                       placeholder="Your Name"
                       type="text"
                       value={form.name}
+                      required
                     />
                   </label>
 
                   <label className="space-y-2">
                     <span className="text-[13px] font-bold text-slate-900">
                       Phone Number
+                      <RequiredFieldMark />
                     </span>
                     <input
                       autoComplete="tel"
@@ -194,6 +198,7 @@ export function AuthScreenView({
                       placeholder="+91"
                       type="tel"
                       value={form.phone}
+                      required
                     />
                   </label>
                 </div>
@@ -204,6 +209,7 @@ export function AuthScreenView({
               <label className="space-y-2">
                 <span className="text-[13px] font-bold text-slate-900">
                   Email Address
+                  <RequiredFieldMark />
                 </span>
                 <input
                   autoCapitalize="none"
@@ -214,16 +220,21 @@ export function AuthScreenView({
                   placeholder="manager@buyhub.com"
                   type="email"
                   value={form.email}
+                  required
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-[13px] font-bold text-slate-900">Password</span>
+                <span className="text-[13px] font-bold text-slate-900">
+                  Password
+                  <RequiredFieldMark />
+                </span>
                 <div className="relative">
                   <input
                     autoComplete={isRequestMode ? "new-password" : "current-password"}
                     className="min-h-14 w-full rounded-[18px] border border-[#D7DDEA] px-4 pr-12 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10"
                     name="password"
+                    required
                     onChange={(event) =>
                       onFieldChange("password", event.target.value)
                     }

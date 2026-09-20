@@ -45,7 +45,7 @@ const SIZE_CLASSES: Record<AdminFormModalSize, string> = {
   lg: "sm:max-w-4xl",
   xl: "sm:max-w-5xl",
   landscape:
-    "h-[min(92vh,900px)] w-[min(98vw,1600px)] sm:max-w-[min(98vw,1600px)]",
+    "flex flex-col overflow-hidden h-[min(calc(100dvh-1.5rem),720px)] max-h-[min(92dvh,720px)] w-[min(98vw,1280px)] sm:max-w-[min(98vw,1280px)] min-h-0",
 };
 
 export function AdminFormModal({
@@ -67,9 +67,7 @@ export function AdminFormModal({
         className={cn(
           "gap-0 p-0",
           SIZE_CLASSES[size],
-          isLandscape
-            ? "flex flex-col overflow-hidden"
-            : "flex max-h-[min(92vh,900px)] flex-col overflow-hidden",
+          isLandscape ? undefined : "flex max-h-[min(92vh,900px)] flex-col overflow-hidden",
         )}
       >
         <DialogHeader className="shrink-0 gap-1 border-b border-border px-5 py-4 text-left">
@@ -84,7 +82,10 @@ export function AdminFormModal({
         </div>
 
         {footer ? (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 rounded-b-xl border-t border-border bg-muted/50 px-5 pb-4 pt-3">
+          <div
+            data-form-enter-footer
+            className="flex shrink-0 flex-wrap items-center justify-end gap-2 rounded-b-xl border-t border-border bg-muted/50 px-5 pb-4 pt-3"
+          >
             {footer}
           </div>
         ) : null}
@@ -174,15 +175,19 @@ export function AdminFormShell({
         backHref={backHref}
         breadcrumb={breadcrumb}
       />
-      <div
-        className={cn(pending && "pointer-events-none opacity-60 transition-opacity")}
-        aria-busy={pending || undefined}
-      >
-        {children}
+      <div data-form-enter-scope>
+        <div
+          className={cn(pending && "pointer-events-none opacity-60 transition-opacity")}
+          aria-busy={pending || undefined}
+        >
+          {children}
+        </div>
+        {footer && variant === "page" ? (
+          <div data-form-enter-footer className="mt-4 flex flex-wrap justify-end gap-2">
+            {footer}
+          </div>
+        ) : null}
       </div>
-      {footer && variant === "page" ? (
-        <div className="mt-4 flex flex-wrap justify-end gap-2">{footer}</div>
-      ) : null}
     </AdminPageLayout>
   );
 }
@@ -255,12 +260,19 @@ export function AdminFormActions({
 }) {
   return (
     <>
-      <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+      <Button
+        type="button"
+        variant="outline"
+        data-enter-nav-skip
+        onClick={onCancel}
+        disabled={pending}
+      >
         {cancelLabel}
       </Button>
       <LoadingButton
         type="submit"
         form={formId}
+        data-form-enter-submit
         loading={pending}
         loadingLabel={loadingLabel}
       >

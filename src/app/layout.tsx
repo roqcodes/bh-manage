@@ -5,6 +5,7 @@ import {
   BUYHUB_FAVICON_PATH,
   BUYHUB_ICON_PATH,
 } from "@/modules/brand/components/buyhub-logo";
+import { AppProviders } from "@/modules/admin/components/app-providers";
 import { NavigationProgress } from "@/modules/navigation/components/navigation-progress";
 import { GlobalTopProgressBar } from "@/modules/navigation/components/global-top-progress-bar";
 import "./globals.css";
@@ -41,7 +42,7 @@ export default function RootLayout({
       <body className="h-full overflow-hidden bg-background font-sans text-foreground">
         <NavigationProgress />
         <GlobalTopProgressBar />
-        {children}
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

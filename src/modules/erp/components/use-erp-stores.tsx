@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import type { ErpContext } from "@/common/erp/types";
+import { RequiredFieldMark } from "@/lib/required-field-label";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 
@@ -89,20 +90,26 @@ export function StoreSelect({
   stores,
   label = "Store",
   allowAll = false,
+  required = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   stores: StoreOption[];
   label?: string;
   allowAll?: boolean;
+  required?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium text-slate-700">{label}</span>
+      <span className="font-medium text-slate-700">
+        {label}
+        {required && label.trim() ? <RequiredFieldMark /> : null}
+      </span>
       <select
         className="h-9 rounded-md border border-input px-3"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        required={required}
       >
         {allowAll ? <option value="">All stores</option> : <option value="">Select store</option>}
         {stores.map((s) => (

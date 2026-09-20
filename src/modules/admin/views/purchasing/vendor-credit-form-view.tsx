@@ -509,7 +509,7 @@ export function VendorCreditFormView({
                   placeholder="Supplier reference"
                 />
               </AdminFormField>
-              <AdminFormField label="Store">
+              <AdminFormField label="Store" required>
                 <ActiveStoreFormField
                   mode={mode}
                   stores={stores}

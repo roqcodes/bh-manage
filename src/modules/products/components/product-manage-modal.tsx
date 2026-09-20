@@ -5,9 +5,6 @@ import type { ComponentType, ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowLeft,
-  Check,
-  ClipboardCheck,
   Layers,
   Loader2,
   Package,
@@ -51,13 +48,15 @@ import {
 } from "@/modules/products/components/group-variants-step";
 import { adminGet, adminGetNullable } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { cn } from "@/lib/utils";
+import { RequiredFieldMark, showRequiredMark } from "@/lib/required-field-label";
 import { currencyLabel, formatInr } from "@/lib/format-currency";
 import { useCurrencySettings } from "@/modules/settings/providers/currency-settings-provider";
 import { isDefaultSkuName } from "@/modules/products/lib/product-sku-catalog";
 
 const BRAND = "#2563EB";
 
-type StepId = "details" | "variants" | "review";
+// Removed StepId
 
 type ProductDetailPayload = {
   product: ProductWithCategory;
@@ -114,18 +113,50 @@ const compactTextareaCls =
 
 function CompactField({
   label,
+  required,
   children,
 }: {
   label: string;
+  required?: boolean;
   children: ReactNode;
 }) {
+  const showRequired = showRequiredMark(required, children);
+
   return (
     <label className="flex flex-col gap-1">
       <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
         {label}
+        {showRequired ? <RequiredFieldMark /> : null}
       </span>
       {children}
     </label>
+  );
+}
+
+function DetailsSection({
+  title,
+  hint,
+  children,
+  className,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm",
+        className,
+      )}
+    >
+      <div className="mb-2.5">
+        <h2 className="text-[13px] font-bold text-slate-900">{title}</h2>
+        {hint ? <p className="mt-0.5 text-[11px] leading-snug text-slate-500">{hint}</p> : null}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -338,11 +369,6 @@ function emptyVariantDraft(name = DEFAULT_SKU_NAME): VariantDraft {
   };
 }
 
-function isPricingValid(price: number, mrp: number, showMrp = true): boolean {
-  if (!Number.isFinite(price) || price <= 0) return false;
-  if (!showMrp) return true;
-  return Number.isFinite(mrp) && mrp >= 0;
-}
 
 function applyGroupDefaults(groups: GroupDraft[], draft: ProductDraft): GroupDraft[] {
   return groups.map((g) => ({
@@ -379,12 +405,6 @@ function catalogImageFromVariantRows(variants: ProductVariant[]): string | null 
   return null;
 }
 
-function formatPriceRange(drafts: VariantDraft[]): string {
-  const prices = drafts.map((d) => d.price).filter((p) => p > 0);
-  if (prices.length === 0) return "—";
-  if (prices.length === 1) return formatInr(prices[0]!);
-  return `${formatInr(Math.min(...prices))} – ${formatInr(Math.max(...prices))}`;
-}
 
 function roundMoney2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -483,116 +503,7 @@ async function syncProductCatalogImage(
   await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
 }
 
-const CREATE_STEPS: { id: StepId; label: string; icon: ComponentType<{ className?: string }> }[] = [
-  { id: "details", label: "Item Details", icon: Package },
-  { id: "variants", label: "Inventory", icon: Layers },
-  { id: "review", label: "Preview", icon: ClipboardCheck },
-];
-
-const EDIT_STEPS: { id: StepId; label: string; icon: ComponentType<{ className?: string }> }[] = [
-  { id: "details", label: "Item Details", icon: Package },
-  { id: "variants", label: "Inventory", icon: Layers },
-];
-
-function StepProgress({
-  steps,
-  currentIndex,
-  maxReachableIndex,
-  onStepClick,
-}: {
-  steps: typeof CREATE_STEPS;
-  currentIndex: number;
-  maxReachableIndex: number;
-  onStepClick: (index: number) => void;
-}) {
-  return (
-    <nav
-      aria-label="Product setup progress"
-      className="shrink-0 border-b border-slate-100 bg-white px-8 py-5"
-      style={{ ["--brand" as string]: BRAND }}
-    >
-      <ol className="flex w-full items-center">
-        {steps.map((step, i) => {
-          const done = i < currentIndex;
-          const active = i === currentIndex;
-          const reachable = i <= maxReachableIndex;
-          const isLast = i === steps.length - 1;
-          const Icon = step.icon;
-          const connectorFilled = i < currentIndex;
-
-          return (
-            <li
-              key={step.id}
-              className={`flex items-center ${isLast ? "shrink-0" : "min-w-0 flex-1"}`}
-            >
-              <button
-                type="button"
-                disabled={!reachable}
-                onClick={() => reachable && onStepClick(i)}
-                aria-current={active ? "step" : undefined}
-                className={`group flex shrink-0 items-center gap-3 rounded-xl px-1 py-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--brand)]/30 disabled:cursor-not-allowed ${
-                  reachable ? "cursor-pointer" : "cursor-not-allowed opacity-45"
-                }`}
-              >
-                <span
-                  className={`relative flex size-10 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 ${
-                    active
-                      ? "scale-105 border-[color:var(--brand)] bg-[color:var(--brand)] text-white shadow-[0_4px_16px_-4px_rgba(37,99,235,0.55)]"
-                      : done
-                        ? "border-[color:var(--brand)] bg-[color:var(--brand)] text-white"
-                        : "border-slate-200 bg-white text-slate-400 group-hover:border-slate-300"
-                  }`}
-                >
-                  {done ? (
-                    <Check className="size-4" strokeWidth={2.5} aria-hidden />
-                  ) : (
-                    <Icon className="size-4" aria-hidden />
-                  )}
-                  {active ? (
-                    <span
-                      className="absolute -inset-1 rounded-full border-2 border-[color:var(--brand)]/25"
-                      aria-hidden
-                    />
-                  ) : null}
-                </span>
-                <span className="hidden min-w-0 text-left sm:block">
-                  <span
-                    className={`block text-[10px] font-bold uppercase tracking-[0.16em] ${
-                      active ? "text-[color:var(--brand)]" : done ? "text-slate-500" : "text-slate-400"
-                    }`}
-                  >
-                    Step {i + 1}
-                  </span>
-                  <span
-                    className={`block truncate text-[13px] font-bold tracking-tight ${
-                      active ? "text-slate-950" : done ? "text-slate-700" : "text-slate-500"
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                </span>
-              </button>
-
-              {!isLast ? (
-                <div
-                  className="relative mx-4 h-[3px] min-w-[40px] flex-1 overflow-hidden rounded-full bg-slate-200/90"
-                  aria-hidden
-                >
-                  <motion.div
-                    className="absolute inset-y-0 left-0 rounded-full bg-[color:var(--brand)]"
-                    initial={false}
-                    animate={{ width: connectorFilled ? "100%" : active ? "35%" : "0%" }}
-                    transition={{ duration: 0.4, ease: "easeOut" }}
-                  />
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
-}
+// Removed old wizard components
 
 function VariantThumb({ url }: { url: string | null }) {
   const [broken, setBroken] = useState(false);
@@ -624,11 +535,15 @@ function VariantSplitLayout({
   panel: ReactNode;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 gap-4 px-6 py-4">
-      <aside className="flex w-[280px] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div
+      className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-2 p-2 sm:gap-3 sm:p-3 min-[1100px]:grid-cols-[minmax(160px,200px)_1fr] min-[1100px]:grid-rows-1 min-[1100px]:gap-4 min-[1100px]:p-4"
+    >
+      <aside
+        className="flex min-h-0 max-h-[min(28vh,160px)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white min-[1100px]:max-h-none"
+      >
         {list}
       </aside>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
         {panel}
       </div>
     </div>
@@ -665,12 +580,6 @@ function VariantListItem({
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-bold text-slate-900">{name || "Unnamed SKU"}</p>
-        <p className="text-[11px] font-medium tabular-nums text-slate-500">
-          {price > 0 ? formatInr(price) : "No price"}
-          {mrp > 0 ? (
-            <span className="ml-1.5 text-slate-400 line-through">{formatInr(mrp)}</span>
-          ) : null}
-        </p>
       </div>
     </button>
   );
@@ -711,47 +620,16 @@ function DraftVariantEditor({
         <div className="relative size-16 shrink-0 overflow-hidden rounded-lg border border-slate-200/70 bg-slate-50">
           <VariantThumb url={preview} />
         </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <CompactField label="Variant name">
-            <input
-              className={compactInputCls}
-              value={draft.name}
-              onChange={(e) => onChange({ ...draft, name: e.target.value })}
-              placeholder="e.g. 128 GB, Red / Large"
-            />
-          </CompactField>
-          <div className={`grid gap-2 ${showMrp ? "grid-cols-2" : "grid-cols-1"}`}>
-            <CompactField label={currencyLabel("Price")}>
+          <div className="min-w-0 flex-1 space-y-2">
+            <CompactField label="Variant name">
               <input
                 className={compactInputCls}
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                value={draft.price || ""}
-                onChange={(e) =>
-                  onChange({ ...draft, price: parseFloat(e.target.value) || 0 })
-                }
-                placeholder="Required"
+                value={draft.name}
+                onChange={(e) => onChange({ ...draft, name: e.target.value })}
+                placeholder="e.g. 128 GB, Red / Large"
               />
             </CompactField>
-            {showMrp ? (
-              <CompactField label={currencyLabel("MRP")}>
-                <input
-                  className={compactInputCls}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={draft.mrp || ""}
-                  onChange={(e) =>
-                    onChange({ ...draft, mrp: parseFloat(e.target.value) || 0 })
-                  }
-                  placeholder="Optional"
-                />
-              </CompactField>
-            ) : null}
           </div>
-        </div>
       </div>
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-lg border border-slate-100 bg-slate-50/40 p-3">
@@ -792,34 +670,6 @@ function DraftVariantCreatePanel({
             placeholder="e.g. 128 GB, Red / Large"
           />
         </CompactField>
-        <div className={`grid gap-2 ${showMrp ? "grid-cols-2" : "grid-cols-1"}`}>
-          <CompactField label={currencyLabel("Price")}>
-            <input
-              className={compactInputCls}
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={draft.price || ""}
-              onChange={(e) =>
-                setDraft({ ...draft, price: parseFloat(e.target.value) || 0 })
-              }
-              placeholder="Required"
-            />
-          </CompactField>
-          {showMrp ? (
-            <CompactField label={currencyLabel("MRP")}>
-              <input
-                className={compactInputCls}
-                type="number"
-                step="0.01"
-                min="0"
-                value={draft.mrp || ""}
-                onChange={(e) => setDraft({ ...draft, mrp: parseFloat(e.target.value) || 0 })}
-                placeholder="Optional"
-              />
-            </CompactField>
-          ) : null}
-        </div>
       </div>
 
       <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50/40 p-3">
@@ -839,11 +689,11 @@ function DraftVariantCreatePanel({
       <div className="mt-4 flex justify-end">
         <PrimaryBtn
           onClick={() => {
-            if (!draft.name.trim() || !isPricingValid(draft.price, draft.mrp, showMrp)) return;
+            if (!draft.name.trim()) return;
             onAdd({ ...draft, localId: newLocalId() });
             setDraft(emptyVariantDraft(""));
           }}
-          disabled={!draft.name.trim() || !isPricingValid(draft.price, draft.mrp, showMrp)}
+          disabled={!draft.name.trim()}
         >
           Add SKU
         </PrimaryBtn>
@@ -932,119 +782,69 @@ function CreateVariantsStep({
   );
 }
 
-function ReviewStep({
-  productDraft,
-  variantDrafts,
-  groupDrafts,
-  layoutGrouped,
-  categories,
-  brands,
-}: {
-  productDraft: ProductDraft;
-  variantDrafts: VariantDraft[];
-  groupDrafts: GroupDraft[];
-  layoutGrouped: boolean;
-  categories: Category[];
-  brands: Brand[];
-}) {
-  const categoryName =
-    categories.find((c) => c.id === productDraft.categoryId)?.name ??
-    "Uncategorized";
-  const brandName =
-    brands.find((b) => b.id === productDraft.brandId)?.name ?? null;
+// Removed ReviewStep
 
-  const previewUrl = catalogImageFromProductDraft(productDraft);
-  const skuCount = layoutGrouped
-    ? groupDrafts.reduce((n, g) => n + g.rows.length, 0)
-    : variantDrafts.length;
-  const priceLabel = layoutGrouped
-    ? skuCount > 0
-      ? "Grouped SKUs"
-      : productDraft.defaultPrice > 0
-        ? formatInr(productDraft.defaultPrice)
-        : "—"
-    : skuCount > 0
-      ? formatPriceRange(variantDrafts)
-      : productDraft.defaultPrice > 0
-        ? formatInr(productDraft.defaultPrice)
-        : "—";
-
+function VariantSetupSelection({ onSelect }: { onSelect: (layout: "none" | "flat" | "grouped") => void }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="flex gap-3">
-            <div className="relative size-16 shrink-0 overflow-hidden rounded-lg border border-slate-200/70 bg-slate-50">
-              <VariantThumb url={previewUrl} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-slate-900">{productDraft.name}</p>
-              <p className="mt-0.5 text-xs text-slate-500">
-                {brandName ? `${brandName} · ` : ""}
-                {categoryName}
-              </p>
-              <p className="mt-1 text-xs font-semibold tabular-nums text-slate-700">{priceLabel}</p>
-              <p className="mt-0.5 text-[10px] font-medium text-slate-400">
-                {skuCount > 0
-                  ? `${skuCount} SKU${skuCount !== 1 ? "s" : ""}`
-                  : "No SKUs yet — add variants later from product edit"}
-              </p>
-              {productDraft.description ? (
-                <p className="mt-1.5 line-clamp-3 text-xs leading-snug text-slate-600">
-                  {productDraft.description}
-                </p>
-              ) : null}
-            </div>
-          </div>
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overscroll-contain p-3 sm:p-5 bg-slate-50/30">
+      <div className="mx-auto w-full max-w-2xl space-y-4 text-center sm:space-y-5">
+        <div className="space-y-1.5">
+          <h3 className="text-lg font-bold text-slate-900 sm:text-xl">Organize SKUs & Inventory</h3>
+          <p className="mx-auto max-w-md text-xs text-slate-500 sm:text-sm">
+            Does this product have options like size, color, or different models? Choose how you want to manage them.
+          </p>
         </div>
-
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <ul className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto overscroll-contain">
-            {layoutGrouped
-              ? groupDrafts.flatMap((g) =>
-                  g.rows.map((r) => (
-                    <li key={r.localId} className="flex items-center gap-2.5 px-3 py-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-bold text-slate-900">
-                          {g.name || "Group"} · {r.name || "Model"}
-                        </p>
-                        <p className="text-[11px] font-medium tabular-nums text-slate-500">
-                          {r.price > 0 ? formatInr(r.price) : "—"}
-                        </p>
-                      </div>
-                    </li>
-                  )),
-                )
-              : variantDrafts.map((v) => (
-                  <li key={v.localId} className="flex items-center gap-2.5 px-3 py-2">
-                    <div className="relative size-9 shrink-0 overflow-hidden rounded-md border border-slate-200/70 bg-slate-50">
-                      <VariantThumb url={v.imageUrls[v.previewIndex] ?? v.imageUrls[0] ?? null} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-bold text-slate-900">
-                        {v.name || "Unnamed SKU"}
-                      </p>
-                      <p className="text-[11px] font-medium tabular-nums text-slate-500">
-                        {v.price > 0 ? formatInr(v.price) : "—"}
-                        {v.mrp > 0 ? (
-                          <span className="ml-1.5 text-slate-400 line-through">
-                            {formatInr(v.mrp)}
-                          </span>
-                        ) : null}
-                        <span className="mx-1.5 text-slate-300">·</span>
-                        {v.imageUrls.length} image{v.imageUrls.length !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-          </ul>
+        <div className="grid gap-2.5 pt-2 text-left sm:grid-cols-3 sm:gap-3 sm:pt-3">
+          <button
+            type="button"
+            onClick={() => onSelect("none")}
+            className="flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-400 hover:ring-1 hover:ring-slate-400 sm:gap-3 sm:rounded-2xl sm:p-4"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-slate-100">
+              <Package className="size-5 text-slate-600" />
+            </div>
+            <div>
+              <span className="block font-bold text-slate-900 mb-1">No Variants</span>
+              <span className="block text-xs leading-relaxed text-slate-500">
+                Just a simple product. We'll track inventory on the main item.
+              </span>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSelect("flat")}
+            className="flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-[#2563EB] hover:ring-1 hover:ring-[#2563EB] sm:gap-3 sm:rounded-2xl sm:p-4"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-blue-50">
+              <Layers className="size-5 text-[#2563EB]" />
+            </div>
+            <div>
+              <span className="block font-bold text-slate-900 mb-1">Standard Variants</span>
+              <span className="block text-xs leading-relaxed text-slate-500">
+                A simple list of SKUs for this product. Best for fewer options and fast entry.
+              </span>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSelect("grouped")}
+            className="flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-[#2563EB] hover:ring-1 hover:ring-[#2563EB] sm:gap-3 sm:rounded-2xl sm:p-4"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-indigo-50">
+              <Layers className="size-5 text-indigo-600" />
+            </div>
+            <div>
+              <span className="block font-bold text-slate-900 mb-1">Variant Groups</span>
+              <span className="block text-xs leading-relaxed text-slate-500">
+                Organize SKUs into categorized groups. Best for complex catalogs and storefront bulk selection.
+              </span>
+            </div>
+          </button>
         </div>
       </div>
     </div>
   );
 }
-
-/* ── Edit flow: live variant management ── */
 
 function LiveVariantEditor({
   productId,
@@ -1088,20 +888,17 @@ function LiveVariantEditor({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const name = (fd.get("name") as string).trim();
-    const price = roundMoney2(parseFloat(fd.get("price") as string));
-    const mrp = showMrp
-      ? roundMoney2(parseFloat(fd.get("mrp") as string))
-      : 0;
-    if (!name || !Number.isFinite(price) || price <= 0) {
-      return setError("Name and selling price greater than 0 are required.");
-    }
-    if (showMrp && !Number.isFinite(mrp)) {
-      return setError("MRP must be a valid number.");
+    if (!name) {
+      return setError("Name is required.");
     }
     setError(null);
     startTransition(async () => {
       try {
-        await updateVariantAction(variant.id, productId, { name, price, mrp });
+        await updateVariantAction(variant.id, productId, { 
+          name, 
+          price: Number(variant.price) || 0, 
+          mrp: Number(variant.mrp) || 0 
+        });
         await queryClient.invalidateQueries({
           queryKey: adminQueryKeys.productDetail(productId),
         });
@@ -1145,31 +942,6 @@ function LiveVariantEditor({
                 required
               />
             </CompactField>
-            <div className={`grid gap-2 ${showMrp ? "grid-cols-2" : "grid-cols-1"}`}>
-              <CompactField label={currencyLabel("Price")}>
-                <input
-                  className={compactInputCls}
-                  name="price"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  defaultValue={moneyInputValue(variant.price)}
-                  required
-                />
-              </CompactField>
-              {showMrp ? (
-                <CompactField label={currencyLabel("MRP")}>
-                  <input
-                    className={compactInputCls}
-                    name="mrp"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    defaultValue={moneyInputValue(variant.mrp)}
-                  />
-                </CompactField>
-              ) : null}
-            </div>
           </div>
         </div>
 
@@ -1223,23 +995,16 @@ function NewVariantPanel({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const name = (fd.get("name") as string).trim();
-    const price = roundMoney2(parseFloat(fd.get("price") as string));
-    const mrp = showMrp
-      ? roundMoney2(parseFloat(fd.get("mrp") as string))
-      : 0;
-    if (!name || !Number.isFinite(price) || price <= 0) {
-      return setError("Name and selling price greater than 0 are required.");
-    }
-    if (showMrp && !Number.isFinite(mrp)) {
-      return setError("MRP must be a valid number.");
+    if (!name) {
+      return setError("Name is required.");
     }
     setError(null);
     startTransition(async () => {
       try {
         await createVariantAction(productId, {
           name,
-          price,
-          mrp,
+          price: defaultPrice || 0,
+          mrp: defaultMrp || 0,
           imageUrls: hideImages ? [] : orderedImages(images, previewIndex),
         });
         await queryClient.invalidateQueries({
@@ -1278,31 +1043,6 @@ function NewVariantPanel({
         <CompactField label="Variant name">
           <input className={compactInputCls} name="name" placeholder="e.g. 128 GB / Black" required />
         </CompactField>
-        <div className={`grid gap-2 ${showMrp ? "grid-cols-2" : "grid-cols-1"}`}>
-          <CompactField label={currencyLabel("Price")}>
-            <input
-              className={compactInputCls}
-              name="price"
-              type="number"
-              step="0.01"
-              min="0.01"
-              defaultValue={defaultPrice > 0 ? defaultPrice : undefined}
-              required
-            />
-          </CompactField>
-          {showMrp ? (
-            <CompactField label={currencyLabel("MRP")}>
-              <input
-                className={compactInputCls}
-                name="mrp"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={defaultMrp > 0 ? defaultMrp : undefined}
-              />
-            </CompactField>
-          ) : null}
-        </div>
       </div>
 
       {!hideImages ? (
@@ -1471,96 +1211,7 @@ function EditVariantsStep({
   );
 }
 
-function SkuConfigurationStep({
-  skuTab,
-  onSkuTabChange,
-  flatTabDisabled,
-  groupsTabDisabled,
-  variantDrafts,
-  onVariantDraftsChange,
-  onFlatDirty,
-  groupDrafts,
-  onGroupDraftsChange,
-  onGroupedDirty,
-  showMrp,
-  defaultPrice,
-  defaultMrp,
-}: {
-  skuTab: SkuTab;
-  onSkuTabChange: (tab: SkuTab) => void;
-  flatTabDisabled: boolean;
-  groupsTabDisabled: boolean;
-  variantDrafts: VariantDraft[];
-  onVariantDraftsChange: (next: VariantDraft[]) => void;
-  onFlatDirty: () => void;
-  groupDrafts: GroupDraft[];
-  onGroupDraftsChange: (next: GroupDraft[]) => void;
-  onGroupedDirty: () => void;
-  showMrp: boolean;
-  defaultPrice: number;
-  defaultMrp: number;
-}) {
-  const tabCls = (active: boolean, disabled: boolean) =>
-    `rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-      disabled
-        ? "cursor-not-allowed opacity-40 text-slate-400"
-        : active
-          ? "bg-[#2563EB] text-white"
-          : "text-slate-600 hover:bg-slate-100"
-    }`;
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="border-b border-slate-200 bg-slate-50 px-6 py-2 text-xs text-slate-600">
-        <strong>Simple product:</strong> skip this step — a default SKU is created from item
-        pricing. <strong>Multi-SKU:</strong> add variants here. <strong>Variant groups:</strong>{" "}
-        use the groups tab for bulk storefront selection (e.g. models). You can switch layouts
-        later; existing stock stays on each SKU.
-      </div>
-      <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-6 py-2.5">
-        <button
-          type="button"
-          disabled={groupsTabDisabled}
-          className={tabCls(skuTab === "groups", groupsTabDisabled)}
-          onClick={() => !groupsTabDisabled && onSkuTabChange("groups")}
-        >
-          Variant groups
-        </button>
-        <button
-          type="button"
-          disabled={flatTabDisabled}
-          className={tabCls(skuTab === "variants", flatTabDisabled)}
-          onClick={() => !flatTabDisabled && onSkuTabChange("variants")}
-        >
-          Variants
-        </button>
-        {flatTabDisabled || groupsTabDisabled ? (
-          <span className="ml-2 text-[10px] font-medium text-slate-400">
-            One layout per product — clear the other tab to switch.
-          </span>
-        ) : null}
-      </div>
-      {skuTab === "groups" ? (
-        <GroupVariantsStep
-          groups={groupDrafts}
-          onChange={onGroupDraftsChange}
-          onDirty={onGroupedDirty}
-          showMrp={showMrp}
-          defaultPrice={defaultPrice}
-          defaultMrp={defaultMrp}
-        />
-      ) : (
-        <CreateVariantsStep
-          drafts={variantDrafts}
-          onChange={(next) => {
-            onFlatDirty();
-            onVariantDraftsChange(next);
-          }}
-        />
-      )}
-    </div>
-  );
-}
+// Removed SkuConfigurationStep
 
 function variantErpFieldsFromDraft(draft: ProductDraft) {
   return {
@@ -1592,241 +1243,240 @@ function DetailsStepForm({
   showMrp: boolean;
   isGroupedLayout?: boolean;
 }) {
+  const pricingHint = isGroupedLayout
+    ? "Pre-fills new SKUs you add later."
+    : "Applies to the primary item; variants inherit unless overridden.";
+
+  const pricingCols = showMrp
+    ? "grid-cols-2 sm:grid-cols-3 min-[1200px]:grid-cols-5"
+    : "grid-cols-2 min-[1200px]:grid-cols-4";
+
   return (
-    <div className="flex min-h-0 flex-1 gap-4 px-6 py-4">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain pr-1">
-        <div className="space-y-3">
-          <CompactField label="Item type">
-            <div className="flex gap-4 pt-1">
-              {(["goods", "service"] as const).map((type) => (
-                <label key={type} className="flex items-center gap-2 text-[13px] text-slate-700">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50/30 min-[1100px]:flex-row">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-3 min-[1100px]:p-4">
+        <div className="flex flex-col gap-2.5 min-[1100px]:gap-3">
+          <DetailsSection title="Basic information">
+            <div className="grid gap-2.5 sm:grid-cols-2 min-[1200px]:grid-cols-4">
+              <div className="sm:col-span-2 min-[1200px]:col-span-2">
+                <CompactField label="Name">
                   <input
-                    type="radio"
-                    name="item-type"
-                    checked={draft.itemType === type}
-                    onChange={() => onDraftChange({ ...draft, itemType: type })}
+                    className={compactInputCls}
+                    value={draft.name}
+                    onChange={(e) => onDraftChange({ ...draft, name: e.target.value })}
+                    placeholder="Product name"
+                    required
                   />
-                  {type === "goods" ? "Goods" : "Service"}
-                </label>
-              ))}
-            </div>
-          </CompactField>
+                </CompactField>
+              </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <CompactField label="Category">
-              <select
-                className={compactSelectCls}
-                value={draft.categoryId ?? ""}
-                onChange={(e) =>
-                  onDraftChange({ ...draft, categoryId: e.target.value || null })
-                }
-              >
-                <option value="">Select</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {formatCategoryOptionLabel(c, categories)}
-                  </option>
-                ))}
-              </select>
-            </CompactField>
-
-            <CompactField label="Unit">
-              <select
-                className={compactSelectCls}
-                value={draft.unitId ?? ""}
-                onChange={(e) =>
-                  onDraftChange({ ...draft, unitId: e.target.value || null })
-                }
-              >
-                <option value="">Type to search OR add new</option>
-                {itemUnits.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.name} ({unit.abbreviation})
-                  </option>
-                ))}
-              </select>
-            </CompactField>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <CompactField label="Barcode">
-              <input
-                className={compactInputCls}
-                value={draft.barcode}
-                onChange={(e) => onDraftChange({ ...draft, barcode: e.target.value })}
-                placeholder="Barcode"
-              />
-            </CompactField>
-
-            <CompactField label="HSN/SAC">
-              <input
-                className={compactInputCls}
-                value={draft.hsnSac}
-                onChange={(e) => onDraftChange({ ...draft, hsnSac: e.target.value })}
-                placeholder="Enter HSN Code"
-              />
-            </CompactField>
-          </div>
-
-          <CompactField label="Name">
-            <input
-              className={compactInputCls}
-              value={draft.name}
-              onChange={(e) => onDraftChange({ ...draft, name: e.target.value })}
-              placeholder="Name"
-              required
-            />
-          </CompactField>
-
-          <div className="grid grid-cols-2 gap-2">
-            <CompactField label="Product code">
-              <input
-                className={compactInputCls}
-                value={draft.productCode}
-                onChange={(e) => onDraftChange({ ...draft, productCode: e.target.value })}
-                placeholder="Product Code"
-              />
-            </CompactField>
-
-            <CompactField label="Manufacturer / brand">
-              <select
-                className={compactSelectCls}
-                value={draft.brandId ?? ""}
-                onChange={(e) =>
-                  onDraftChange({ ...draft, brandId: e.target.value || null })
-                }
-              >
-                <option value="">Select</option>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name ?? "Unnamed"}
-                  </option>
-                ))}
-              </select>
-            </CompactField>
-          </div>
-
-          <div className={`grid gap-2 ${showMrp ? "grid-cols-3" : "grid-cols-2"}`}>
-            <CompactField label="Purchase price">
-              <input
-                className={compactInputCls}
-                type="number"
-                step="0.001"
-                min="0"
-                value={draft.purchasePrice || ""}
-                onChange={(e) =>
-                  onDraftChange({
-                    ...draft,
-                    purchasePrice: parseFloat(e.target.value) || 0,
-                  })
-                }
-                placeholder="0.000"
-              />
-            </CompactField>
-            <CompactField label={currencyLabel("Sales price")}>
-              <input
-                className={compactInputCls}
-                type="number"
-                step="0.001"
-                min="0.01"
-                value={draft.defaultPrice || ""}
-                onChange={(e) =>
-                  onDraftChange({
-                    ...draft,
-                    defaultPrice: parseFloat(e.target.value) || 0,
-                  })
-                }
-                placeholder="0.000"
-                required
-              />
-            </CompactField>
-            {showMrp ? (
-              <CompactField label={currencyLabel("MRP")}>
-                <input
-                  className={compactInputCls}
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={draft.defaultMrp || ""}
+              <CompactField label="Category">
+                <select
+                  className={compactSelectCls}
+                  value={draft.categoryId ?? ""}
                   onChange={(e) =>
-                    onDraftChange({
-                      ...draft,
-                      defaultMrp: parseFloat(e.target.value) || 0,
-                    })
+                    onDraftChange({ ...draft, categoryId: e.target.value || null })
                   }
-                  placeholder="Optional"
-                />
+                >
+                  <option value="">Select category</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {formatCategoryOptionLabel(c, categories)}
+                    </option>
+                  ))}
+                </select>
               </CompactField>
-            ) : null}
+
+              <CompactField label="Manufacturer / Brand">
+                <select
+                  className={compactSelectCls}
+                  value={draft.brandId ?? ""}
+                  onChange={(e) =>
+                    onDraftChange({ ...draft, brandId: e.target.value || null })
+                  }
+                >
+                  <option value="">Select brand</option>
+                  {brands.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name ?? "Unnamed"}
+                    </option>
+                  ))}
+                </select>
+              </CompactField>
+
+              <div className="sm:col-span-2 min-[1200px]:col-span-4">
+                <CompactField label="Description">
+                  <textarea
+                    className={compactTextareaCls}
+                    value={draft.description}
+                    onChange={(e) => onDraftChange({ ...draft, description: e.target.value })}
+                    rows={2}
+                    placeholder="Short product description"
+                  />
+                </CompactField>
+              </div>
+            </div>
+          </DetailsSection>
+
+          <div className="grid gap-2.5 min-[1100px]:grid-cols-2 min-[1100px]:gap-3">
+            <DetailsSection title="Pricing & defaults" hint={pricingHint}>
+              <div className={`grid gap-2.5 ${pricingCols}`}>
+                <CompactField label={currencyLabel("Sales price")}>
+                  <input
+                    className={compactInputCls}
+                    type="number"
+                    step="0.001"
+                    min="0.01"
+                    value={draft.defaultPrice || ""}
+                    onChange={(e) =>
+                      onDraftChange({ ...draft, defaultPrice: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0.000"
+                    required
+                  />
+                </CompactField>
+                {showMrp ? (
+                  <CompactField label={currencyLabel("MRP")}>
+                    <input
+                      className={compactInputCls}
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      value={draft.defaultMrp || ""}
+                      onChange={(e) =>
+                        onDraftChange({ ...draft, defaultMrp: parseFloat(e.target.value) || 0 })
+                      }
+                      placeholder="Optional"
+                    />
+                  </CompactField>
+                ) : null}
+                <CompactField label="Purchase price">
+                  <input
+                    className={compactInputCls}
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={draft.purchasePrice || ""}
+                    onChange={(e) =>
+                      onDraftChange({ ...draft, purchasePrice: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0.000"
+                  />
+                </CompactField>
+                <CompactField label="Tax %">
+                  <input
+                    className={compactInputCls}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={draft.taxRatePercent || ""}
+                    onChange={(e) =>
+                      onDraftChange({ ...draft, taxRatePercent: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="e.g. 18"
+                  />
+                </CompactField>
+                <CompactField label="Markup %">
+                  <input
+                    className={compactInputCls}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={draft.markupPercent || ""}
+                    onChange={(e) =>
+                      onDraftChange({ ...draft, markupPercent: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="Optional"
+                  />
+                </CompactField>
+              </div>
+            </DetailsSection>
+
+            <DetailsSection title="Identification & type">
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <CompactField label="Barcode">
+                  <input
+                    className={compactInputCls}
+                    value={draft.barcode}
+                    onChange={(e) => onDraftChange({ ...draft, barcode: e.target.value })}
+                    placeholder="Scanner barcode"
+                  />
+                </CompactField>
+                <CompactField label="Product code">
+                  <input
+                    className={compactInputCls}
+                    value={draft.productCode}
+                    onChange={(e) => onDraftChange({ ...draft, productCode: e.target.value })}
+                    placeholder="Internal code / SKU"
+                  />
+                </CompactField>
+                <CompactField label="HSN/SAC">
+                  <input
+                    className={compactInputCls}
+                    value={draft.hsnSac}
+                    onChange={(e) => onDraftChange({ ...draft, hsnSac: e.target.value })}
+                    placeholder="Tax classification"
+                  />
+                </CompactField>
+                <CompactField label="Unit of measure">
+                  <select
+                    className={compactSelectCls}
+                    value={draft.unitId ?? ""}
+                    onChange={(e) =>
+                      onDraftChange({ ...draft, unitId: e.target.value || null })
+                    }
+                  >
+                    <option value="">Select unit</option>
+                    {itemUnits.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.name} ({unit.abbreviation})
+                      </option>
+                    ))}
+                  </select>
+                </CompactField>
+              </div>
+
+              <div className="mt-2.5 border-t border-slate-100 pt-2.5">
+                <CompactField label="Item type">
+                  <div className="flex h-9 items-center gap-5">
+                    {(["goods", "service"] as const).map((type) => (
+                      <label
+                        key={type}
+                        className="flex cursor-pointer items-center gap-2 text-[13px] text-slate-700"
+                      >
+                        <input
+                          type="radio"
+                          name="item-type"
+                          checked={draft.itemType === type}
+                          onChange={() => onDraftChange({ ...draft, itemType: type })}
+                          className="accent-[#2563EB]"
+                        />
+                        {type === "goods" ? "Physical goods" : "Service"}
+                      </label>
+                    ))}
+                  </div>
+                </CompactField>
+              </div>
+            </DetailsSection>
           </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <CompactField label="Tax %">
-              <input
-                className={compactInputCls}
-                type="number"
-                step="0.01"
-                min="0"
-                value={draft.taxRatePercent || ""}
-                onChange={(e) =>
-                  onDraftChange({
-                    ...draft,
-                    taxRatePercent: parseFloat(e.target.value) || 0,
-                  })
-                }
-                placeholder="15"
-              />
-            </CompactField>
-            <CompactField label="Markup margin %">
-              <input
-                className={compactInputCls}
-                type="number"
-                step="0.01"
-                min="0"
-                value={draft.markupPercent || ""}
-                onChange={(e) =>
-                  onDraftChange({
-                    ...draft,
-                    markupPercent: parseFloat(e.target.value) || 0,
-                  })
-                }
-                placeholder="0"
-              />
-            </CompactField>
-          </div>
-
-          <p className="text-[10px] text-slate-400">
-            {isGroupedLayout
-              ? "Default pricing fills new models on the inventory step."
-              : "Sales price and ERP identifiers apply to the primary SKU. Stock is managed via store → online transfers."}
-          </p>
-
-          <CompactField label="Description">
-            <textarea
-              className={compactTextareaCls}
-              value={draft.description}
-              onChange={(e) => onDraftChange({ ...draft, description: e.target.value })}
-              rows={4}
-              placeholder="Description"
-            />
-          </CompactField>
 
           {error ? (
-            <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+            <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-600">
               {error}
             </p>
           ) : null}
         </div>
       </div>
 
-      <div className="flex min-h-0 w-[min(440px,46%)] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-100 px-4 py-3">
-          <p className="text-xs font-bold text-slate-900">Images</p>
-          <p className="mt-0.5 text-[10px] text-slate-400">
-            Product gallery and videos for catalog display.
-          </p>
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col p-4">
+      <aside
+        className="flex min-h-0 w-full shrink-0 flex-col border-t border-slate-200 bg-white max-h-[min(36vh,280px)] min-[1100px]:max-h-none min-[1100px]:w-[min(100%,300px)] min-[1100px]:border-l min-[1100px]:border-t-0"
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-2.5 sm:p-3 min-[1100px]:p-4">
+          <div className="mb-2.5">
+            <h2 className="text-[13px] font-bold text-slate-900">Media</h2>
+            <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+              Images and video for this product.
+            </p>
+          </div>
           <ProductMediaField
             images={draft.imageUrls}
             previewIndex={draft.imagePreviewIndex}
@@ -1837,7 +1487,7 @@ function DetailsStepForm({
             onVideosChange={(videoUrls) => onDraftChange({ ...draft, videoUrls })}
           />
         </div>
-      </div>
+      </aside>
     </div>
   );
 }
@@ -1856,7 +1506,7 @@ export function ProductManageModal({
   categories: Category[];
   brands: Brand[];
   onClose: () => void;
-  initialStepId?: StepId;
+  initialStepId?: "details" | "variants";
   /** Flat: null opens new SKU panel; string selects that variant. Grouped: string focuses group row. */
   initialVariantId?: string | null;
 }) {
@@ -1866,14 +1516,13 @@ export function ProductManageModal({
   const [isPending, startTransition] = useTransition();
   const isCreate = mode === "create";
 
-  const steps = isCreate ? CREATE_STEPS : EDIT_STEPS;
-  const resolvedInitialIndex = isCreate
-    ? 0
-    : Math.max(0, steps.findIndex((s) => s.id === initialStepId));
-  const [stepIndex, setStepIndex] = useState(resolvedInitialIndex);
-  const [maxReachableIndex, setMaxReachableIndex] = useState(
-    isCreate ? 0 : Math.max(resolvedInitialIndex, EDIT_STEPS.length - 1),
+  const [activeTab, setActiveTab] = useState<"details" | "variants">(
+    initialStepId === "variants" ? "variants" : "details"
   );
+  
+  // Track layout intent during creation before variants are actually added.
+  const [createVariantLayout, setCreateVariantLayout] = useState<"none" | "flat" | "grouped">("none");
+
   const [error, setError] = useState<string | null>(null);
 
   const [productDraft, setProductDraft] = useState<ProductDraft>(() =>
@@ -1881,7 +1530,8 @@ export function ProductManageModal({
   );
   const [variantDrafts, setVariantDrafts] = useState<VariantDraft[]>([]);
   const [groupDrafts, setGroupDrafts] = useState<GroupDraft[]>([]);
-  const [skuTab, setSkuTab] = useState<SkuTab>("groups");
+  
+  // Replace skuTab with the active layout concept in edit mode, or intent in create mode.
   const [flatDirty, setFlatDirty] = useState(false);
   const [groupedDirty, setGroupedDirty] = useState(false);
   const [editFormId, setEditFormId] = useState(EDIT_VARIANT_FORM_ID);
@@ -1908,7 +1558,6 @@ export function ProductManageModal({
     : (itemUnitsData?.data ?? []);
 
   const variants = data?.variants ?? [];
-  const currentStep = steps[stepIndex]?.id ?? "details";
   const isGroupedProduct =
     !isCreate &&
     (data?.product?.variant_layout === "grouped" ||
@@ -1917,11 +1566,8 @@ export function ProductManageModal({
 
   useEffect(() => {
     setDetailHydrated(false);
-    const startIndex = isCreate
-      ? 0
-      : Math.max(0, EDIT_STEPS.findIndex((s) => s.id === initialStepId));
-    setStepIndex(startIndex);
-    setMaxReachableIndex(isCreate ? 0 : Math.max(startIndex, EDIT_STEPS.length - 1));
+    setActiveTab(initialStepId === "variants" ? "variants" : "details");
+    setCreateVariantLayout("none");
     setGroupDrafts([]);
     setVariantDrafts([]);
     setOriginalVariantIds([]);
@@ -1953,10 +1599,8 @@ export function ProductManageModal({
       setGroupDrafts(nextGroups);
       setInitialGroupDrafts(cloneGroupDrafts(nextGroups));
       setOriginalGroupIds((data.variant_groups ?? []).map((g) => g.id));
-      setSkuTab("groups");
     } else if (data.variants.length > 0) {
       setVariantDrafts(variantDraftsFromApi(data.variants));
-      setSkuTab("variants");
     }
 
     setDetailHydrated(true);
@@ -1964,47 +1608,66 @@ export function ProductManageModal({
 
   const detailsValid =
     productDraft.name.trim().length > 0 &&
-    (productDraft.defaultPrice > 0 || (!isCreate && variants.length > 0));
+    (productDraft.defaultPrice > 0 || (!isCreate && variants.length > 0) || (isCreate && createVariantLayout !== "none"));
 
   const variantsValid = useMemo(() => {
     if (variantDrafts.length === 0) return true;
     return variantDrafts.every(
-      (v) => v.name.trim().length > 0 && isPricingValid(v.price, v.mrp, showMrp),
+      (v) => v.name.trim().length > 0,
     );
-  }, [variantDrafts, showMrp]);
+  }, [variantDrafts]);
 
   const groupsValid = useMemo(
     () => isGroupDraftsValid(groupDrafts, showMrp),
     [groupDrafts, showMrp],
   );
 
-  const layoutGrouped = groupedDirty || (skuTab === "groups" && !flatDirty);
+  const layoutGrouped = isCreate ? createVariantLayout === "grouped" : isGroupedProduct;
 
-  function handleSkuTabChange(tab: SkuTab) {
-    if (tab === "groups" && variantDrafts.length > 0 && !groupedDirty) {
+  function handleCreateVariantLayoutSelect(layout: "none" | "flat" | "grouped") {
+    if (layout === "none") {
+      setGroupDrafts([]);
+      setVariantDrafts([]);
+      setCreateVariantLayout("none");
+      setActiveTab("details");
+      return;
+    }
+    
+    if (layout === "grouped") {
       const hasNamedRows = groupDrafts.some((g) =>
         g.rows.some((r) => r.name.trim().length > 0),
       );
       if (!hasNamedRows) {
-        setGroupDrafts([
-          {
-            localId: newLocalId(),
-            name: "Models",
-            rows: variantDrafts.map((v) => ({
-              localId: v.localId,
-              name: v.name,
-              price: v.price,
-              mrp: v.mrp,
-              stock: v.stock,
-            })),
-          },
-        ]);
-        setGroupedDirty(true);
+        if (variantDrafts.length > 0 && variantDrafts.some(v => v.name.trim().length > 0)) {
+          // Migrate flat -> grouped
+          setGroupDrafts([
+            {
+              localId: newLocalId(),
+              name: "Models",
+              rows: variantDrafts.filter(v => v.name.trim().length > 0).map((v) => ({
+                localId: v.localId,
+                variantId: undefined,
+                name: v.name,
+                price: v.price,
+                mrp: v.mrp,
+                stock: v.stock,
+              })),
+            },
+          ]);
+        } else {
+          setGroupDrafts([
+            {
+              localId: newLocalId(),
+              name: "Models",
+              rows: [emptyGroupSkuRow()],
+            },
+          ]);
+        }
       }
-    }
-    if (tab === "variants" && !flatDirty) {
+    } else if (layout === "flat") {
       const rows = groupDrafts.flatMap((g) => g.rows).filter((r) => r.name.trim());
-      if (rows.length > 0 && variantDrafts.length === 0) {
+      if (rows.length > 0) {
+        // Migrate grouped -> flat
         setVariantDrafts(
           rows.map((r) => ({
             localId: r.localId,
@@ -2016,10 +1679,13 @@ export function ProductManageModal({
             previewIndex: 0,
           })),
         );
-        setFlatDirty(true);
+      } else if (variantDrafts.length === 0) {
+        setVariantDrafts([
+          emptyVariantDraft(),
+        ]);
       }
     }
-    setSkuTab(tab);
+    setCreateVariantLayout(layout);
   }
 
   const skuValid = layoutGrouped
@@ -2036,122 +1702,98 @@ export function ProductManageModal({
     return !groupDraftsEqual(groupDrafts, initialGroupDrafts);
   }, [isGroupedProduct, groupDrafts, initialGroupDrafts]);
 
-  function goToStep(index: number) {
-    if (index < 0 || index >= steps.length) return;
-    setStepIndex(index);
-    setMaxReachableIndex((m) => Math.max(m, index));
+  function handleContinueDetails() {
     setError(null);
-  }
-
-  function handleBack() {
-    goToStep(stepIndex - 1);
-  }
-
-  function handleContinue() {
-    setError(null);
-    if (currentStep === "details") {
-      if (!detailsValid) {
-        setError(
-          isCreate
-            ? "Product name and default price are required."
-            : "Product name is required.",
-        );
-        return;
-      }
-      if (isCreate) {
-        if (groupDrafts.length > 0) {
-          setGroupDrafts(applyGroupDefaults(groupDrafts, productDraft));
-        }
-        if (variantDrafts.length > 0) {
-          setVariantDrafts(applyVariantDefaults(variantDrafts, productDraft));
-        }
-        goToStep(1);
-        return;
-      }
-      if (!isDetailsDirty) {
-        goToStep(1);
-        return;
-      }
-      startTransition(async () => {
-        try {
-          const orderedProductImages = orderedImages(
-            productDraft.imageUrls,
-            productDraft.imagePreviewIndex,
-          );
-          const erpFields = variantErpFieldsFromDraft(productDraft);
-          const primaryVariant = variants[0];
-          const catalogImage =
-            catalogImageFromProductDraft(productDraft) ??
-            catalogImageFromVariantRows(variants);
-
-          await updateProductAction(productId!, {
-            name: productDraft.name.trim(),
-            description: productDraft.description.trim(),
-            categoryId: productDraft.categoryId,
-            brandId: productDraft.brandId,
-            imageUrl: catalogImage,
-            imageUrls: orderedProductImages,
-            videoUrls: productDraft.videoUrls,
-            imagePreviewIndex: productDraft.imagePreviewIndex,
-            itemType: productDraft.itemType,
-            hsnSac: productDraft.hsnSac.trim() || null,
-            ...(primaryVariant
-              ? {}
-              : {
-                  price:
-                    productDraft.defaultPrice > 0
-                      ? roundMoney2(productDraft.defaultPrice)
-                      : null,
-                  mrp:
-                    productDraft.defaultMrp > 0
-                      ? roundMoney2(productDraft.defaultMrp)
-                      : null,
-                  barcode: erpFields.barcode,
-                  purchasePrice: erpFields.purchasePrice,
-                  taxRatePercent: erpFields.taxRatePercent,
-                }),
-          });
-
-          if (primaryVariant) {
-            await updateVariantAction(primaryVariant.id, productId!, {
-              name: primaryVariant.name ?? productDraft.name.trim(),
-              price: productDraft.defaultPrice > 0 ? productDraft.defaultPrice : Number(primaryVariant.price) || 0,
-              mrp: productDraft.defaultMrp > 0 ? productDraft.defaultMrp : Number(primaryVariant.mrp) || 0,
-              ...erpFields,
-            });
-          } else if (productDraft.defaultPrice > 0 && variants.length === 0) {
-            await ensureDefaultProductVariantAction(productId!);
-          }
-          await queryClient.invalidateQueries({
-            queryKey: adminQueryKeys.productDetail(productId!),
-          });
-          await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-          goToStep(1);
-        } catch (err) {
-          setError(formatActionError(err));
-        }
-      });
+    if (!detailsValid) {
+      setError(
+        isCreate
+          ? "Product name and default price are required."
+          : "Product name is required.",
+      );
       return;
     }
-    if (currentStep === "variants") {
-      if (isCreate) {
-        if (!skuValid) {
-          setError(
-            layoutGrouped
-              ? "Each group needs a name and models with price > 0."
-              : "Each SKU needs a name and a selling price greater than 0.",
-          );
-          return;
-        }
-        goToStep(2);
-      }
+    setActiveTab("variants");
+  }
+
+  function handleSaveDetails() {
+    setError(null);
+    if (!detailsValid) {
+      setError(
+        isCreate
+          ? "Product name and default price are required."
+          : "Product name is required.",
+      );
+      return;
     }
+    if (!isDetailsDirty) {
+      onClose();
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const orderedProductImages = orderedImages(
+          productDraft.imageUrls,
+          productDraft.imagePreviewIndex,
+        );
+        const erpFields = variantErpFieldsFromDraft(productDraft);
+        const primaryVariant = variants[0];
+        const catalogImage =
+          catalogImageFromProductDraft(productDraft) ??
+          catalogImageFromVariantRows(variants);
+
+        await updateProductAction(productId!, {
+          name: productDraft.name.trim(),
+          description: productDraft.description.trim(),
+          categoryId: productDraft.categoryId,
+          brandId: productDraft.brandId,
+          imageUrl: catalogImage,
+          imageUrls: orderedProductImages,
+          videoUrls: productDraft.videoUrls,
+          imagePreviewIndex: productDraft.imagePreviewIndex,
+          itemType: productDraft.itemType,
+          hsnSac: productDraft.hsnSac.trim() || null,
+          ...(primaryVariant
+            ? {}
+            : {
+                price:
+                  productDraft.defaultPrice > 0
+                    ? roundMoney2(productDraft.defaultPrice)
+                    : null,
+                mrp:
+                  productDraft.defaultMrp > 0
+                    ? roundMoney2(productDraft.defaultMrp)
+                    : null,
+                barcode: erpFields.barcode,
+                purchasePrice: erpFields.purchasePrice,
+                taxRatePercent: erpFields.taxRatePercent,
+              }),
+        });
+
+        if (primaryVariant) {
+          await updateVariantAction(primaryVariant.id, productId!, {
+            name: primaryVariant.name ?? productDraft.name.trim(),
+            price: productDraft.defaultPrice > 0 ? productDraft.defaultPrice : Number(primaryVariant.price) || 0,
+            mrp: productDraft.defaultMrp > 0 ? productDraft.defaultMrp : Number(primaryVariant.mrp) || 0,
+            ...erpFields,
+          });
+        } else if (productDraft.defaultPrice > 0 && variants.length === 0) {
+          await ensureDefaultProductVariantAction(productId!);
+        }
+        await queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.productDetail(productId!),
+        });
+        await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+        onClose();
+      } catch (err) {
+        setError(formatActionError(err));
+      }
+    });
   }
 
   function handleSaveGroupedVariants() {
     if (!productId) return;
     if (!groupsValid) {
-      setError("Each group needs a name and models with price > 0.");
+      setError("Each group needs a name and models.");
       return;
     }
     if (!isGroupedVariantsDirty) {
@@ -2193,16 +1835,16 @@ export function ProductManageModal({
   function handleCreateAll() {
     if (!detailsValid) {
       setError("Product name is required.");
-      goToStep(0);
+      setActiveTab("details");
       return;
     }
-    if (!skuValid) {
+    if (createVariantLayout !== "none" && !skuValid) {
       setError(
         layoutGrouped
-          ? "Each group needs a name and models with price > 0."
-          : "Each added SKU needs a name and a selling price greater than 0.",
+          ? "Each group needs a name and models."
+          : "Each added SKU needs a name.",
       );
-      goToStep(1);
+      setActiveTab("variants");
       return;
     }
     setError(null);
@@ -2285,8 +1927,7 @@ export function ProductManageModal({
     });
   }
 
-  const isLastStep = stepIndex === steps.length - 1;
-  const showBack = stepIndex > 0;
+  const showBack = false;
 
   async function handleCatalogSync() {
     if (!productId) return;
@@ -2295,34 +1936,49 @@ export function ProductManageModal({
 
   return (
     <Modal
-      title={isCreate ? "Inventory Item" : "Inventory Item"}
-      subtitle={
-        isCreate
-          ? "Item Details → Inventory → Preview"
-          : (product?.name ?? "Update item details and inventory")
-      }
+      title={isCreate ? "New Product" : "Edit Product"}
+      subtitle={product?.name ?? undefined}
       onClose={onClose}
       size="landscape"
       bareBody
     >
-      <StepProgress
-        steps={steps}
-        currentIndex={stepIndex}
-        maxReachableIndex={Math.max(maxReachableIndex, stepIndex)}
-        onStepClick={goToStep}
-      />
+      <div className="flex shrink-0 border-b border-slate-200 bg-white px-2.5 sm:px-4 min-[1100px]:px-5">
+        <button
+          type="button"
+          onClick={() => setActiveTab("details")}
+          className={`px-2.5 py-2 text-xs font-semibold border-b-[3px] transition-colors -mb-px sm:px-3 sm:py-2.5 sm:text-sm ${
+            activeTab === "details"
+              ? "border-[#2563EB] text-[#2563EB]"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Product Details
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("variants")}
+          className={`px-2.5 py-2 text-xs font-semibold border-b-[3px] transition-colors -mb-px sm:px-3 sm:py-2.5 sm:text-sm ${
+            activeTab === "variants"
+              ? "border-[#2563EB] text-[#2563EB]"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Variants & SKUs
+        </button>
+      </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/30">
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentStep}
+            key={activeTab}
+            data-form-enter-nav
             className="flex min-h-0 flex-1 flex-col"
             initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -16 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
           >
-            {currentStep === "details" && !isCreate && isLoading && !detailHydrated ? (
+            {activeTab === "details" && !isCreate && isLoading && !detailHydrated ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-slate-400">
                 <Loader2
                   className="size-6 animate-spin text-[color:var(--brand)]"
@@ -2332,7 +1988,7 @@ export function ProductManageModal({
               </div>
             ) : null}
 
-            {currentStep === "details" && (isCreate || detailHydrated || !isLoading) ? (
+            {activeTab === "details" && (isCreate || detailHydrated || !isLoading) ? (
               <DetailsStepForm
                 draft={productDraft}
                 categories={categories}
@@ -2345,25 +2001,56 @@ export function ProductManageModal({
               />
             ) : null}
 
-            {currentStep === "variants" && isCreate ? (
-              <SkuConfigurationStep
-                skuTab={skuTab}
-                onSkuTabChange={handleSkuTabChange}
-                flatTabDisabled={groupedDirty}
-                groupsTabDisabled={flatDirty}
-                variantDrafts={variantDrafts}
-                onVariantDraftsChange={setVariantDrafts}
-                onFlatDirty={() => setFlatDirty(true)}
-                groupDrafts={groupDrafts}
-                onGroupDraftsChange={setGroupDrafts}
-                onGroupedDirty={() => setGroupedDirty(true)}
-                showMrp={showMrp}
-                defaultPrice={productDraft.defaultPrice}
-                defaultMrp={productDraft.defaultMrp}
-              />
+            {activeTab === "variants" && isCreate ? (
+              createVariantLayout === "none" ? (
+                <VariantSetupSelection onSelect={handleCreateVariantLayoutSelect} />
+              ) : (
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-2.5 py-2 shadow-sm sm:px-4 min-[1100px]:px-6 min-[1100px]:py-2.5">
+                    <p className="text-[11px] text-slate-600 sm:text-xs">
+                      Layout: <strong>{createVariantLayout === "grouped" ? "Variant Groups" : "Standard Variants"}</strong>
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm("Are you sure you want to remove all variants? This will revert to a simple product.")) {
+                            handleCreateVariantLayoutSelect("none");
+                          }
+                        }}
+                        className="text-xs font-medium text-slate-500 hover:text-rose-600 transition-colors"
+                      >
+                        Remove all variants
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateVariantLayoutSelect(createVariantLayout === "grouped" ? "flat" : "grouped")}
+                        className="text-xs font-semibold text-[#2563EB] hover:text-[#1D4ED8] transition-colors"
+                      >
+                        Switch to {createVariantLayout === "grouped" ? "Standard Variants" : "Variant Groups"}
+                      </button>
+                    </div>
+                  </div>
+                  {createVariantLayout === "grouped" ? (
+                    <GroupVariantsStep
+                      groups={groupDrafts}
+                      onChange={setGroupDrafts}
+                      onDirty={() => {}}
+                      showMrp={showMrp}
+                      defaultPrice={productDraft.defaultPrice}
+                      defaultMrp={productDraft.defaultMrp}
+                    />
+                  ) : (
+                    <CreateVariantsStep
+                      drafts={variantDrafts}
+                      onChange={setVariantDrafts}
+                    />
+                  )}
+                </div>
+              )
             ) : null}
 
-            {currentStep === "variants" && !isCreate && productId && isGroupedProduct ? (
+            {activeTab === "variants" && !isCreate && productId && isGroupedProduct ? (
               <GroupVariantsStep
                 groups={groupDrafts}
                 onChange={setGroupDrafts}
@@ -2377,7 +2064,7 @@ export function ProductManageModal({
               />
             ) : null}
 
-            {currentStep === "variants" && !isCreate && productId && !isGroupedProduct ? (
+            {activeTab === "variants" && !isCreate && productId && !isGroupedProduct ? (
               <EditVariantsStep
                 productId={productId}
                 productName={productDraft.name}
@@ -2392,20 +2079,7 @@ export function ProductManageModal({
               />
             ) : null}
 
-            {currentStep === "review" && isCreate ? (
-              <ReviewStep
-                productDraft={productDraft}
-                variantDrafts={variantDrafts}
-                groupDrafts={groupDrafts}
-                layoutGrouped={layoutGrouped}
-                categories={categories}
-                brands={brands}
-              />
-            ) : null}
-
-            {(currentStep === "details" && error) ||
-            (currentStep === "variants" && isCreate && error) ||
-            (currentStep === "review" && isCreate && error) ? (
+            {(activeTab === "variants" && isCreate && error) ? (
               <div className="shrink-0 border-t border-border bg-background px-6 py-3">
                 <FormError message={error} />
               </div>
@@ -2414,53 +2088,37 @@ export function ProductManageModal({
         </AnimatePresence>
       </div>
 
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-background px-6 py-4">
-        <div>
-          {showBack ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleBack}
-              disabled={isPending}
-            >
-              <ArrowLeft data-icon="inline-start" />
-              Back
-            </Button>
-          ) : (
-            <span />
-          )}
-        </div>
-
+      <div
+        data-form-enter-footer
+        className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-background px-2.5 py-2.5 sm:gap-3 sm:px-4 sm:py-3 min-[1100px]:px-6 min-[1100px]:py-4"
+      >
         <div className="flex items-center gap-2">
           <SecondaryBtn onClick={onClose} disabled={isPending}>
             Cancel
           </SecondaryBtn>
 
-          {isCreate && isLastStep ? (
-            <PrimaryBtn onClick={handleCreateAll} disabled={isPending}>
-              {isPending ? "Creating…" : "Create product"}
+          {isCreate ? (
+            <PrimaryBtn enterNavSubmit onClick={handleCreateAll} disabled={isPending}>
+              {isPending ? "Creating…" : "Save product"}
             </PrimaryBtn>
-          ) : !isLastStep ? (
+          ) : activeTab === "details" ? (
             <PrimaryBtn
-              onClick={handleContinue}
-              disabled={
-                isPending ||
-                (currentStep === "details" && !detailsValid) ||
-                (currentStep === "variants" && isCreate && !skuValid)
-              }
+              enterNavSubmit
+              onClick={handleSaveDetails}
+              disabled={isPending || !detailsValid}
             >
-              {isPending ? "Saving…" : "Continue"}
+              {isPending ? "Saving…" : "Save product"}
             </PrimaryBtn>
           ) : isGroupedProduct ? (
             <PrimaryBtn
+              enterNavSubmit
               onClick={handleSaveGroupedVariants}
               disabled={isPending || !groupsValid}
             >
               {isPending
                 ? "Saving…"
                 : isGroupedVariantsDirty
-                  ? "Save changes"
+                  ? "Save variants"
                   : "Done"}
             </PrimaryBtn>
           ) : editFormId === EDIT_VARIANT_FORM_ID ? (

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { Input } from "@/components/ui/input";
+import { RequiredFieldMark } from "@/lib/required-field-label";
 import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
 
 type UseActiveStoreFormFieldOptions = {
@@ -46,6 +47,7 @@ export function ActiveStoreFormField({
   onStoreIdChange,
   label = "Store",
   allowAll = false,
+  required = true,
 }: {
   mode: "create" | "edit";
   stores: Array<{ id: string; name: string }>;
@@ -54,6 +56,7 @@ export function ActiveStoreFormField({
   onStoreIdChange: (id: string) => void;
   label?: string;
   allowAll?: boolean;
+  required?: boolean;
 }) {
   const effectiveId = mode === "create" ? activeStoreId || storeId : storeId;
   const displayName =
@@ -62,8 +65,11 @@ export function ActiveStoreFormField({
   if (mode === "create") {
     return (
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-slate-700">{label}</span>
-        <Input readOnly value={displayName} />
+        <span className="font-medium text-slate-700">
+          {label}
+          {required && label.trim() ? <RequiredFieldMark /> : null}
+        </span>
+        <Input readOnly value={displayName} required={required} />
       </label>
     );
   }
@@ -75,6 +81,7 @@ export function ActiveStoreFormField({
       stores={stores}
       label={label}
       allowAll={allowAll}
+      required={required}
     />
   );
 }

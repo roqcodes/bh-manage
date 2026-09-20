@@ -251,7 +251,7 @@ export function RecurringScheduleFormDialog({
                   ))}
                 </select>
               </AdminFormField>
-              <AdminFormField label="Store">
+              <AdminFormField label="Store" required>
                 <StoreSelect value={storeId} onChange={setStoreId} stores={stores} label="" />
               </AdminFormField>
               <AdminFormField label="Next run date" required>

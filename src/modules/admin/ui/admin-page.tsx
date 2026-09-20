@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
 import { AdminInfoTip } from "@/modules/admin/ui/admin-info-tip";
 import { cn } from "@/lib/utils";
+import { RequiredFieldMark, showRequiredMark } from "@/lib/required-field-label";
 
 export function AdminPageLayout({
   children,
@@ -151,11 +152,13 @@ export function AdminFormField({
   children: ReactNode;
   className?: string;
 }) {
+  const showRequired = showRequiredMark(required, children);
+
   return (
     <div className={cn("space-y-1", className)}>
       <label htmlFor={htmlFor} className="text-xs font-medium text-foreground">
         {label}
-        {required ? <span className="text-destructive"> *</span> : null}
+        {showRequired ? <RequiredFieldMark /> : null}
       </label>
       <div className="[&_input]:h-10 [&_button]:h-10 [&_select]:h-10 [&_textarea]:min-h-[2.5rem]">
         {children}

@@ -271,7 +271,7 @@ export function SalesOrderFormView({
                   onChange={(e) => setSalesPerson(e.target.value)}
                 />
               </AdminFormField>
-              <AdminFormField label="Store">
+              <AdminFormField label="Store" required>
                 <ActiveStoreFormField
                   mode="create"
                   stores={stores}

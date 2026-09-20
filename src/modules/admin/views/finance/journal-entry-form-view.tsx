@@ -173,7 +173,7 @@ export function JournalEntryFormView({
                 onChange={(e) => setTransactionDate(e.target.value)}
               />
             </AdminFormField>
-            <AdminFormField label="Store">
+            <AdminFormField label="Store" required>
               <ActiveStoreFormField
                 mode="create"
                 stores={stores}

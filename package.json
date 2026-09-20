@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node -e \"require('node:fs').rmSync('.next/dev',{recursive:true,force:true})\"",
+    "prebuild": "node -e \"try{require('node:fs').rmSync('.next/dev',{recursive:true,force:true,maxRetries:3,retryDelay:200})}catch(e){if(e&&e.code!=='EPERM'&&e.code!=='EBUSY')throw e}\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

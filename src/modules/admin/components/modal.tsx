@@ -14,6 +14,7 @@ import {
 import { Field, FieldLabel as UiFieldLabel } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { formatActionError } from "@/modules/admin/lib/format-action-error";
+import { RequiredFieldMark, showRequiredMark } from "@/lib/required-field-label";
 
 interface ModalProps {
   title: string;
@@ -33,7 +34,7 @@ const SIZE_CLASSES: Record<NonNullable<ModalProps["size"]>, string> = {
   lg: "sm:max-w-2xl",
   xl: "sm:max-w-4xl",
   landscape:
-    "h-[min(90vh,840px)] min-h-[min(80vh,640px)] w-[min(96vw,1536px)] sm:max-w-[min(96vw,1536px)]",
+    "flex flex-col overflow-hidden h-[min(calc(100dvh-1.5rem),720px)] max-h-[min(92dvh,720px)] w-[min(98vw,1280px)] sm:max-w-[min(98vw,1280px)] min-h-0",
 };
 
 /** Shared input styling for legacy raw `<input>` / `<select>` / `<textarea>` in forms. */
@@ -64,10 +65,10 @@ export function Modal({
         className={cn(
           "gap-0 p-0",
           SIZE_CLASSES[size],
-          isLandscape ? "flex flex-col overflow-hidden" : "flex max-h-[min(90vh,840px)] flex-col overflow-hidden",
+          isLandscape ? undefined : "flex max-h-[min(90vh,840px)] flex-col overflow-hidden",
         )}
       >
-        <DialogHeader className="shrink-0 gap-1 border-b border-border px-5 py-3 text-left">
+        <DialogHeader className="shrink-0 gap-0.5 border-b border-border px-3 py-2 text-left sm:gap-1 sm:px-4 sm:py-2.5 min-[1100px]:px-5 min-[1100px]:py-3">
           <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
           {subtitle ? (
             <DialogDescription className="text-sm">{subtitle}</DialogDescription>
@@ -90,14 +91,21 @@ export function Modal({
 
 export function FieldLabel({
   label,
+  required,
   children,
 }: {
   label: string;
+  required?: boolean;
   children: ReactNode;
 }) {
+  const showRequired = showRequiredMark(required, children);
+
   return (
     <Field>
-      <UiFieldLabel className="text-sm font-medium">{label}</UiFieldLabel>
+      <UiFieldLabel className="text-sm font-medium">
+        {label}
+        {showRequired ? <RequiredFieldMark /> : null}
+      </UiFieldLabel>
       {children}
     </Field>
   );
@@ -118,15 +126,26 @@ export function PrimaryBtn({
   type = "button",
   onClick,
   form,
+  enterNavSubmit,
 }: {
   children: ReactNode;
   disabled?: boolean;
   type?: "button" | "submit";
   onClick?: () => void;
   form?: string;
+  /** Include in Enter-key field navigation and submit on Enter when focused. */
+  enterNavSubmit?: boolean;
 }) {
+  const isSubmitTarget = enterNavSubmit ?? type === "submit";
+
   return (
-    <Button type={type} disabled={disabled} onClick={onClick} form={form}>
+    <Button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      form={form}
+      data-form-enter-submit={isSubmitTarget ? "" : undefined}
+    >
       {children}
     </Button>
   );
@@ -142,7 +161,13 @@ export function SecondaryBtn({
   disabled?: boolean;
 }) {
   return (
-    <Button type="button" variant="outline" disabled={disabled} onClick={onClick}>
+    <Button
+      type="button"
+      variant="outline"
+      disabled={disabled}
+      onClick={onClick}
+      data-enter-nav-skip
+    >
       {children}
     </Button>
   );

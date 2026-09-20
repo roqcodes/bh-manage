@@ -389,7 +389,7 @@ export function CreditNoteFormView({
                 value={creditNoteNumber}
                 enabled={mode === "create"}
               />
-              <AdminFormField label="Store">
+              <AdminFormField label="Store" required>
                 <ActiveStoreFormField
                   mode={mode}
                   stores={stores}

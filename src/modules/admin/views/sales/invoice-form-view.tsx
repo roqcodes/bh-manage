@@ -319,7 +319,7 @@ export function InvoiceFormView({
                 </Link>
               </AdminFormField>
               <ErpDocumentNumberField kind="INV" enabled={mode === "create"} />
-              <AdminFormField label="Store">
+              <AdminFormField label="Store" required>
                 <ActiveStoreFormField
                   mode={mode}
                   stores={stores}
