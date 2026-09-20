@@ -139,6 +139,14 @@
   }
   html {
     @apply font-sans antialiased;
+    /* Scale down the entire UI for desktop screens to emulate a 90% browser zoom,
+       making the dashboard feel less cramped on low-resolution displays */
+    font-size: 16px;
+  }
+  @media (min-width: 1024px) {
+    html {
+      font-size: 90%;
+    }
   }
   body {
     @apply bg-background font-sans text-foreground;
