@@ -3524,6 +3524,13 @@ export type Database = {
             referencedRelation: "stores"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "invoices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       item_units: {
