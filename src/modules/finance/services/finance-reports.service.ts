@@ -66,7 +66,7 @@ export async function getReceivables(
   if (error) throw new Error(error.message);
 
   const receivables: ReceivableRow[] = (data ?? []).map((inv) => {
-    const user = inv.users as { name: string | null; email: string | null } | null;
+    const user = Array.isArray(inv.users) ? inv.users[0] : inv.users;
     const total = inv.total_amount ?? 0;
     const paid = Number((inv as { amount_paid?: number }).amount_paid ?? 0);
     const outstanding = Number((inv as { balance_due?: number }).balance_due ?? total);

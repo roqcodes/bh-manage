@@ -99,7 +99,9 @@ export async function searchActiveVendors(query: string, limit = 20): Promise<
     .from("vendors")
     .select("id, name")
     .eq("is_active", true)
-    .ilike("name", `%${q}%`)
+    .or(
+      `name.ilike.%${q}%,contact.ilike.%${q}%,email.ilike.%${q}%,trn.ilike.%${q}%,phone.ilike.%${q}%`,
+    )
     .order("name")
     .limit(limit);
 

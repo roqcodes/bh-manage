@@ -81,7 +81,25 @@ export async function listPurchaseBills(options: {
   if (options.dateTo) query = query.lte("purchase_date", options.dateTo);
   if (options.search?.trim()) {
     const s = options.search.trim();
-    query = query.or(`purchase_bill_number.ilike.%${s}%,vendor_bill_number.ilike.%${s}%,batch_reference.ilike.%${s}%`);
+    const { data: vendorMatches } = await supabase
+      .from("vendors")
+      .select("id")
+      .eq("is_active", true)
+      .or(
+        `name.ilike.%${s}%,contact.ilike.%${s}%,email.ilike.%${s}%,trn.ilike.%${s}%,phone.ilike.%${s}%`,
+      )
+      .limit(50);
+
+    const filters = [
+      `purchase_bill_number.ilike.%${s}%`,
+      `vendor_bill_number.ilike.%${s}%`,
+      `batch_reference.ilike.%${s}%`,
+    ];
+    const vendorIds = (vendorMatches ?? []).map((row) => row.id);
+    if (vendorIds.length > 0) {
+      filters.push(`vendor_id.in.(${vendorIds.join(",")})`);
+    }
+    query = query.or(filters.join(","));
   }
 
   const { data, error, count } = await query;

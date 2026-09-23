@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, Search, X } from "lucide-react";
 
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
@@ -46,13 +47,31 @@ export function EntitySearchSelect({
   loadOnFocus = true,
 }: EntitySearchSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const fetchOptionsRef = useRef(fetchOptions);
   fetchOptionsRef.current = fetchOptions;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<EntitySearchOption[]>([]);
+  const [menuStyle, setMenuStyle] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
   const debouncedQuery = useDebouncedValue(query, 200);
+
+  const updateMenuPosition = useCallback(() => {
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    setMenuStyle({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, []);
 
   const displayValue = useMemo(() => {
     if (open) return query;
@@ -83,15 +102,88 @@ export function EntitySearchSelect({
   }, [debouncedQuery, open, minChars, loadOnFocus]);
 
   useEffect(() => {
+    if (!open) {
+      setMenuStyle(null);
+      return;
+    }
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
+  useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-        setQuery("");
-      }
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+      setQuery("");
     }
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
+
+  const dropdown =
+    open && menuStyle ? (
+      <div
+        ref={dropdownRef}
+        className="fixed z-[100] max-h-72 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md"
+        style={{
+          top: menuStyle.top,
+          left: menuStyle.left,
+          width: menuStyle.width,
+        }}
+      >
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Searching…
+          </div>
+        ) : debouncedQuery.trim().length < minChars && !loadOnFocus ? (
+          <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+            Type at least {minChars} characters
+          </p>
+        ) : options.length === 0 ? (
+          <p className="px-3 py-6 text-center text-xs text-muted-foreground">{emptyText}</p>
+        ) : (
+          options.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onChange(option.id, option);
+                setOpen(false);
+                setQuery("");
+              }}
+              className={cn(
+                "flex w-full items-start gap-2 rounded-md px-2.5 py-2 text-left text-sm transition hover:bg-muted",
+                value === option.id && "bg-primary/5",
+              )}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{option.label}</p>
+                {option.sublabel ? (
+                  <p className="truncate text-xs text-muted-foreground">{option.sublabel}</p>
+                ) : null}
+                {option.meta ? (
+                  <p className="truncate text-[11px] text-muted-foreground/80">{option.meta}</p>
+                ) : null}
+              </div>
+              {option.amount != null ? (
+                <span className="shrink-0 text-xs font-semibold tabular-nums">
+                  {formatCurrencyAmount(option.amount)}
+                </span>
+              ) : null}
+            </button>
+          ))
+        )}
+      </div>
+    ) : null;
 
   return (
     <div
@@ -99,7 +191,7 @@ export function EntitySearchSelect({
       data-enter-nav={open ? "off" : undefined}
       className={cn("relative w-full", className)}
     >
-      <div className="relative">
+      <div ref={anchorRef} className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={displayValue}
@@ -134,54 +226,9 @@ export function EntitySearchSelect({
         ) : null}
       </div>
 
-      {open ? (
-        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md">
-          {loading ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Searching…
-            </div>
-          ) : debouncedQuery.trim().length < minChars && !loadOnFocus ? (
-            <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-              Type at least {minChars} characters
-            </p>
-          ) : options.length === 0 ? (
-            <p className="px-3 py-6 text-center text-xs text-muted-foreground">{emptyText}</p>
-          ) : (
-            options.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onChange(option.id, option);
-                  setOpen(false);
-                  setQuery("");
-                }}
-                className={cn(
-                  "flex w-full items-start gap-2 rounded-md px-2.5 py-2 text-left text-sm transition hover:bg-muted",
-                  value === option.id && "bg-primary/5",
-                )}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{option.label}</p>
-                  {option.sublabel ? (
-                    <p className="truncate text-xs text-muted-foreground">{option.sublabel}</p>
-                  ) : null}
-                  {option.meta ? (
-                    <p className="truncate text-[11px] text-muted-foreground/80">{option.meta}</p>
-                  ) : null}
-                </div>
-                {option.amount != null ? (
-                  <span className="shrink-0 text-xs font-semibold tabular-nums">
-                    {formatCurrencyAmount(option.amount)}
-                  </span>
-                ) : null}
-              </button>
-            ))
-          )}
-        </div>
-      ) : null}
+      {typeof document !== "undefined" && dropdown
+        ? createPortal(dropdown, document.body)
+        : null}
     </div>
   );
 }

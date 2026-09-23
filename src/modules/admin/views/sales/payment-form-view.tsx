@@ -206,6 +206,15 @@ export function PaymentFormView({
 
   if (isModal && !open) return null;
 
+  const paidAmount = parseFloat(amount) || 0;
+  const remainingAfterPayment = selectedInvoice
+    ? Math.max(0, selectedInvoice.balance_due - paidAmount)
+    : 0;
+  const netReceived = Math.max(0, paidAmount - bankChargesAmount);
+  const paymentFieldsDisabled = !selectedInvoice;
+  const selectClassName =
+    "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50";
+
   const title = "Payment received";
   const footer = isModal ? (
     <AdminFormActions
@@ -216,141 +225,233 @@ export function PaymentFormView({
     />
   ) : undefined;
 
-  const summarySidebar = selectedInvoice ? (
-    <div className="space-y-3 rounded-lg border p-4 text-sm">
-      <p className="font-semibold">Invoice summary</p>
-      <div className="flex justify-between gap-3">
-        <span className="text-muted-foreground">Invoice</span>
-        <span className="font-medium">{selectedInvoice.invoice_number}</span>
-      </div>
-      <div className="flex justify-between gap-3">
-        <span className="text-muted-foreground">Total</span>
-        <span className="tabular-nums">{formatCurrencyAmount(selectedInvoice.total_amount)}</span>
-      </div>
-      <div className="flex justify-between gap-3">
-        <span className="text-muted-foreground">Paid</span>
-        <span className="tabular-nums">{formatCurrencyAmount(selectedInvoice.amount_paid)}</span>
-      </div>
-      <div className="flex justify-between gap-3 border-t pt-3">
-        <span className="font-medium">Balance due</span>
-        <span className="font-semibold tabular-nums">
-          {formatCurrencyAmount(selectedInvoice.balance_due)}
-        </span>
-      </div>
+  const summarySidebar = (
+    <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4 text-sm">
+      <p className="font-semibold tracking-tight">Invoice summary</p>
+      {selectedInvoice ? (
+        <>
+          <div className="space-y-2.5">
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Customer</span>
+              <span className="max-w-[58%] truncate text-right font-medium">
+                {customerLabel || "—"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Invoice</span>
+              <span className="font-medium">{selectedInvoice.invoice_number}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Invoice total</span>
+              <span className="tabular-nums">{formatCurrencyAmount(selectedInvoice.total_amount)}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Already paid</span>
+              <span className="tabular-nums">{formatCurrencyAmount(selectedInvoice.amount_paid)}</span>
+            </div>
+            <div className="flex justify-between gap-3 border-t border-border/80 pt-2.5">
+              <span className="font-medium">Balance due</span>
+              <span className="font-semibold tabular-nums">
+                {formatCurrencyAmount(selectedInvoice.balance_due)}
+              </span>
+            </div>
+          </div>
+          {paidAmount > 0 ? (
+            <div className="space-y-2 rounded-md border border-border/80 bg-background/80 p-3">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">This payment</span>
+                <span className="font-semibold tabular-nums">{formatCurrencyAmount(paidAmount)}</span>
+              </div>
+              {bankChargesAmount > 0 ? (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Bank charges</span>
+                  <span className="tabular-nums text-rose-600">
+                    −{formatCurrencyAmount(bankChargesAmount)}
+                  </span>
+                </div>
+              ) : null}
+              <div className="flex justify-between gap-3 border-t border-border/60 pt-2">
+                <span className="font-medium">Net received</span>
+                <span className="font-semibold tabular-nums">{formatCurrencyAmount(netReceived)}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Remaining</span>
+                <span className="font-medium tabular-nums">
+                  {formatCurrencyAmount(remainingAfterPayment)}
+                </span>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Select an open invoice to view balances and enter payment details.
+        </p>
+      )}
     </div>
-  ) : undefined;
+  );
 
   const formContent = (
-    <AdminFormModalLayout sidebar={summarySidebar}>
-      <AdminFormSection title="Payment details">
-        <AdminFormGrid cols={3}>
-          <ErpDocumentNumberField kind="PR" />
-          <AdminFormField label="Invoice" required className="sm:col-span-2">
+    <AdminFormModalLayout
+      sidebar={summarySidebar}
+      className="lg:grid-cols-[minmax(0,1fr)_minmax(240px,300px)]"
+    >
+      <AdminFormSection title="Invoice & customer">
+        <div className="space-y-3">
+          <AdminFormField label="Invoice" required>
             <InvoiceSearchSelect
               value={invoiceId || null}
               selectedLabel={invoiceLabel || undefined}
+              storeId={storeId || undefined}
               openOnly
+              disabled={!storeId}
               onChange={(id, option) => {
                 setInvoiceId(id ?? "");
                 setInvoiceLabel(option?.label ?? "");
-                if (!id) setSelectedInvoice(null);
+                if (!id) {
+                  setSelectedInvoice(null);
+                  setAmount("");
+                }
               }}
             />
+            {!storeId ? (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Select an active store to search open invoices.
+              </p>
+            ) : null}
           </AdminFormField>
-          <AdminFormField label="Customer" required>
-            <CustomerSearchSelect
-              value={customerId || null}
-              selectedLabel={customerLabel || undefined}
-              disabled={Boolean(selectedInvoice)}
-              onChange={(id, option) => {
-                setCustomerId(id ?? "");
-                setCustomerLabel(option?.label ?? "");
-              }}
+          <AdminFormGrid cols={2}>
+            <AdminFormField label="Customer" required>
+              <CustomerSearchSelect
+                value={customerId || null}
+                selectedLabel={customerLabel || undefined}
+                disabled={Boolean(selectedInvoice)}
+                onChange={(id, option) => {
+                  setCustomerId(id ?? "");
+                  setCustomerLabel(option?.label ?? "");
+                }}
+              />
+            </AdminFormField>
+            <ErpDocumentNumberField kind="PR" />
+          </AdminFormGrid>
+        </div>
+      </AdminFormSection>
+
+      <AdminFormSection title="Payment details">
+        {!selectedInvoice ? (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Choose an invoice above to enable payment fields.
+          </p>
+        ) : null}
+        <AdminFormGrid cols={3}>
+          <AdminFormField label="Payment date" required>
+            <Input
+              type="date"
+              value={paymentDate}
+              disabled={paymentFieldsDisabled}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              required
             />
           </AdminFormField>
-          {selectedInvoice ? (
-            <>
-              <AdminFormField label="Payment date">
-                <Input
-                  type="date"
-                  value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                />
-              </AdminFormField>
-              <AdminFormField label="Payment type">
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                  value={paymentMode}
-                  onChange={(e) => setPaymentMode(e.target.value)}
-                >
-                  {PAYMENT_MODE_OPTIONS.map((mode) => (
-                    <option key={mode} value={mode}>
-                      {paymentModeDisplay(mode)}
-                    </option>
-                  ))}
-                </select>
-              </AdminFormField>
-              <AdminFormField label="Deposit To" required>
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                >
-                  <option value="">Select deposit account</option>
-                  {depositAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name}
-                    </option>
-                  ))}
-                </select>
-              </AdminFormField>
-              <AdminFormField label="Amount received">
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </AdminFormField>
-              <AdminFormField label="Bank charges">
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={bankCharges}
-                  onChange={(e) => setBankCharges(e.target.value)}
-                  placeholder="0.00"
-                />
-              </AdminFormField>
-              {showBankChargesAccount ? (
-                <AdminFormField label="Bank charges expense account" required>
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                    value={bankChargesAccountId}
-                    onChange={(e) => setBankChargesAccountId(e.target.value)}
-                  >
-                    <option value="">Select expense account</option>
-                    {expenseAccounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
-                      </option>
-                    ))}
-                  </select>
-                </AdminFormField>
-              ) : null}
-              <AdminFormField label="Reference">
-                <Input
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder="Cheque / txn ref"
-                />
-              </AdminFormField>
-              <AdminFormField label="Notes" className="sm:col-span-2">
-                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-              </AdminFormField>
-            </>
+          <AdminFormField label="Payment type" required>
+            <select
+              className={selectClassName}
+              value={paymentMode}
+              disabled={paymentFieldsDisabled}
+              onChange={(e) => setPaymentMode(e.target.value)}
+            >
+              {PAYMENT_MODE_OPTIONS.map((mode) => (
+                <option key={mode} value={mode}>
+                  {paymentModeDisplay(mode)}
+                </option>
+              ))}
+            </select>
+          </AdminFormField>
+          <AdminFormField label="Deposit to" required>
+            <select
+              className={selectClassName}
+              value={accountId}
+              disabled={paymentFieldsDisabled}
+              onChange={(e) => setAccountId(e.target.value)}
+              required
+            >
+              <option value="">Select deposit account</option>
+              {depositAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          </AdminFormField>
+          <AdminFormField label="Amount received" required className="sm:col-span-2">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                disabled={paymentFieldsDisabled}
+                onChange={(e) => setAmount(e.target.value)}
+                className="min-w-[140px] flex-1"
+                required
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 shrink-0"
+                disabled={paymentFieldsDisabled}
+                onClick={() => setAmount(String(selectedInvoice?.balance_due ?? 0))}
+              >
+                Pay full balance
+              </Button>
+            </div>
+          </AdminFormField>
+          <AdminFormField label="Bank charges">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={bankCharges}
+              disabled={paymentFieldsDisabled}
+              onChange={(e) => setBankCharges(e.target.value)}
+              placeholder="0.00"
+            />
+          </AdminFormField>
+          {showBankChargesAccount ? (
+            <AdminFormField label="Bank charges expense account" required className="sm:col-span-2">
+              <select
+                className={selectClassName}
+                value={bankChargesAccountId}
+                disabled={paymentFieldsDisabled}
+                onChange={(e) => setBankChargesAccountId(e.target.value)}
+              >
+                <option value="">Select expense account</option>
+                {expenseAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            </AdminFormField>
           ) : null}
+          <AdminFormField label="Reference">
+            <Input
+              value={reference}
+              disabled={paymentFieldsDisabled}
+              onChange={(e) => setReference(e.target.value)}
+              placeholder="Cheque / transaction ref"
+            />
+          </AdminFormField>
+          <AdminFormField label="Notes" className="sm:col-span-2">
+            <Textarea
+              value={notes}
+              disabled={paymentFieldsDisabled}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Internal notes (optional)"
+            />
+          </AdminFormField>
         </AdminFormGrid>
       </AdminFormSection>
     </AdminFormModalLayout>
@@ -362,13 +463,17 @@ export function PaymentFormView({
       open={open}
       onOpenChange={onOpenChange}
       title={title}
-      description="Record a customer payment against an invoice."
+      description={
+        isModal
+          ? "Select an open invoice, then enter how much was received."
+          : "Record a customer payment against an invoice."
+      }
       backHref="/admin/erp/payments"
       breadcrumb={[
         { label: "Payments", href: "/admin/erp/payments" },
         { label: title },
       ]}
-      size="lg"
+      size={isModal ? "landscape" : "lg"}
       formId={formId}
       footer={footer}
     >

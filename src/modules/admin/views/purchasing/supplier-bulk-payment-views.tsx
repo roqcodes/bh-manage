@@ -21,6 +21,8 @@ import {
   AdminFormGrid,
   AdminFormSection,
   AdminFormShell,
+  PurchaseBillSearchSelect,
+  VendorSearchSelect,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -66,9 +68,11 @@ export function SupplierBulkPaymentFormView({
 
   const [accounts, setAccounts] = useState<PaidThroughAccountOption[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<PaidThroughAccountOption[]>([]);
-  const [openBills, setOpenBills] = useState<ErpPurchaseBillListRow[]>([]);
-  const [billSearch, setBillSearch] = useState("");
+  const [vendorId, setVendorId] = useState("");
+  const [vendorLabel, setVendorLabel] = useState("");
   const [selectedBillId, setSelectedBillId] = useState("");
+  const [billLabel, setBillLabel] = useState("");
+  const [selectedBillBalance, setSelectedBillBalance] = useState(0);
   const [lineAmount, setLineAmount] = useState("");
   const [fifoAmount, setFifoAmount] = useState("");
   const [lines, setLines] = useState<PendingLine[]>([]);
@@ -89,24 +93,6 @@ export function SupplierBulkPaymentFormView({
     ).then((res) => setExpenseAccounts(res.data ?? []));
   }, [effectiveStoreId]);
 
-  useEffect(() => {
-    if (!effectiveStoreId) {
-      setOpenBills([]);
-      return;
-    }
-    const q = new URLSearchParams({
-      page: "0",
-      limit: "100",
-      openOnly: "1",
-      storeId: effectiveStoreId,
-    });
-    if (billSearch.trim()) q.set("search", billSearch.trim());
-    adminGet<{ data: ErpPurchaseBillListRow[] }>(`erp/purchase-bills?${q.toString()}`).then(
-      (res) => setOpenBills((res.data ?? []).filter((row) => row.balance_due > 0)),
-    );
-  }, [effectiveStoreId, billSearch]);
-
-  const selectedBill = openBills.find((row) => row.id === selectedBillId) ?? null;
   const total = lines.reduce((s, l) => s + l.amount, 0);
   const bankChargesAmount = parseFloat(bankCharges) || 0;
 
@@ -133,24 +119,27 @@ export function SupplierBulkPaymentFormView({
 
   function addLine() {
     const amt = parseFloat(lineAmount);
-    if (!selectedBill) return setError("Select a purchase bill.");
+    if (!vendorId) return setError("Select a vendor.");
+    if (!selectedBillId) return setError("Select a purchase bill.");
     if (!amt || amt <= 0) return setError("Enter a positive amount.");
-    if (lines.some((l) => l.purchaseBillId === selectedBill.id)) {
+    if (lines.some((l) => l.purchaseBillId === selectedBillId)) {
       return setError("Bill already added.");
     }
-    if (amt > selectedBill.balance_due) return setError("Amount exceeds bill balance.");
+    if (amt > selectedBillBalance) return setError("Amount exceeds bill balance.");
     setLines((prev) => [
       ...prev,
       {
-        purchaseBillId: selectedBill.id,
-        billNumber: selectedBill.purchase_bill_number,
-        vendorName: selectedBill.vendor_name,
-        balanceDue: selectedBill.balance_due,
+        purchaseBillId: selectedBillId,
+        billNumber: billLabel,
+        vendorName: vendorLabel || null,
+        balanceDue: selectedBillBalance,
         amount: amt,
       },
     ]);
     setLineAmount("");
     setSelectedBillId("");
+    setBillLabel("");
+    setSelectedBillBalance(0);
     setError(null);
   }
 
@@ -172,20 +161,15 @@ export function SupplierBulkPaymentFormView({
         `erp/supplier-payments?view=fifo&storeId=${encodeURIComponent(effectiveStoreId)}&amount=${amount}&exclude=${encodeURIComponent(exclude)}`,
       );
 
-      const missingIds = res.allocations
-        .map((a) => a.purchaseBillId)
-        .filter((id) => !openBills.some((b) => b.id === id));
-
-      let mergedBills = openBills;
-      if (missingIds.length > 0) {
-        const q = new URLSearchParams({ page: "0", limit: "100", openOnly: "1", storeId: effectiveStoreId });
-        const full = await adminGet<{ data: ErpPurchaseBillListRow[] }>(
-          `erp/purchase-bills?${q.toString()}`,
-        );
-        mergedBills = (full.data ?? []).filter((row) => row.balance_due > 0);
-      }
-
-      const lookup = new Map(mergedBills.map((row) => [row.id, row]));
+      const q = new URLSearchParams({ page: "0", limit: "100", openOnly: "1", storeId: effectiveStoreId });
+      const full = await adminGet<{ data: ErpPurchaseBillListRow[] }>(
+        `erp/purchase-bills?${q.toString()}`,
+      );
+      const lookup = new Map(
+        (full.data ?? [])
+          .filter((row) => row.balance_due > 0)
+          .map((row) => [row.id, row]),
+      );
       const newLines: PendingLine[] = [];
 
       for (const alloc of res.allocations) {
@@ -352,31 +336,41 @@ export function SupplierBulkPaymentFormView({
 
           <AdminFormSection title="Add bill payment">
             <AdminFormGrid cols={1}>
-              <AdminFormField label="Search">
-                <Input
-                  placeholder="Search bill or vendor…"
-                  value={billSearch}
-                  onChange={(e) => setBillSearch(e.target.value)}
+              <AdminFormField label="Vendor" required>
+                <VendorSearchSelect
+                  value={vendorId || null}
+                  selectedLabel={vendorLabel || undefined}
+                  disabled={!effectiveStoreId}
+                  onChange={(id, option) => {
+                    setVendorId(id ?? "");
+                    setVendorLabel(option?.label ?? "");
+                    setSelectedBillId("");
+                    setBillLabel("");
+                    setSelectedBillBalance(0);
+                    setLineAmount("");
+                  }}
                 />
               </AdminFormField>
-              <AdminFormField label="Purchase bill">
-                <select
-                  className="h-9 w-full rounded-md border px-3 text-sm"
-                  value={selectedBillId}
-                  onChange={(e) => setSelectedBillId(e.target.value)}
-                >
-                  <option value="">Select purchase bill</option>
-                  {openBills.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.purchase_bill_number} — {b.vendor_name} — due{" "}
-                      {formatCurrencyAmount(b.balance_due)}
-                    </option>
-                  ))}
-                </select>
+              <AdminFormField label="Purchase bill" required>
+                <PurchaseBillSearchSelect
+                  value={selectedBillId || null}
+                  selectedLabel={billLabel || undefined}
+                  vendorId={vendorId || undefined}
+                  storeId={effectiveStoreId || undefined}
+                  disabled={!vendorId || !effectiveStoreId}
+                  onChange={(id, option) => {
+                    setSelectedBillId(id ?? "");
+                    setBillLabel(option?.label ?? "");
+                    const balance = option?.amount ?? 0;
+                    setSelectedBillBalance(balance);
+                    if (id && balance > 0) setLineAmount(String(balance));
+                    if (!id) setLineAmount("");
+                  }}
+                />
               </AdminFormField>
-              {selectedBill ? (
+              {selectedBillId ? (
                 <p className="text-sm text-muted-foreground">
-                  Balance due: {formatCurrencyAmount(selectedBill.balance_due)}
+                  Balance due: {formatCurrencyAmount(selectedBillBalance)}
                 </p>
               ) : null}
               <AdminFormField label="Amount">
@@ -420,8 +414,9 @@ export function SupplierBulkPaymentFormView({
                   <TableRow>
                     <TableHead>Bill</TableHead>
                     <TableHead>Vendor</TableHead>
-                    <TableHead>Due</TableHead>
-                    <TableHead>Paying</TableHead>
+                    <TableHead className="text-right">Due</TableHead>
+                    <TableHead className="text-right">Paying</TableHead>
+                    <TableHead className="text-right">Remaining</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -430,8 +425,15 @@ export function SupplierBulkPaymentFormView({
                     <TableRow key={l.purchaseBillId}>
                       <TableCell>{l.billNumber}</TableCell>
                       <TableCell>{l.vendorName ?? "—"}</TableCell>
-                      <TableCell>{formatCurrencyAmount(l.balanceDue)}</TableCell>
-                      <TableCell>{formatCurrencyAmount(l.amount)}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrencyAmount(l.balanceDue)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrencyAmount(l.amount)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatCurrencyAmount(Math.max(0, l.balanceDue - l.amount))}
+                      </TableCell>
                       <TableCell>
                         <button
                           type="button"

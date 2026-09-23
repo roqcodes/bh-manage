@@ -77,7 +77,20 @@ export async function listErpInvoices(filters?: {
   if (filters?.dateTo) query = query.lte("created_at", `${filters.dateTo}T23:59:59`);
   if (filters?.search?.trim()) {
     const s = filters.search.trim();
-    query = query.ilike("invoice_number", `%${s}%`);
+    const { data: customerMatches } = await supabase
+      .from("users")
+      .select("id")
+      .or(
+        `name.ilike.%${s}%,email.ilike.%${s}%,phone.ilike.%${s}%,customer_number.ilike.%${s}%,company_name.ilike.%${s}%`,
+      )
+      .limit(50);
+
+    const customerIds = (customerMatches ?? []).map((row) => row.id);
+    if (customerIds.length > 0) {
+      query = query.or(`invoice_number.ilike.%${s}%,user_id.in.(${customerIds.join(",")})`);
+    } else {
+      query = query.ilike("invoice_number", `%${s}%`);
+    }
   }
 
   const { data, error, count } = await query;
