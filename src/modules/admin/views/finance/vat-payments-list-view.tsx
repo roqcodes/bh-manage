@@ -69,7 +69,7 @@ export function VatPaymentsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, debouncedSearch, activeStoreId]);
+  }, [page, storeId, debouncedSearch]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;

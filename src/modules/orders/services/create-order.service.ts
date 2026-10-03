@@ -4,7 +4,7 @@ import { getCurrentSessionProfile } from "@/modules/auth/services/auth.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 import { getCart } from "@/modules/cart/services/cart.service";
-import { buildOrderItemSnapshot } from "@/modules/orders/services/order-item-pricing.service";
+import { buildOrderItemSnapshots } from "@/modules/orders/services/order-item-pricing.service";
 import { commitOrderInventory } from "@/modules/orders/services/order-wallet-inventory.service";
 import { clearCart } from "@/modules/cart/services/cart.service";
 
@@ -88,14 +88,26 @@ export async function createOrderFromCart(
   }
 
   // Step 3: Build order line items with pricing
+  const qtyByVariant = new Map<string, number>();
+  for (const cartItem of cart.items) {
+    qtyByVariant.set(
+      cartItem.variant_id,
+      (qtyByVariant.get(cartItem.variant_id) ?? 0) + cartItem.quantity,
+    );
+  }
+  const snapshots = await buildOrderItemSnapshots(
+    [...qtyByVariant.entries()].map(([variantId, quantity]) => ({
+      variantId,
+      quantity,
+    })),
+  );
+
   const orderLineItems: OrderLineItem[] = [];
 
   for (const cartItem of cart.items) {
     try {
-      const snapshot = await buildOrderItemSnapshot({
-        variantId: cartItem.variant_id,
-        quantity: cartItem.quantity,
-      });
+      const snapshot = snapshots.get(cartItem.variant_id);
+      if (!snapshot) throw new Error("Variant or product not found.");
 
       orderLineItems.push({
         productId: snapshot.product_id,
@@ -226,15 +238,48 @@ export async function checkCartAvailability(): Promise<{
     reason?: string;
   }[] = [];
 
-  for (const cartItem of cart.items) {
-    const { data: availableStock, error: availErr } = await invokeRpc(
-      supabase,
-      "get_variant_online_available",
-      { p_variant_id: cartItem.variant_id },
-    );
-    if (availErr) throw new Error(availErr.message);
+  const variantIds = cart.items.map((c) => c.variant_id);
+  const { data: stockRows, error: availErr } = await invokeRpc(
+    supabase,
+    "get_variants_online_available",
+    { p_variant_ids: variantIds },
+  );
+  if (availErr) {
+    for (const cartItem of cart.items) {
+      const { data: availableStock, error: oneErr } = await invokeRpc(
+        supabase,
+        "get_variant_online_available",
+        { p_variant_id: cartItem.variant_id },
+      );
+      if (oneErr) throw new Error(oneErr.message);
+      const onlineStock = Math.max(0, Math.floor(Number(availableStock ?? 0)));
+      items.push({
+        variantId: cartItem.variant_id,
+        productName: cartItem.product?.name ?? "Unknown Product",
+        quantity: cartItem.quantity,
+        available: onlineStock >= cartItem.quantity,
+        reason:
+          onlineStock === 0
+            ? "Out of stock"
+            : onlineStock < cartItem.quantity
+              ? `Only ${onlineStock} available (requested ${cartItem.quantity})`
+              : undefined,
+      });
+    }
+    const allAvailable = items.every((item) => item.available);
+    return { available: allAvailable, items };
+  }
 
-    const onlineStock = Math.max(0, Math.floor(Number(availableStock ?? 0)));
+  const stockByVariant = new Map<string, number>();
+  for (const row of (stockRows ?? []) as { variant_id: string; available: number }[]) {
+    stockByVariant.set(
+      row.variant_id,
+      Math.max(0, Math.floor(Number(row.available ?? 0))),
+    );
+  }
+
+  for (const cartItem of cart.items) {
+    const onlineStock = stockByVariant.get(cartItem.variant_id) ?? 0;
 
     items.push({
       variantId: cartItem.variant_id,

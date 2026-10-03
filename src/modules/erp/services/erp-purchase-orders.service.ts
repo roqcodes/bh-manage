@@ -7,6 +7,7 @@ import type {
   ErpPurchaseOrderDetail,
   ErpPurchaseOrderLineDiscrepancy,
   ErpPurchaseOrderListRow,
+  ErpLandedCostLineInput,
 } from "@/common/erp/purchasing-types";
 import { matchPoLineToBillLine } from "@/common/erp/match-po-bill-line";
 import { roundMoney } from "@/common/erp/purchasing-types";
@@ -14,19 +15,55 @@ import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import { requireErpStoreId, resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
 
-function calcPoTotals(lines: ErpPurchaseLineInput[], discount: number) {
+function calcPoTotals(lines: ErpPurchaseLineInput[], landedCosts: ErpLandedCostLineInput[], discount: number) {
   let subtotal = 0;
   let tax = 0;
-  let total = 0;
+  let landedTotal = 0;
   for (const line of lines) {
     const taxable = roundMoney(line.quantity * line.purchasePrice);
     const lineTax = roundMoney(taxable * (line.taxRatePercent / 100));
     subtotal += taxable;
     tax += lineTax;
-    total += taxable + lineTax;
   }
-  total = Math.max(0, roundMoney(total - discount));
-  return { subtotal: roundMoney(subtotal), tax: roundMoney(tax), total };
+  for (const lc of landedCosts) {
+    const taxable = roundMoney(lc.quantity * lc.rate);
+    const lineTax = roundMoney(taxable * (lc.taxRatePercent / 100));
+    landedTotal += roundMoney(taxable + lineTax);
+  }
+  const total = roundMoney(Math.max(0, subtotal + tax - discount) + landedTotal);
+  return { subtotal: roundMoney(subtotal), tax: roundMoney(tax), landedTotal, total };
+}
+
+async function persistPoLandedCosts(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  poId: string,
+  landedCosts: ErpLandedCostLineInput[],
+) {
+  await supabase.from("purchase_order_landed_costs").delete().eq("po_id", poId);
+
+  if (landedCosts.length > 0) {
+    const rows = landedCosts.map((lc) => {
+      const taxable = roundMoney(lc.quantity * lc.rate);
+      const lineTax = roundMoney(taxable * (lc.taxRatePercent / 100));
+      return {
+        po_id: poId,
+        landed_cost_item_id: lc.landedCostItemId ?? null,
+        name: lc.name,
+        quantity: lc.quantity,
+        rate: lc.rate,
+        tax_rate_percent: lc.taxRatePercent,
+        tax_amount: lineTax,
+        line_total: roundMoney(taxable + lineTax),
+      };
+    });
+    const { error } = await supabase.from("purchase_order_landed_costs").insert(rows);
+    if (error) throw new Error(error.message);
+  }
+
+  const { error: refreshError } = await supabase.rpc("refresh_purchase_order_landed_allocations", {
+    p_po_id: poId,
+  });
+  if (refreshError) throw new Error(refreshError.message);
 }
 
 export async function listErpPurchaseOrders(options: {
@@ -108,16 +145,23 @@ export async function getErpPurchaseOrderDetail(poId: string): Promise<ErpPurcha
   if (error) throw new Error(error.message);
   if (!data) return null;
 
-  const { data: billRow } = await supabase
+  const { data: poLandedRows } = await supabase
+    .from("purchase_order_landed_costs")
+    .select("id, landed_cost_item_id, name, quantity, rate, tax_rate_percent")
+    .eq("po_id", poId);
+
+  const { data: billRows, error: billErr } = await supabase
     .from("erp_purchase_bills")
     .select(
-      "id, purchase_bill_number, status, accounting_posted, total_amount, erp_purchase_bill_lines(id, variant_id, product_id, product_name, original_quantity, quantity, accepted_qty)",
+      "id, purchase_bill_number, status, accounting_posted, total_amount, created_at, erp_purchase_bill_lines(id, variant_id, product_id, product_name, original_quantity, quantity, accepted_qty)",
     )
     .eq("po_id", poId)
     .neq("status", "cancelled")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
+  if (billErr) throw new Error(billErr.message);
+
+  const billRow =
+    (billRows ?? []).find((row) => row.status === "draft") ?? billRows?.[0] ?? null;
 
   const { data: receiveRow } = billRow
     ? await supabase
@@ -211,6 +255,14 @@ export async function getErpPurchaseOrderDetail(poId: string): Promise<ErpPurcha
       canSubmitDelivery,
     },
     discrepancies,
+    purchase_order_landed_costs: (poLandedRows ?? []).map((lc) => ({
+      id: lc.id as string,
+      landed_cost_item_id: lc.landed_cost_item_id as string | null,
+      name: lc.name as string,
+      quantity: Number(lc.quantity ?? 0),
+      rate: Number(lc.rate ?? 0),
+      tax_rate_percent: Number(lc.tax_rate_percent ?? 0),
+    })),
   } as ErpPurchaseOrderDetail;
 }
 
@@ -223,6 +275,7 @@ export async function createErpPurchaseOrder(input: {
   notes?: string | null;
   lines: ErpPurchaseLineInput[];
   discount?: number;
+  landedCosts?: ErpLandedCostLineInput[];
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -250,15 +303,27 @@ export async function createErpPurchaseOrder(input: {
 
   if (error) throw new Error(error.message);
 
+  const poId = data as string;
+  await persistPoLandedCosts(supabase, poId, input.landedCosts ?? []);
+
+  const totals = calcPoTotals(input.lines, input.landedCosts ?? [], input.discount ?? 0);
+  await supabase
+    .from("purchase_orders")
+    .update({
+      landed_cost_total: totals.landedTotal,
+      total_amount: totals.total,
+    })
+    .eq("id", poId);
+
   await logAuditEvent({
     action: "create",
     entityType: "purchase_order",
-    entityId: data as string,
+    entityId: poId,
     description: "ERP purchase order created",
     storeId,
   });
 
-  return data as string;
+  return poId;
 }
 
 export async function updateErpPurchaseOrder(
@@ -272,6 +337,7 @@ export async function updateErpPurchaseOrder(
     notes?: string | null;
     lines: ErpPurchaseLineInput[];
     discount?: number;
+    landedCosts?: ErpLandedCostLineInput[];
   },
 ): Promise<void> {
   await requireAdminOrManagerProfile();
@@ -290,7 +356,8 @@ export async function updateErpPurchaseOrder(
   if (!input.lines.length) throw new Error("At least one line item is required");
 
   const discount = input.discount ?? 0;
-  const totals = calcPoTotals(input.lines, discount);
+  const landedCosts = input.landedCosts ?? [];
+  const totals = calcPoTotals(input.lines, landedCosts, discount);
 
   const { error: updateError } = await supabase
     .from("purchase_orders")
@@ -304,6 +371,7 @@ export async function updateErpPurchaseOrder(
       discount,
       subtotal: totals.subtotal,
       tax_total: totals.tax,
+      landed_cost_total: totals.landedTotal,
       total_amount: totals.total,
       updated_at: new Date().toISOString(),
     })
@@ -336,6 +404,8 @@ export async function updateErpPurchaseOrder(
   const { error: insertError } = await supabase.from("purchase_order_items").insert(items);
   if (insertError) throw new Error(insertError.message);
 
+  await persistPoLandedCosts(supabase, poId, landedCosts);
+
   await logAuditEvent({
     action: "update",
     entityType: "purchase_order",
@@ -350,6 +420,8 @@ export async function submitPoDeliveryAndFinalize(input: {
   receiveDate?: string;
   notes?: string | null;
   lines: Array<{ poLineId: string; deliveredQty: number }>;
+  /** Safe retries (same key) return the original receive/bill without duplicating stock or GL. */
+  idempotencyKey?: string;
 }): Promise<{ receiveId: string; billId: string }> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -364,6 +436,7 @@ export async function submitPoDeliveryAndFinalize(input: {
     p_lines: linesJson,
     p_receive_date: input.receiveDate ?? new Date().toISOString().slice(0, 10),
     p_notes: input.notes ?? undefined,
+    p_idempotency_key: input.idempotencyKey ?? crypto.randomUUID(),
   });
 
   if (error) throw new Error(error.message);

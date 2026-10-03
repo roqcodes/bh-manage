@@ -73,7 +73,7 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
     icon: Warehouse,
     items: [
       { name: "Online Inventory", href: "/admin/inventory", icon: Warehouse, keywords: ["stock", "online", "transfers", "variants", "buyhub"] },
-      { name: "Stock Details", href: "/admin/erp/stock-details", icon: ClipboardList, keywords: ["physical stock", "store stock", "erp"] },
+      { name: "Store inventory", href: "/admin/erp/store-inventory", icon: ClipboardList, keywords: ["physical stock", "store stock", "erp", "store inventory", "wac"] },
       { name: "Stock Adjustments", href: "/admin/erp/stock-adjustments", icon: Layers, keywords: ["adjustment", "correction"] },
       { name: "Item Transactions", href: "/admin/erp/item-transactions", icon: ListOrdered, keywords: ["stock movements", "audit", "history"] },
       { name: "Store Transfers", href: "/admin/erp/store-transfers", icon: ArrowRightLeft, keywords: ["inter-store", "stock transfer", "dispatch"] },

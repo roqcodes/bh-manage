@@ -2,14 +2,29 @@ import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
-import { buildOrderItemSnapshot } from "@/modules/orders/services/order-item-pricing.service";
 import {
-  assignOrderFulfillmentStore,
-  shipOrderFulfillments,
-} from "@/modules/orders/services/order-wallet-inventory.service";
+  buildPosOrderItemSnapshots,
+  type OrderItemSnapshot,
+} from "@/modules/orders/services/order-item-pricing.service";
+import {
+  computeOrderMargin,
+  resolveListPrice,
+} from "@/modules/pricing/pricing.resolver";
 import { requireErpStoreId } from "@/modules/erp/services/store-context.service";
-import { notifyOrderStatusChange } from "@/modules/admin/services/push-notifications.service";
-import { convertOrderToInvoice } from "@/modules/erp/services/convert-order-to-invoice.service";
+import { mapPosCheckoutUserMessage } from "@/modules/orders/services/pos-checkout-errors";
+import { logPosCheckoutCommitted } from "@/modules/orders/services/pos-post-checkout.service";
+import { derivePosCheckoutHeaderTotals } from "@/modules/orders/services/pos-checkout-totals.service";
+import type { Json } from "@/lib/integrations/supabase/types";
+
+function resolvePosCartLinePrice(
+  snapshot: OrderItemSnapshot,
+  unitPriceOverride?: number,
+): number {
+  if (unitPriceOverride != null && Number.isFinite(unitPriceOverride)) {
+    return resolveListPrice(unitPriceOverride);
+  }
+  return snapshot.final_price;
+}
 
 export interface CreateManualOrderInput {
   userId?: string;
@@ -26,6 +41,8 @@ export interface CreateManualOrderInput {
     quantity: number;
     unitPrice?: number;
   }[];
+  /** Client-generated UUID; same key on safe retries prevents duplicate sales. */
+  idempotencyKey?: string;
 }
 
 export interface CreateManualOrderResult {
@@ -33,9 +50,11 @@ export interface CreateManualOrderResult {
   orderNumber: string;
   totalAmount: number;
   itemCount: number;
+  /** True when the same idempotency key was replayed (no duplicate sale). */
+  idempotentReplay: boolean;
 }
 
-/** Admin POS counter sale — creates an online order, fulfills immediately at the active store. */
+/** Admin POS counter sale — one atomic database transaction via `complete_pos_counter_sale`. */
 export async function createManualOrder(
   input: CreateManualOrderInput,
 ): Promise<CreateManualOrderResult> {
@@ -48,114 +67,113 @@ export async function createManualOrder(
     throw new Error("Cannot create a sale with no items");
   }
 
-  const orderLineItems = [];
+  if (!input.idempotencyKey) {
+    throw new Error(
+      mapPosCheckoutUserMessage(new Error("POS_CHECKOUT_INVALID: idempotency key is required")),
+    );
+  }
+  const idempotencyKey = input.idempotencyKey;
+
+  const qtyByVariant = new Map<string, number>();
   for (const item of input.items) {
-    const snapshot = await buildOrderItemSnapshot({
-      variantId: item.variantId,
-      quantity: item.quantity,
-      unitPriceOverride: item.unitPrice,
-    });
+    qtyByVariant.set(
+      item.variantId,
+      (qtyByVariant.get(item.variantId) ?? 0) + item.quantity,
+    );
+  }
+  const snapshots = await buildPosOrderItemSnapshots(
+    storeId,
+    [...qtyByVariant.entries()].map(([variantId, quantity]) => ({
+      variantId,
+      quantity,
+      unitPriceOverride: input.items.find((i) => i.variantId === variantId)?.unitPrice,
+    })),
+  );
 
-    orderLineItems.push({
-      productId: snapshot.product_id,
-      variantId: item.variantId,
+  const rpcLines: Json = [];
+  let itemCount = 0;
+
+  for (const item of input.items) {
+    const snapshot = snapshots.get(item.variantId);
+    if (!snapshot) throw new Error("Variant or product not found.");
+
+    itemCount += item.quantity;
+
+    const finalPrice = resolvePosCartLinePrice(snapshot, item.unitPrice);
+
+    (rpcLines as unknown[]).push({
+      variant_id: item.variantId,
+      product_id: snapshot.product_id,
       quantity: item.quantity,
-      vendorId: snapshot.vendor_id,
-      basePrice: snapshot.base_price,
-      finalPrice: snapshot.final_price,
-      marginAmount: snapshot.margin_amount,
-      productName: snapshot.product_name,
+      unit_price: finalPrice,
+      final_price: finalPrice,
+      base_price: snapshot.base_price,
+      margin_amount: computeOrderMargin(finalPrice, snapshot.base_price),
+      vendor_id: snapshot.vendor_id,
+      product_name: snapshot.product_name,
     });
   }
 
-  const finalTotalAmount = input.totalAmount;
-
-  const { data: orderData, error: orderError } = await supabase
-    .from("orders")
-    .insert({
-      user_id: input.userId ?? null,
-      address_id: null,
-      total_amount: finalTotalAmount,
-      status: "processing",
-      payment_status: "paid",
-      customer_name: input.customerName || null,
-      phone: input.phone || null,
-      company: input.company || null,
-      gst_number: input.gstNumber || null,
-      source: "online",
-      store_id: storeId,
-      subtotal: input.subtotal,
-      tax: input.tax,
-      discount: input.discount,
-      merchant_note: "POS counter sale",
-      created_by_admin_id: auth.profile.id,
-    })
-    .select("id")
-    .single();
-
-  if (orderError) {
-    throw new Error(`Failed to create order: ${orderError.message}`);
-  }
-
-  const orderId = orderData.id;
-
-  const orderItemsInsert = orderLineItems.map((item) => ({
-    order_id: orderId,
-    product_id: item.productId,
-    variant_id: item.variantId,
-    quantity: item.quantity,
-    price: item.finalPrice,
-    vendor_id: item.vendorId || null,
-    base_price: item.basePrice,
-    final_price: item.finalPrice,
-    margin_amount: item.marginAmount,
-    product_name: item.productName,
+  const pricedLines = (rpcLines as unknown as {
+    final_price: number;
+    quantity: number;
+  }[]).map((line) => ({
+    finalPrice: line.final_price,
+    quantity: line.quantity,
   }));
 
-  const { error: itemsError } = await supabase
-    .from("order_items")
-    .insert(orderItemsInsert);
+  const headerTotals = derivePosCheckoutHeaderTotals(
+    pricedLines,
+    input.tax,
+    input.discount,
+  );
 
-  if (itemsError) {
-    await supabase.from("orders").delete().eq("id", orderId);
-    throw new Error(`Failed to insert order items: ${itemsError.message}`);
+  const { data, error } = await supabase.rpc("complete_pos_counter_sale", {
+    p_idempotency_key: idempotencyKey,
+    p_store_id: storeId,
+    p_lines: rpcLines,
+    p_subtotal: headerTotals.subtotal,
+    p_tax: headerTotals.tax,
+    p_discount: headerTotals.discount,
+    p_total_amount: headerTotals.totalAmount,
+    p_customer_user_id: input.userId ?? undefined,
+    p_customer_name: input.customerName ?? undefined,
+    p_phone: input.phone ?? undefined,
+    p_company: input.company ?? undefined,
+    p_gst_number: input.gstNumber ?? undefined,
+    p_created_by: auth.profile.id,
+  });
+
+  if (error) {
+    throw new Error(mapPosCheckoutUserMessage(error));
   }
 
-  try {
-    await assignOrderFulfillmentStore(orderId, storeId);
-    await shipOrderFulfillments(orderId);
-    const { error: finalizeError } = await supabase
-      .from("orders")
-      .update({
-        status: "delivered",
-        fulfillment_status: "shipped",
-        inventory_committed: true,
-      })
-      .eq("id", orderId);
-    if (finalizeError) throw new Error(finalizeError.message);
-  } catch (invErr) {
-    await supabase.from("order_items").delete().eq("order_id", orderId);
-    await supabase.from("orders").delete().eq("id", orderId);
-    throw invErr instanceof Error
-      ? invErr
-      : new Error("Failed to fulfill POS sale");
+  const payload = data as {
+    order_id?: string;
+    total_amount?: number;
+    item_count?: number;
+    idempotent_replay?: boolean;
+  } | null;
+
+  const orderId = payload?.order_id;
+  if (!orderId) {
+    throw new Error(mapPosCheckoutUserMessage(new Error("POS_CHECKOUT_INVALID: missing order")));
   }
 
-  try {
-    await convertOrderToInvoice(orderId);
-  } catch (invoiceErr) {
-    console.error("[createManualOrder] invoice conversion failed:", invoiceErr);
-    throw invoiceErr instanceof Error
-      ? invoiceErr
-      : new Error("Sale completed but invoice could not be created");
-  }
+  const idempotentReplay = Boolean(payload?.idempotent_replay);
 
-  await notifyOrderStatusChange(orderId, "delivered").catch(() => undefined);
+  logPosCheckoutCommitted({
+    orderId,
+    storeId,
+    actorId: auth.profile.id,
+    idempotentReplay,
+  });
 
   return {
     orderId,
     orderNumber: orderId.slice(0, 8).toUpperCase(),
-    totalAmount: finalTotalAmount,
-    itemCount: orderLineItems.reduce((sum, item) => sum + item.quantity, 0),
+    totalAmount: Number(payload?.total_amount ?? input.totalAmount),
+    itemCount: Number(payload?.item_count ?? itemCount),
+    idempotentReplay,
   };
 }

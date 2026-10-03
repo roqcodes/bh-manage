@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
+  Bot,
   Headphones,
   Keyboard,
   LogOut,
@@ -13,6 +14,8 @@ import {
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
+import { useAiAssistantPreference } from "@/modules/ai-assistant";
 import { cn } from "@/lib/utils";
 import { useAdminSession } from "@/modules/admin/providers/admin-session-provider";
 import { signOutAction } from "@/modules/auth/actions/auth.actions";
@@ -149,6 +152,8 @@ function ProfileMenuButton({
 
 export function AdminProfileMenu() {
   const profile = useAdminSession();
+  const { enabled: aiAssistantEnabled, setEnabled: setAiAssistantEnabled } =
+    useAiAssistantPreference();
   const isMd = useIsMdUp();
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -251,6 +256,32 @@ export function AdminProfileMenu() {
                   <p className="mt-1 truncate text-xs text-slate-500">{profile.email}</p>
                 ) : null}
               </div>
+            </div>
+
+            <div
+              className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200/70 bg-white/90 px-3 py-2.5 shadow-sm"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span
+                  className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+                  aria-hidden
+                >
+                  <Bot className="size-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-900">AI Assistant</p>
+                  <p className="text-[10px] leading-snug text-slate-500">
+                    Orb, chat & on-screen guide
+                  </p>
+                </div>
+              </div>
+              <Switch
+                size="sm"
+                checked={aiAssistantEnabled}
+                onCheckedChange={setAiAssistantEnabled}
+                aria-label="Enable AI Assistant"
+              />
             </div>
           </div>
 

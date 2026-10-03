@@ -33,12 +33,10 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  if (
-    pathname === AUTH_ROUTES.signIn ||
-    pathname === AUTH_ROUTES.signUp
-  ) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
+  // Do not redirect signed-in users away from sign-in / sign-up here. That caused
+  // an auth storm when a session existed without a public.users row (failed staff
+  // sign-up): middleware sent them to "/", and "/" sent them back to sign-in.
+  // Server pages use redirectAuthenticatedUsersFromAuth() once a profile exists.
 
   // Recovery sessions land on reset-password; keep users there until they finish.
   if (
@@ -52,5 +50,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|_next/webpack-hmr|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };

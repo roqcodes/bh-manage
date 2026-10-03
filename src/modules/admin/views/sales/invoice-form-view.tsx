@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -24,7 +25,9 @@ import {
   emptySalesLine,
   salesLinesToApiInput,
 } from "@/modules/erp/components/sales-lines-editor";
-import { validateSalesLinesStoreStock } from "@/modules/erp/lib/sales-line-stock-validation";
+import { getSalesLinesStockFeedback } from "@/modules/erp/lib/sales-line-stock-validation";
+import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import type { CurrencySettings } from "@/lib/format-currency";
 import type { LineProductContextMap } from "@/common/erp/line-product-context";
 import {
   ActiveStoreFormField,
@@ -55,7 +58,16 @@ export function InvoiceFormView({
     useActiveStoreFormField({ mode });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [stockWarning, setStockWarning] = useState<string | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(mode === "edit");
+
+  const { data: appSettings } = useQuery({
+    queryKey: adminQueryKeys.appSettings(),
+    queryFn: () =>
+      adminGet<{ settings: CurrencySettings }>("settings").then((r) => r.settings),
+    staleTime: 60_000,
+  });
+  const allowNegativeStoreStock = appSettings?.allow_negative_store_stock ?? false;
   const isModal = variant === "modal";
 
   const [customerId, setCustomerId] = useState("");
@@ -158,6 +170,7 @@ export function InvoiceFormView({
 
   function handleSubmit(finalize: boolean) {
     setError(null);
+    setStockWarning(null);
     if (!customerId) {
       setError("Customer is required");
       return;
@@ -186,10 +199,17 @@ export function InvoiceFormView({
             const stockCtx = await adminGet<{ data: LineProductContextMap }>(
               `erp/line-product-context?storeId=${encodeURIComponent(effectiveStoreId)}&productIds=${productIds.join(",")}`,
             );
-            const stockError = validateSalesLinesStoreStock(lines, stockCtx.data ?? {});
-            if (stockError) {
-              setError(stockError);
+            const feedback = getSalesLinesStockFeedback(
+              lines,
+              stockCtx.data ?? {},
+              allowNegativeStoreStock,
+            );
+            if (feedback.blocking) {
+              setError(feedback.blocking);
               return;
+            }
+            if (feedback.warning) {
+              setStockWarning(feedback.warning);
             }
           } else if (apiLines.some((line) => !line.productId)) {
             setError("Each line must be linked to a product (use product search) before issuing.");
@@ -368,6 +388,9 @@ export function InvoiceFormView({
             />
           </AdminFormSection>
 
+          {stockWarning ? (
+            <p className="text-sm text-amber-700 dark:text-amber-400">{stockWarning}</p>
+          ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           {!isModal ? (

@@ -24,6 +24,9 @@ import {
   AdminTableHeader,
   AdminTableLink,
   AdminTableRow,
+  ErpDocumentTableGlance,
+  ErpStoreTableGlance,
+  ErpVendorTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useErpFormModal,
@@ -90,7 +93,7 @@ export function PurchaseBillsListView() {
         setLoadError(error instanceof Error ? error.message : "Failed to load purchase bills");
       })
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, dateFrom, dateTo, reloadToken, listParams, activeStoreId]);
+  }, [page, debouncedSearch, status, dateFrom, dateTo, reloadToken, listParams]);
 
   function handleCancel(id: string) {
     startCancel(async () => {
@@ -220,18 +223,24 @@ export function PurchaseBillsListView() {
                 <AdminTableRow key={r.id}>
                   <AdminTableCell>{r.purchase_date}</AdminTableCell>
                   <AdminTableCell>
-                    <AdminTableLink href={`/admin/erp/purchase-bills/${r.id}`}>
-                      {displayErpDocumentNumber(r.purchase_bill_number, "PB", r.id)}
-                    </AdminTableLink>
+                    <ErpDocumentTableGlance
+                      triggerLabel={displayErpDocumentNumber(r.purchase_bill_number, "PB", r.id)}
+                      shellLabel="Purchase bill"
+                      title={
+                        r.purchase_bill_number?.trim() ||
+                        displayErpDocumentNumber(r.purchase_bill_number, "PB", r.id)
+                      }
+                      subtitle={r.vendor_name ?? undefined}
+                      viewHref={`/admin/erp/purchase-bills/${r.id}`}
+                      viewLabel="View purchase bill →"
+                      stats={[
+                        { label: "Total", value: formatCurrencyAmount(r.total_amount) },
+                        { label: "Balance", value: formatCurrencyAmount(r.balance_due) },
+                      ]}
+                    />
                   </AdminTableCell>
                   <AdminTableCell>
-                    {r.store_id && r.store_name ? (
-                      <AdminTableLink href={`/admin/erp/stores/${r.store_id}/edit`}>
-                        {r.store_name}
-                      </AdminTableLink>
-                    ) : (
-                      (r.store_name ?? "—")
-                    )}
+                    <ErpStoreTableGlance storeId={r.store_id} name={r.store_name} />
                   </AdminTableCell>
                   <AdminTableCell>
                     {r.po_id ? (
@@ -243,13 +252,13 @@ export function PurchaseBillsListView() {
                     )}
                   </AdminTableCell>
                   <AdminTableCell>
-                    {r.vendor_id && r.vendor_name ? (
-                      <AdminTableLink href={`/admin/vendors/${r.vendor_id}/erp`}>
-                        {r.vendor_name}
-                      </AdminTableLink>
-                    ) : (
-                      (r.vendor_name ?? "—")
-                    )}
+                    <ErpVendorTableGlance
+                      vendorId={r.vendor_id}
+                      name={r.vendor_name}
+                      stats={[
+                        { label: "Balance", value: formatCurrencyAmount(r.balance_due) },
+                      ]}
+                    />
                   </AdminTableCell>
                   <AdminTableCell>
                     <StatusBadge status={r.display_status} />

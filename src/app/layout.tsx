@@ -8,6 +8,7 @@ import {
 import { AppProviders } from "@/modules/admin/components/app-providers";
 import { NavigationProgress } from "@/modules/navigation/components/navigation-progress";
 import { GlobalTopProgressBar } from "@/modules/navigation/components/global-top-progress-bar";
+import { AiAssistantRoot } from "@/modules/ai-assistant";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,9 +41,11 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full overflow-hidden`}
     >
       <body className="h-full overflow-hidden bg-background font-sans text-foreground">
-        <NavigationProgress />
-        <GlobalTopProgressBar />
-        <AppProviders>{children}</AppProviders>
+        <AiAssistantRoot>
+          <NavigationProgress />
+          <GlobalTopProgressBar />
+          <AppProviders>{children}</AppProviders>
+        </AiAssistantRoot>
       </body>
     </html>
   );

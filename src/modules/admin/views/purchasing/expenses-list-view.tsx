@@ -23,8 +23,11 @@ import {
   AdminTableBody,
   AdminTableCell,
   AdminTableHeader,
-  AdminTableLink,
   AdminTableRow,
+  ErpCustomerTableGlance,
+  ErpDocumentTableGlance,
+  ErpStoreTableGlance,
+  ErpVendorTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useDebouncedValue,
@@ -78,7 +81,7 @@ export function ExpensesListView() {
     adminGet<{ data: Array<{ id: string; name: string }> }>(`erp/expenses${q}`).then((res) =>
       setExpenseAccounts(res.data),
     );
-  }, [storeId, activeStoreId]);
+  }, [storeId]);
 
   useEffect(() => {
     setLoading(true);
@@ -98,7 +101,7 @@ export function ExpensesListView() {
         setTotalAmount(res.totalAmount);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, period, accountId, debouncedSearch, reloadToken, activeStoreId]);
+  }, [page, storeId, period, accountId, debouncedSearch, reloadToken]);
 
   const accountOptions = useMemo(
     () => [
@@ -248,31 +251,27 @@ export function ExpensesListView() {
                   {formatDisplayDate(row.expense_date)}
                 </AdminTableCell>
                 <AdminTableCell className="max-w-[140px] truncate text-sm">
-                  {row.store_id && row.store_name ? (
-                    <AdminTableLink href={`/admin/erp/stores/${row.store_id}/edit`}>
-                      {row.store_name}
-                    </AdminTableLink>
-                  ) : (
-                    (row.store_name ?? "—")
-                  )}
+                  <ErpStoreTableGlance storeId={row.store_id} name={row.store_name} />
                 </AdminTableCell>
                 <AdminTableCell>{row.account_name ?? "—"}</AdminTableCell>
                 <AdminTableCell className="hidden max-w-[160px] truncate md:table-cell">
-                  <AdminTableLink
-                    href={`/admin/erp/expenses/${row.id}`}
-                    title={row.expense_number}
-                  >
-                    {formatErpDocRef("EXP", row.id)}
-                  </AdminTableLink>
+                  <ErpDocumentTableGlance
+                    triggerLabel={formatErpDocRef("EXP", row.id)}
+                    shellLabel="Expense"
+                    title={row.expense_number?.trim() || formatErpDocRef("EXP", row.id)}
+                    viewHref={`/admin/erp/expenses/${row.id}`}
+                    viewLabel="View expense →"
+                    stats={[{ label: "Amount", value: formatCurrencyAmount(row.total_amount) }]}
+                  />
                 </AdminTableCell>
-                <AdminTableCell className="hidden text-muted-foreground lg:table-cell">
-                  {row.vendor_name ?? "—"}
+                <AdminTableCell className="hidden lg:table-cell">
+                  <ErpVendorTableGlance name={row.vendor_name} />
                 </AdminTableCell>
                 <AdminTableCell className="text-sm text-muted-foreground">
                   {row.paid_through_name ?? "—"}
                 </AdminTableCell>
-                <AdminTableCell className="hidden text-muted-foreground xl:table-cell">
-                  {row.customer_name ?? "—"}
+                <AdminTableCell className="hidden xl:table-cell">
+                  <ErpCustomerTableGlance name={row.customer_name} />
                 </AdminTableCell>
                 <AdminTableCell align="right" className="font-semibold tabular-nums">
                   {formatCurrencyAmount(row.total_amount)}

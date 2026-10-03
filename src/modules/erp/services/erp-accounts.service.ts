@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 import type { AccountListRow, AccountTypeRow } from "@/common/erp/finance-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
 import {
@@ -155,15 +156,33 @@ export async function listAccounts(
   const { data, error, count } = await query.range(from, from + limit - 1);
   if (error) throw new Error(error.message);
 
+  const balanceByAccount = new Map<string, number>();
+  if (filters.includeBalance && (data ?? []).length > 0) {
+    const ids = (data ?? []).map((row) => row.id as string);
+    const { data: balRows, error: balErr } = await invokeRpc(
+      supabase,
+      "get_account_balances",
+      { p_account_ids: ids },
+    );
+    if (balErr) {
+      for (const id of ids) {
+        const { data: bal } = await supabase.rpc("get_account_balance", {
+          p_account_id: id,
+        });
+        balanceByAccount.set(id, Number(bal ?? 0));
+      }
+    } else {
+      for (const row of (balRows ?? []) as { account_id: string; balance: number }[]) {
+        balanceByAccount.set(row.account_id, Number(row.balance ?? 0));
+      }
+    }
+  }
+
   const rows: AccountListRow[] = [];
   for (const row of data ?? []) {
-    let balance = 0;
-    if (filters.includeBalance) {
-      const { data: bal } = await supabase.rpc("get_account_balance", {
-        p_account_id: row.id,
-      });
-      balance = Number(bal ?? 0);
-    }
+    const balance = filters.includeBalance
+      ? (balanceByAccount.get(row.id as string) ?? 0)
+      : 0;
     rows.push(mapAccountRow(row as Record<string, unknown>, balance));
   }
 

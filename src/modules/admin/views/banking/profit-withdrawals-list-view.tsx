@@ -69,7 +69,7 @@ export function ProfitWithdrawalsListView() {
     adminGet<{ data: BankingAccountRow[] }>(`erp/banking${q}`).then((res) =>
       setAccounts(res.data ?? []),
     );
-  }, [storeId, activeStoreId]);
+  }, [storeId]);
 
   useEffect(() => {
     setLoading(true);
@@ -86,7 +86,7 @@ export function ProfitWithdrawalsListView() {
         setRows(res.data ?? []);
       })
       .finally(() => setLoading(false));
-  }, [storeId, accountId, period, debouncedSearch, reloadToken, activeStoreId]);
+  }, [storeId, accountId, period, debouncedSearch, reloadToken]);
 
   const amountTotal = useMemo(
     () => sorted.reduce((sum, row) => sum + row.amount, 0),

@@ -6,6 +6,8 @@ export type CurrencySettings = {
   locale: string;
   show_mrp: boolean;
   capture_payments: boolean;
+  /** ERP sales may drive store_product_inventory below zero when true. */
+  allow_negative_store_stock: boolean;
 };
 
 export const DEFAULT_CURRENCY_SETTINGS: CurrencySettings = {
@@ -16,6 +18,7 @@ export const DEFAULT_CURRENCY_SETTINGS: CurrencySettings = {
   locale: "en-IN",
   show_mrp: true,
   capture_payments: true,
+  allow_negative_store_stock: false,
 };
 
 /** Official Saudi Riyal sign (U+20C1). */

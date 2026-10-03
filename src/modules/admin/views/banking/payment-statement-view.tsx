@@ -62,7 +62,7 @@ export function PaymentStatementView() {
     adminGet<{ data: BankingAccountRow[] }>(`erp/banking${q}`).then((res) =>
       setAccounts(res.data ?? []),
     );
-  }, [storeId, activeStoreId]);
+  }, [storeId]);
 
   useEffect(() => {
     setLoading(true);
@@ -85,7 +85,7 @@ export function PaymentStatementView() {
         setTotals(res.totals ?? { debit: 0, credit: 0, balance: 0 });
       })
       .finally(() => setLoading(false));
-  }, [storeId, accountId, period, search, activeStoreId]);
+  }, [storeId, accountId, period, search]);
 
   const selectedStoreLabel = useMemo(
     () => stores.find((s) => s.id === storeId)?.name ?? "Selected store",

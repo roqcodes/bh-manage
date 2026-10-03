@@ -100,7 +100,7 @@ export function VatReturnsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, debouncedSearch, reloadToken, activeStoreId]);
+  }, [page, storeId, debouncedSearch, reloadToken]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;

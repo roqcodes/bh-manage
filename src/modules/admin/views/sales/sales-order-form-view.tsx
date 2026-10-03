@@ -1,12 +1,17 @@
 "use client";
 
 import { useId, useMemo, useState, useTransition } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import type { SalesLineFormRow } from "@/common/erp/sales-types";
 import { calcSalesLine, roundSalesMoney } from "@/common/erp/sales-types";
-import { adminPost } from "@/modules/admin/lib/admin-api-client";
+import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
+import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import type { CurrencySettings } from "@/lib/format-currency";
+import type { LineProductContextMap } from "@/common/erp/line-product-context";
+import { getSalesLinesStockFeedback } from "@/modules/erp/lib/sales-line-stock-validation";
 import {
   AdminFormActions,
   AdminFormField,
@@ -46,7 +51,16 @@ export function SalesOrderFormView({
     useActiveStoreFormField({ mode: "create" });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [stockWarning, setStockWarning] = useState<string | null>(null);
   const isModal = variant === "modal";
+
+  const { data: appSettings } = useQuery({
+    queryKey: adminQueryKeys.appSettings(),
+    queryFn: () =>
+      adminGet<{ settings: CurrencySettings }>("settings").then((r) => r.settings),
+    staleTime: 60_000,
+  });
+  const allowNegativeStoreStock = appSettings?.allow_negative_store_stock ?? false;
 
   const [customerId, setCustomerId] = useState("");
   const [customerLabel, setCustomerLabel] = useState("");
@@ -95,6 +109,7 @@ export function SalesOrderFormView({
 
   function handleSubmit() {
     setError(null);
+    setStockWarning(null);
     if (!customerId) {
       setError("Customer is required");
       return;
@@ -123,6 +138,27 @@ export function SalesOrderFormView({
 
     startTransition(async () => {
       try {
+        const productIds = [
+          ...new Set(items.map((i) => i.productId).filter(Boolean)),
+        ];
+        if (productIds.length > 0 && effectiveStoreId) {
+          const stockCtx = await adminGet<{ data: LineProductContextMap }>(
+            `erp/line-product-context?storeId=${encodeURIComponent(effectiveStoreId)}&productIds=${productIds.join(",")}`,
+          );
+          const feedback = getSalesLinesStockFeedback(
+            lines,
+            stockCtx.data ?? {},
+            allowNegativeStoreStock,
+          );
+          if (feedback.blocking) {
+            setError(feedback.blocking);
+            return;
+          }
+          if (feedback.warning) {
+            setStockWarning(feedback.warning);
+          }
+        }
+
         const res = await adminPost<{ orderId: string; salesOrderNumber: string }>(
           "erp/sales-orders",
           {
@@ -295,6 +331,9 @@ export function SalesOrderFormView({
             />
           </AdminFormSection>
 
+          {stockWarning ? (
+            <p className="text-sm text-amber-700 dark:text-amber-400">{stockWarning}</p>
+          ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           {!isModal ? (

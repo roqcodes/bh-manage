@@ -1,8 +1,10 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
+
 import { getCurrentSessionProfile } from "@/modules/auth/services/auth.service";
+import { PUBLIC_CATALOG_CACHE_TAG } from "@/lib/cache/public-catalog-cache";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
-import { cache } from "react";
 
 export interface MarketplaceProduct {
   id: string;
@@ -55,11 +57,7 @@ export interface MarketplaceCategory {
 
 const PAGE_SIZE = 20;
 
-/**
- * Get public product catalog (active products only).
- * No auth required - public endpoint.
- */
-export async function getMarketplaceProducts(page = 0): Promise<{
+async function loadMarketplaceProductsPage(page: number): Promise<{
   data: MarketplaceProduct[];
   total: number;
   hasMore: boolean;
@@ -125,6 +123,26 @@ export async function getMarketplaceProducts(page = 0): Promise<{
     total: countResult.count || 0,
     hasMore: from + products.length < (countResult.count || 0),
   };
+}
+
+/**
+ * Get public product catalog (active products only).
+ * Cached briefly for read load; checkout/POS never use this for stock authority.
+ */
+export async function getMarketplaceProducts(page = 0): Promise<{
+  data: MarketplaceProduct[];
+  total: number;
+  hasMore: boolean;
+}> {
+  const safePage = Math.max(0, Math.floor(page));
+  return unstable_cache(
+    () => loadMarketplaceProductsPage(safePage),
+    ["marketplace-products-page", String(safePage)],
+    {
+      tags: [PUBLIC_CATALOG_CACHE_TAG],
+      revalidate: 60,
+    },
+  )();
 }
 
 /**
@@ -195,11 +213,7 @@ export async function getMarketplaceProductById(
   };
 }
 
-/**
- * Get all active categories with product counts.
- * Cached for performance.
- */
-export const getMarketplaceCategories = cache(async (): Promise<MarketplaceCategory[]> => {
+async function loadMarketplaceCategoriesFromDb(): Promise<MarketplaceCategory[]> {
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
@@ -230,7 +244,19 @@ export const getMarketplaceCategories = cache(async (): Promise<MarketplaceCateg
     image_url: c.image_url,
     product_count: c.products?.length || 0,
   })) as MarketplaceCategory[];
-});
+}
+
+/** Category tree for public storefront (revalidated on catalog mutations). */
+export async function getMarketplaceCategories(): Promise<MarketplaceCategory[]> {
+  return unstable_cache(
+    loadMarketplaceCategoriesFromDb,
+    ["marketplace-categories"],
+    {
+      tags: [PUBLIC_CATALOG_CACHE_TAG],
+      revalidate: 120,
+    },
+  )();
+}
 
 /**
  * Search products by name or description.

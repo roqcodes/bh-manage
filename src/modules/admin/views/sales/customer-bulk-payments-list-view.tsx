@@ -24,8 +24,9 @@ import {
   AdminTableBody,
   AdminTableCell,
   AdminTableHeader,
-  AdminTableLink,
   AdminTableRow,
+  ErpDocumentTableGlance,
+  ErpStoreTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useDebouncedValue,
@@ -88,7 +89,7 @@ export function CustomerBulkPaymentsListView() {
         setTotalAmount(res.totalAmount);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, period, debouncedSearch, reloadToken, activeStoreId]);
+  }, [page, storeId, period, debouncedSearch, reloadToken]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
@@ -238,15 +239,24 @@ export function CustomerBulkPaymentsListView() {
             {sorted.map((row) => (
               <AdminTableRow key={row.batch_id}>
                 <AdminTableCell>
-                  <AdminTableLink href={`/admin/erp/customer-bulk-payments/${encodeURIComponent(row.batch_id)}`}>
-                    {formatErpDocRef("CPM", row.batch_id)}
-                  </AdminTableLink>
+                  <ErpDocumentTableGlance
+                    triggerLabel={formatErpDocRef("CPM", row.batch_id)}
+                    shellLabel="Customer bulk payment"
+                    title={formatErpDocRef("CPM", row.batch_id)}
+                    subtitle={`${row.customer_count} customers · ${row.invoices_count} invoices`}
+                    viewHref={`/admin/erp/customer-bulk-payments/${encodeURIComponent(row.batch_id)}`}
+                    viewLabel="View batch →"
+                    stats={[
+                      { label: "Total", value: formatCurrencyAmount(row.total_amount) },
+                      { label: "Mode", value: paymentModeLabel(row.payment_mode) },
+                    ]}
+                  />
                 </AdminTableCell>
                 <AdminTableCell className="tabular-nums text-muted-foreground">
                   {formatDisplayDate(row.payment_date)}
                 </AdminTableCell>
-                <AdminTableCell className="max-w-[140px] truncate">
-                  {row.store_name ?? "—"}
+                <AdminTableCell className="max-w-[140px]">
+                  <ErpStoreTableGlance storeId={row.store_id} name={row.store_name} />
                 </AdminTableCell>
                 <AdminTableCell align="right" className="font-semibold tabular-nums">
                   {formatCurrencyAmount(row.total_amount)}

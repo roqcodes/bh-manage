@@ -35,7 +35,7 @@ import {
   SalesPageHeader,
   SalesPageLayout,
 } from "@/modules/erp/components/sales-module-ui";
-import { SortableTableHead, useErpFormModal, useSortableData } from "@/modules/admin/ui";
+import { SortableTableHead, useErpFormModal, useSortableData, ErpCustomerTableGlance, ErpDocumentTableGlance, ErpStoreTableGlance } from "@/modules/admin/ui";
 import { EstimateFormView } from "@/modules/admin/views/sales/estimate-form-view";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
@@ -148,17 +148,21 @@ export function AdminErpEstimatesView() {
             {sorted.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="font-medium">
-                  <Link
-                    href={`/admin/erp/estimates/${row.id}`}
-                    className="hover:text-primary hover:underline"
-                    title={row.estimate_number}
-                  >
-                    {formatErpDocRef("EST", row.id)}
-                  </Link>
+                  <ErpDocumentTableGlance
+                    triggerLabel={formatErpDocRef("EST", row.id)}
+                    shellLabel="Estimate"
+                    title={row.estimate_number?.trim() || formatErpDocRef("EST", row.id)}
+                    subtitle={row.customer_name ?? undefined}
+                    viewHref={`/admin/erp/estimates/${row.id}`}
+                    viewLabel="View estimate →"
+                    stats={[{ label: "Total", value: formatCurrencyAmount(row.total_amount) }]}
+                  />
                 </TableCell>
-                <TableCell>{row.customer_name ?? "—"}</TableCell>
-                <TableCell className="hidden text-muted-foreground md:table-cell">
-                  {row.store_name ?? "—"}
+                <TableCell>
+                  <ErpCustomerTableGlance userId={row.user_id} name={row.customer_name} />
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <ErpStoreTableGlance storeId={row.store_id} name={row.store_name} />
                 </TableCell>
                 <TableCell>
                   <StatusBadge status={row.status} />
@@ -322,12 +326,22 @@ export function AdminErpPaymentsView() {
           <TableBody>
             {sorted.map((row) => (
               <TableRow key={row.id}>
-                <TableCell className="font-medium" title={row.payment_number}>
-                  {formatErpDocRef("PR", row.id)}
+                <TableCell className="font-medium">
+                  <ErpDocumentTableGlance
+                    triggerLabel={formatErpDocRef("PR", row.id)}
+                    shellLabel="Payment"
+                    title={row.payment_number?.trim() || formatErpDocRef("PR", row.id)}
+                    subtitle={row.customer_name ?? undefined}
+                    viewHref={`/admin/erp/payments/${row.id}`}
+                    viewLabel="View payment →"
+                    stats={[{ label: "Amount", value: formatCurrencyAmount(row.total_amount) }]}
+                  />
                 </TableCell>
-                <TableCell>{row.customer_name ?? "—"}</TableCell>
-                <TableCell className="hidden text-muted-foreground md:table-cell">
-                  {row.store_name ?? "—"}
+                <TableCell>
+                  <ErpCustomerTableGlance userId={row.user_id} name={row.customer_name} />
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <ErpStoreTableGlance storeId={row.store_id} name={row.store_name} />
                 </TableCell>
                 <TableCell className="capitalize">{row.payment_mode}</TableCell>
                 <TableCell className="text-right font-semibold tabular-nums">

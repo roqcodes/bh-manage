@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Package, Plus, Search, Trash2 } from "lucide-react";
 
@@ -30,6 +30,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CustomerSearchSelect, SortableTableHead, useSortableData } from "@/modules/admin/ui";
+import { useSearchListKeyboard } from "@/modules/admin/ui/use-search-list-keyboard";
+import { cn } from "@/lib/utils";
 import { BillingMetricsBar } from "@/modules/billing/components/billing-metrics-bar";
 import {
   formatBillingInr,
@@ -61,6 +63,9 @@ export function BillingPanel() {
   const [company, setCompany] = useState("");
   const [gstNumber, setGstNumber] = useState("");
 
+  const checkoutIdempotencyKeyRef = useRef<string | null>(null);
+  const productListboxId = useId();
+  const [productSearchFocused, setProductSearchFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{
     type: "success" | "error";
@@ -133,6 +138,32 @@ export function BillingPanel() {
     });
   }
 
+  const productKeyboardCount =
+    productSearchFocused && !isSearching && searchResults.length > 0
+      ? searchResults.length
+      : 0;
+
+  const selectProductAt = useCallback(
+    (index: number) => {
+      const item = searchResults[index];
+      if (!item || item.stock <= 0) return;
+      addToCart(item);
+    },
+    [searchResults],
+  );
+
+  const {
+    activeIndex: activeProductIndex,
+    setActiveIndex: setActiveProductIndex,
+    registerItemRef: registerProductRef,
+    handleKeyDown: handleProductSearchKeyDown,
+  } = useSearchListKeyboard({
+    open: productSearchFocused,
+    itemCount: productKeyboardCount,
+    onSelectIndex: selectProductAt,
+    onClose: () => setProductSearchFocused(false),
+  });
+
   function updateCartItem(variantId: string, updates: Partial<CartItem>) {
     setCart((prev) =>
       prev.map((item) => {
@@ -162,6 +193,7 @@ export function BillingPanel() {
     setCompany("");
     setGstNumber("");
     setSubmitMessage(null);
+    checkoutIdempotencyKeyRef.current = null;
   }
 
   async function handleSaveInvoice() {
@@ -174,7 +206,12 @@ export function BillingPanel() {
     setSubmitMessage(null);
 
     try {
+      if (!checkoutIdempotencyKeyRef.current) {
+        checkoutIdempotencyKeyRef.current = crypto.randomUUID();
+      }
+
       const payload = {
+        idempotencyKey: checkoutIdempotencyKeyRef.current,
         userId: customerId ?? undefined,
         customerName: customerId ? undefined : customerName || undefined,
         phone,
@@ -198,17 +235,23 @@ export function BillingPanel() {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to save sale");
+        const errorData = (await res.json()) as { error?: string };
+        throw new Error(
+          errorData.error || "This sale couldn't be completed. Please try again.",
+        );
       }
 
       const data = (await res.json()) as { orderId: string };
+      checkoutIdempotencyKeyRef.current = null;
       setSubmitMessage({ type: "success", text: "Sale recorded in Online Sales." });
       router.push(`/admin/orders/${data.orderId}`);
     } catch (err) {
       setSubmitMessage({
         type: "error",
-        text: err instanceof Error ? err.message : "An error occurred.",
+        text:
+          err instanceof Error
+            ? err.message
+            : "Something went wrong. No changes were made.",
       });
     } finally {
       setIsSubmitting(false);
@@ -250,6 +293,18 @@ export function BillingPanel() {
                 type="search"
                 placeholder="Search product or variant..."
                 value={searchQuery}
+                role="combobox"
+                aria-expanded={productSearchFocused && searchResults.length > 0}
+                aria-controls={productListboxId}
+                aria-autocomplete="list"
+                aria-activedescendant={
+                  activeProductIndex >= 0
+                    ? `${productListboxId}-option-${activeProductIndex}`
+                    : undefined
+                }
+                onKeyDown={handleProductSearchKeyDown}
+                onFocus={() => setProductSearchFocused(true)}
+                onBlur={() => setProductSearchFocused(false)}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </InputGroup>
@@ -265,11 +320,24 @@ export function BillingPanel() {
                   <p className="text-sm text-muted-foreground">No products found.</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2">
-                  {searchResults.map((item) => (
+                <div
+                  id={productListboxId}
+                  role="listbox"
+                  aria-label="Product search results"
+                  className="flex flex-col gap-2"
+                >
+                  {searchResults.map((item, index) => (
                     <div
                       key={item.variantId}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5"
+                      id={`${productListboxId}-option-${index}`}
+                      role="option"
+                      aria-selected={activeProductIndex === index}
+                      ref={(el) => registerProductRef(index, el)}
+                      onMouseEnter={() => setActiveProductIndex(index)}
+                      className={cn(
+                        "flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5",
+                        activeProductIndex === index && "bg-muted ring-1 ring-ring",
+                      )}
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">

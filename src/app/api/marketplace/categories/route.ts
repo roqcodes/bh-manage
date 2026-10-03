@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { PUBLIC_CATEGORIES_CACHE_CONTROL } from "@/lib/http/public-cache-headers";
 import { getMarketplaceCategories } from "@/modules/marketplace/services/marketplace-products.service";
 
 /**
@@ -11,10 +12,13 @@ export async function GET() {
   try {
     const categories = await getMarketplaceCategories();
 
-    return NextResponse.json({
-      categories,
-      count: categories.length,
-    });
+    return NextResponse.json(
+      {
+        categories,
+        count: categories.length,
+      },
+      { headers: { "Cache-Control": PUBLIC_CATEGORIES_CACHE_CONTROL } },
+    );
   } catch (error) {
     console.error("Error fetching categories:", error);
     return NextResponse.json(

@@ -3,7 +3,7 @@ import "server-only";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpProductSearchRow } from "@/common/erp/purchasing-types";
-import { buildIlikePattern } from "@/lib/postgrest-search";
+import { searchActiveGoodsProducts } from "@/lib/erp/server/product-catalog-query";
 
 /** ERP purchasing catalog: product-level (no variants). */
 export async function searchPurchaseProducts(
@@ -11,22 +11,10 @@ export async function searchPurchaseProducts(
   limit = 25,
 ): Promise<ErpProductSearchRow[]> {
   await requireAdminOrManagerProfile();
-  const pattern = buildIlikePattern(query);
-  if (!pattern) return [];
-
   const supabase = await createSupabaseServerClient();
+  const rows = await searchActiveGoodsProducts(supabase, query, limit);
 
-  const { data, error } = await supabase
-    .from("products")
-    .select("id, name, barcode, purchase_price, tax_rate_percent")
-    .eq("is_active", true)
-    .eq("item_type", "goods")
-    .or(`name.ilike.${pattern},barcode.ilike.${pattern}`)
-    .limit(limit);
-
-  if (error) throw new Error(error.message);
-
-  return (data ?? []).map((row) => ({
+  return rows.map((row) => ({
     id: row.id,
     product_name: row.name ?? "Product",
     barcode: row.barcode,

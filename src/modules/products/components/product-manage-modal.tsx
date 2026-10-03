@@ -47,6 +47,7 @@ import {
   type GroupDraft,
 } from "@/modules/products/components/group-variants-step";
 import { adminGet, adminGetNullable } from "@/modules/admin/lib/admin-api-client";
+import { invalidateAdminProductCatalogQueries } from "@/modules/erp/lib/erp-product-live-search.client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { cn } from "@/lib/utils";
 import { RequiredFieldMark, showRequiredMark } from "@/lib/required-field-label";
@@ -500,7 +501,7 @@ async function syncProductCatalogImage(
     itemType: detail.product.item_type ?? "goods",
     hsnSac: detail.product.hsn_sac ?? null,
   });
-  await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+  await invalidateAdminProductCatalogQueries(queryClient);
 }
 
 // Removed old wizard components

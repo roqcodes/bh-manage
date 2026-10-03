@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 import type {
   AccountStoreBalanceRow,
   AccountTransactionRow,
@@ -67,19 +68,36 @@ export async function listBankingAccounts(storeId?: string): Promise<BankingAcco
   );
   if (error) throw new Error(error.message);
 
-  const rows: BankingAccountRow[] = [];
-  for (const row of data ?? []) {
+  const cashRows = (data ?? []).filter((row) => {
     const type = row.account_types as { name: string; account_category: string } | null;
-    const typeName = type?.name ?? "";
-    const category = type?.account_category ?? "";
-    if (!isCashAccountRow(typeName, category)) continue;
+    return isCashAccountRow(type?.name ?? "", type?.account_category ?? "");
+  });
 
-    const { data: balance } = await supabase.rpc("get_account_balance", {
-      p_account_id: row.id,
-    });
-    rows.push(mapAccountRow(row, Number(balance ?? 0)));
+  const ids = cashRows.map((row) => row.id as string);
+  const balanceByAccount = new Map<string, number>();
+  if (ids.length > 0) {
+    const { data: balRows, error: balErr } = await invokeRpc(
+      supabase,
+      "get_account_balances",
+      { p_account_ids: ids },
+    );
+    if (balErr) {
+      for (const id of ids) {
+        const { data: balance } = await supabase.rpc("get_account_balance", {
+          p_account_id: id,
+        });
+        balanceByAccount.set(id, Number(balance ?? 0));
+      }
+    } else {
+      for (const row of (balRows ?? []) as { account_id: string; balance: number }[]) {
+        balanceByAccount.set(row.account_id, Number(row.balance ?? 0));
+      }
+    }
   }
-  return rows;
+
+  return cashRows.map((row) =>
+    mapAccountRow(row, balanceByAccount.get(row.id as string) ?? 0),
+  );
 }
 
 export async function getBankingAccount(accountId: string): Promise<BankingAccountRow | null> {

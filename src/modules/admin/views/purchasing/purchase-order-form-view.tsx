@@ -6,7 +6,28 @@ import { useRouter } from "next/navigation";
 
 import type { ErpPurchaseOrderDetail } from "@/common/erp/purchasing-types";
 import { roundMoney } from "@/common/erp/purchasing-types";
+import type { PurchaseLineFormRow, LandedCostFormRow } from "@/common/erp/purchasing-types";
+import {
+  emptyPurchaseLine,
+  linesToApiInput,
+  PurchaseLinesEditor,
+} from "@/modules/purchasing/components/purchase-lines-editor";
+import {
+  LandedCostsEditor,
+  landedCostsToApiInput,
+} from "@/modules/purchasing/components/landed-costs-editor";
+import type { ErpLandedCostItem } from "@/common/erp/purchasing-types";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCurrencyAmount } from "@/lib/format-currency";
+import { calcPurchaseLine } from "@/common/erp/purchasing-types";
 import { adminGet, adminPost, adminPut } from "@/modules/admin/lib/admin-api-client";
+import type { StoreStockShortageRow } from "@/common/erp/stock-shortage-types";
 import {
   AdminFormActions,
   AdminFormField,
@@ -19,21 +40,6 @@ import {
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
-import type { PurchaseLineFormRow } from "@/common/erp/purchasing-types";
-import {
-  emptyPurchaseLine,
-  linesToApiInput,
-  PurchaseLinesEditor,
-} from "@/modules/purchasing/components/purchase-lines-editor";
-import {
-  ActiveStoreFormField,
-  useActiveStoreFormField,
-} from "@/modules/erp/components/use-active-store-form-field";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrencyAmount } from "@/lib/format-currency";
-import { calcPurchaseLine } from "@/common/erp/purchasing-types";
 
 export type PurchaseOrderFormViewProps = ErpFormViewBaseProps & {
   mode: "create" | "edit";
@@ -65,7 +71,46 @@ export function PurchaseOrderFormView({
   const [notes, setNotes] = useState("");
   const [discount, setDiscount] = useState(0);
   const [lines, setLines] = useState<PurchaseLineFormRow[]>([emptyPurchaseLine()]);
+  const [landedCosts, setLandedCosts] = useState<LandedCostFormRow[]>([]);
+  const [landedMaster, setLandedMaster] = useState<ErpLandedCostItem[]>([]);
   const [poNumber, setPoNumber] = useState<string | null>(null);
+  const [shortagesLoading, setShortagesLoading] = useState(false);
+
+  async function fillLinesFromShortages() {
+    if (!effectiveStoreId) {
+      setError(storeRequiredMessage ?? "Select a store first");
+      return;
+    }
+    setShortagesLoading(true);
+    setError(null);
+    try {
+      const res = await adminGet<{ data: StoreStockShortageRow[] }>(
+        `erp/stock-shortages?storeId=${encodeURIComponent(effectiveStoreId)}`,
+      );
+      const shortages = res.data ?? [];
+      if (shortages.length === 0) {
+        setError("No negative store stock for this branch.");
+        return;
+      }
+      const newLines = shortages.map((row) => ({
+        ...emptyPurchaseLine(),
+        productId: row.productId,
+        productName: row.productName,
+        quantity: Math.max(1, Math.ceil(row.suggestedQty)),
+      }));
+      setLines(newLines);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load shortages");
+    } finally {
+      setShortagesLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    adminGet<{ data: ErpLandedCostItem[] }>("erp/landed-costs").then((r) =>
+      setLandedMaster(r.data ?? []),
+    );
+  }, []);
 
   useEffect(() => {
     if (mode !== "edit" || !poId) return;
@@ -102,6 +147,16 @@ export function PurchaseOrderFormView({
               }))
             : [emptyPurchaseLine()],
         );
+        setLandedCosts(
+          (po.purchase_order_landed_costs ?? []).map((lc) => ({
+            key: lc.id,
+            landedCostItemId: lc.landed_cost_item_id,
+            name: lc.name,
+            quantity: lc.quantity,
+            rate: lc.rate,
+            taxRatePercent: lc.tax_rate_percent,
+          })),
+        );
       })
       .finally(() => setLoading(false));
   }, [poId, mode]);
@@ -118,9 +173,18 @@ export function PurchaseOrderFormView({
       subtotal += taxable;
       tax += taxAmount;
     }
-    const total = roundMoney(Math.max(0, subtotal + tax - discount));
-    return { subtotal: roundMoney(subtotal), tax: roundMoney(tax), total };
-  }, [lines, discount]);
+    let landed = 0;
+    for (const lc of landedCosts) {
+      landed += calcPurchaseLine(lc.quantity, lc.rate, lc.taxRatePercent).lineTotal;
+    }
+    const total = roundMoney(Math.max(0, subtotal + tax - discount) + landed);
+    return {
+      subtotal: roundMoney(subtotal),
+      tax: roundMoney(tax),
+      landed: roundMoney(landed),
+      total,
+    };
+  }, [lines, landedCosts, discount]);
 
   function handleCancel() {
     if (isModal) {
@@ -163,6 +227,7 @@ export function PurchaseOrderFormView({
       notes: notes || null,
       lines: apiLines,
       discount,
+      landedCosts: landedCostsToApiInput(landedCosts),
     };
 
     startTransition(async () => {
@@ -197,6 +262,10 @@ export function PurchaseOrderFormView({
         <div className="flex justify-between">
           <span className="text-muted-foreground">Tax</span>
           <span className="tabular-nums">{formatCurrencyAmount(totals.tax)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Landed costs</span>
+          <span className="tabular-nums">{formatCurrencyAmount(totals.landed)}</span>
         </div>
         <AdminFormField label="Discount">
           <Input
@@ -293,11 +362,36 @@ export function PurchaseOrderFormView({
           </AdminFormSection>
 
           <AdminFormSection title="Line items">
+            {mode === "create" ? (
+              <div className="mb-3 flex flex-wrap justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={shortagesLoading || !effectiveStoreId}
+                  onClick={() => fillLinesFromShortages()}
+                >
+                  {shortagesLoading ? "Loading…" : "Fill from stock shortages"}
+                </Button>
+              </div>
+            ) : null}
             <PurchaseLinesEditor
               lines={lines}
               onChange={setLines}
               storeId={effectiveStoreId}
               vendorId={vendorId}
+            />
+          </AdminFormSection>
+
+          <AdminFormSection title="Landed costs">
+            <p className="mb-3 text-sm text-muted-foreground">
+              Freight, duty, and other charges are allocated to each line by extended value
+              (quantity × unit price) when stock is received.
+            </p>
+            <LandedCostsEditor
+              rows={landedCosts}
+              onChange={setLandedCosts}
+              masterItems={landedMaster}
             />
           </AdminFormSection>
 

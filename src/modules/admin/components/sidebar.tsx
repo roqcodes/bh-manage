@@ -230,6 +230,8 @@ function NavSectionGroup({
         <button
           ref={triggerRef}
           type="button"
+          data-bh-nav-section={section.label}
+          aria-expanded={flyoutOpen}
           title={section.label}
           onClick={() => {
             updateFlyoutPosition();
@@ -262,6 +264,8 @@ function NavSectionGroup({
 
         {flyoutOpen && flyoutPos ? (
           <div
+            data-bh-sidebar-flyout="true"
+            data-bh-flyout-section={section.label}
             className="fixed z-[100] pl-2"
             style={{ top: flyoutPos.top, left: flyoutPos.left }}
             onMouseEnter={onFlyoutOpen}
@@ -299,6 +303,7 @@ function NavSectionGroup({
     <div className="pt-1">
       <button
         type="button"
+        data-bh-nav-section={section.label}
         onClick={onToggle}
         aria-expanded={open}
         className={cn(
@@ -390,6 +395,7 @@ export function AdminSidebar({
     queryFn: () => adminGet<{ badges: Record<string, AdminNavBadge> }>("nav-badges"),
     staleTime: 30_000,
     refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   });
 
   const navAlerts = navBadgesData?.badges ?? {};
@@ -402,6 +408,8 @@ export function AdminSidebar({
 
   return (
     <aside
+      data-bh-admin-sidebar="true"
+      data-bh-sidebar-collapsed={collapsed ? "true" : "false"}
       className={cn(
         "flex h-full shrink-0 flex-col border-r border-slate-200/60 bg-white/80 shadow-[4px_0_24px_-8px_rgba(15,23,42,0.12)] backdrop-blur-xl md:shadow-none",
         "fixed left-0 top-0 z-40 will-change-transform md:relative md:will-change-auto",

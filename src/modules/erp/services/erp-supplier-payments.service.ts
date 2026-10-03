@@ -468,26 +468,33 @@ export async function recordBulkSupplierPaymentBatch(input: {
   }
 
   const batchId = `${BULK_REF_PREFIX}${randomUUID()}`;
-  let vendorIndex = 0;
 
+  const bulkLines: Json = [];
   for (const [vendorId, vendorLines] of byVendor) {
     const totalAmount = vendorLines.reduce((sum, line) => sum + line.amount, 0);
-    await recordSupplierPayment({
-      vendorId,
-      storeId,
-      paymentDate: input.paymentDate,
-      paymentMode: input.paymentMode,
-      accountId: input.accountId,
-      bankCharges: vendorIndex === 0 ? (input.bankCharges ?? 0) : 0,
-      bankChargesAccountId: vendorIndex === 0 ? input.bankChargesAccountId : undefined,
-      totalAmount,
-      reference: batchId,
-      notes: input.notes,
-      isBulk: true,
-      allocations: vendorLines,
+    (bulkLines as unknown[]).push({
+      vendor_id: vendorId,
+      amount: totalAmount,
+      allocations: vendorLines.map((line) => ({
+        purchase_bill_id: line.purchaseBillId,
+        amount: line.amount,
+      })),
     });
-    vendorIndex += 1;
   }
+
+  const { error: bulkError } = await supabase.rpc("record_erp_supplier_bulk_payment", {
+    p_store_id: storeId,
+    p_payment_date: input.paymentDate,
+    p_payment_mode: input.paymentMode,
+    p_account_id: input.accountId ?? undefined,
+    p_reference: batchId,
+    p_notes: input.notes ?? undefined,
+    p_lines: bulkLines,
+    p_bank_charges: input.bankCharges ?? 0,
+    p_bank_charges_account_id: input.bankChargesAccountId ?? undefined,
+  });
+
+  if (bulkError) throw new Error(bulkError.message);
 
   await logAuditEvent({
     action: "create_bulk_supplier_payment",

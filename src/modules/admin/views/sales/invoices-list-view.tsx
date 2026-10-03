@@ -20,8 +20,10 @@ import {
   AdminTableBody,
   AdminTableCell,
   AdminTableHeader,
-  AdminTableLink,
   AdminTableRow,
+  ErpCustomerTableGlance,
+  ErpDocumentTableGlance,
+  ErpStoreTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useErpFormModal,
@@ -91,7 +93,7 @@ export function InvoicesListView() {
   useEffect(() => {
     setLoading(true);
     reload().finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken, activeStoreId]);
+  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken]);
 
   function cancelInvoice(invoiceId: string) {
     startCancel(async () => {
@@ -226,27 +228,34 @@ export function InvoicesListView() {
                   {row.created_at?.slice(0, 10)}
                 </AdminTableCell>
                 <AdminTableCell>
-                  <AdminTableLink
-                    href={`/admin/erp/invoices/${row.id}`}
-                    title={row.invoice_number}
-                  >
-                    {formatErpDocRef("INV", row.id)}
-                  </AdminTableLink>
+                  <ErpDocumentTableGlance
+                    triggerLabel={formatErpDocRef("INV", row.id)}
+                    shellLabel="Invoice"
+                    title={row.invoice_number?.trim() || formatErpDocRef("INV", row.id)}
+                    subtitle={row.customer_name ?? undefined}
+                    viewHref={`/admin/erp/invoices/${row.id}`}
+                    viewLabel="View invoice →"
+                    stats={[
+                      { label: "Total", value: formatCurrencyAmount(row.total_amount) },
+                      { label: "Balance", value: formatCurrencyAmount(row.balance_due) },
+                    ]}
+                  />
                 </AdminTableCell>
-                <AdminTableCell className="hidden max-w-[120px] truncate text-muted-foreground md:table-cell">
-                  {row.store_id && row.store_name ? (
-                    <AdminTableLink href={`/admin/erp/stores/${row.store_id}/edit`}>
-                      {row.store_name}
-                    </AdminTableLink>
-                  ) : (
-                    (row.store_name ?? "—")
-                  )}
+                <AdminTableCell className="hidden max-w-[140px] md:table-cell">
+                  <ErpStoreTableGlance storeId={row.store_id} name={row.store_name} />
                 </AdminTableCell>
                 <AdminTableCell className="hidden sm:table-cell">
                   <InvoiceChannelBadge source={row.source} />
                 </AdminTableCell>
-                <AdminTableCell className="max-w-[160px] truncate">
-                  {row.customer_name ?? "—"}
+                <AdminTableCell className="max-w-[180px]">
+                  <ErpCustomerTableGlance
+                    userId={row.user_id}
+                    name={row.customer_name}
+                    stats={[
+                      { label: "Balance", value: formatCurrencyAmount(row.balance_due) },
+                      { label: "Paid", value: formatCurrencyAmount(row.amount_paid) },
+                    ]}
+                  />
                 </AdminTableCell>
                 <AdminTableCell>
                   <StatusBadge status={row.status} />

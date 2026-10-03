@@ -21,8 +21,10 @@ import {
   AdminTableBody,
   AdminTableCell,
   AdminTableHeader,
-  AdminTableLink,
   AdminTableRow,
+  ErpDocumentTableGlance,
+  ErpStoreTableGlance,
+  ErpVendorTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useDebouncedValue,
@@ -170,7 +172,13 @@ export function VendorsErpListView() {
                   {r.id.slice(0, 8)}
                 </AdminTableCell>
                 <AdminTableCell>
-                  <AdminTableLink href={`/admin/vendors/${r.id}/erp`}>{r.name ?? "—"}</AdminTableLink>
+                  <ErpVendorTableGlance
+                    vendorId={r.id}
+                    name={r.name}
+                    contact={r.phone}
+                    email={r.email}
+                    subtitle={r.trn ? `TRN ${r.trn}` : undefined}
+                  />
                 </AdminTableCell>
                 <AdminTableCell className="hidden max-w-[200px] truncate md:table-cell">
                   {r.address ?? "—"}

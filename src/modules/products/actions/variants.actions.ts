@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { revalidatePublicCatalog } from "@/lib/cache/public-catalog-cache";
+
 import {
   deleteVariantAndSupplyRows,
   insertVariantWithInventory,
@@ -22,6 +24,7 @@ export async function updateVariantGroupAction(
 ): Promise<void> {
   await updateVariantGroupById(groupId, { name: data.name });
   revalidatePath(`/admin/products/${productId}`);
+  revalidatePublicCatalog();
 }
 
 export type GroupedVariantSaveRow = {
@@ -91,7 +94,9 @@ export async function saveGroupedVariantsAction(
   }
 
   revalidatePath(`/admin/products/${productId}`);
+  revalidatePublicCatalog();
   revalidatePath("/admin/products");
+  revalidatePublicCatalog();
 }
 
 export async function createVariantGroupAction(
@@ -104,6 +109,7 @@ export async function createVariantGroupAction(
     sortOrder: data.sortOrder,
   });
   revalidatePath(`/admin/products/${productId}`);
+  revalidatePublicCatalog();
   return groupId;
 }
 
@@ -142,6 +148,7 @@ export async function createVariantAction(
     await addVariantImages(variantId, data.imageUrls);
   }
   revalidatePath(`/admin/products/${productId}`);
+  revalidatePublicCatalog();
   return variantId;
 }
 
@@ -172,6 +179,7 @@ export async function updateVariantAction(
     markupPercent: data.markupPercent,
   });
   revalidatePath(`/admin/products/${productId}`);
+  revalidatePublicCatalog();
 }
 
 export async function deleteVariantAction(
@@ -180,4 +188,5 @@ export async function deleteVariantAction(
 ): Promise<void> {
   await deleteVariantAndSupplyRows(id);
   revalidatePath(`/admin/products/${productId}`);
+  revalidatePublicCatalog();
 }

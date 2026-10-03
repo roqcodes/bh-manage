@@ -36,6 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { CatalogProductTableGlance } from "@/modules/admin/ui";
 import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import {
@@ -381,13 +382,8 @@ export function ProductsDataTable({
               <TableCell>
                 <div className="flex items-center gap-3">
                   <ProductThumbnail url={product.image_url} />
-                  <div className="min-w-0">
-                    <Link
-                      href={`/admin/products/${product.id}`}
-                      className="text-[13px] font-medium leading-snug text-foreground hover:text-primary hover:underline"
-                    >
-                      {product.name ?? "Untitled item"}
-                    </Link>
+                  <div className="min-w-0 flex-1">
+                    <CatalogProductTableGlance product={product} storeName={storeName} />
                     <p className="truncate text-[11px] text-muted-foreground">
                       {product.product_code
                         ? `Code: ${product.product_code}`

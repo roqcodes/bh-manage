@@ -160,7 +160,7 @@ export function AdminStockDetailsView() {
   if (loading) return <p className="p-4 text-sm">Loading…</p>;
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-lg font-semibold">Stock Details</h1>
+      <h1 className="text-lg font-semibold">Store inventory</h1>
       <SimpleTable
         headers={["Product", "Variant", "Central", "Store", "Purchase", "Sales"]}
         rows={rows.map((r) => [

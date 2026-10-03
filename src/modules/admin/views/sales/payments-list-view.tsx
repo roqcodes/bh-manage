@@ -25,8 +25,10 @@ import {
   AdminTableBody,
   AdminTableCell,
   AdminTableHeader,
-  AdminTableLink,
   AdminTableRow,
+  ErpCustomerTableGlance,
+  ErpDocumentTableGlance,
+  ErpStoreTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useDebouncedValue,
@@ -102,7 +104,7 @@ export function PaymentsListView() {
         setSummary(res.summary);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, dateFrom, dateTo, debouncedSearch, reloadToken, activeStoreId]);
+  }, [page, storeId, dateFrom, dateTo, debouncedSearch, reloadToken]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
@@ -236,24 +238,39 @@ export function PaymentsListView() {
               <AdminTableRow key={row.id}>
                 <AdminTableCell className="text-muted-foreground">{row.payment_date}</AdminTableCell>
                 <AdminTableCell>
-                  <AdminTableLink
-                    href={`/admin/erp/payments/${row.id}`}
-                    title={row.payment_number}
-                  >
-                    {formatErpDocRef("PR", row.id)}
-                  </AdminTableLink>
+                  <ErpDocumentTableGlance
+                    triggerLabel={formatErpDocRef("PR", row.id)}
+                    shellLabel="Payment received"
+                    title={row.payment_number?.trim() || formatErpDocRef("PR", row.id)}
+                    subtitle={row.customer_name ?? undefined}
+                    viewHref={`/admin/erp/payments/${row.id}`}
+                    viewLabel="View payment →"
+                    stats={[
+                      { label: "Amount", value: formatCurrencyAmount(row.total_amount) },
+                      { label: "Mode", value: paymentModeLabel(row.payment_mode) },
+                    ]}
+                  />
                 </AdminTableCell>
-                <AdminTableCell className="hidden max-w-[120px] truncate text-muted-foreground md:table-cell">
-                  {row.store_id && row.store_name ? (
-                    <AdminTableLink href={`/admin/erp/stores/${row.store_id}/edit`}>
-                      {row.store_name}
-                    </AdminTableLink>
-                  ) : (
-                    (row.store_name ?? "—")
-                  )}
+                <AdminTableCell className="hidden max-w-[140px] md:table-cell">
+                  <ErpStoreTableGlance storeId={row.store_id} name={row.store_name} />
                 </AdminTableCell>
-                <AdminTableCell className="max-w-[160px] truncate">
-                  {row.customer_name ?? "—"}
+                <AdminTableCell className="max-w-[180px]">
+                  <ErpCustomerTableGlance
+                    userId={row.user_id}
+                    name={row.customer_name}
+                    subtitle={row.invoice_number ? `Invoice ${row.invoice_number}` : undefined}
+                    stats={[
+                      { label: "This payment", value: formatCurrencyAmount(row.total_amount) },
+                      ...(row.unallocated_amount > 0
+                        ? [
+                            {
+                              label: "Unallocated",
+                              value: formatCurrencyAmount(row.unallocated_amount),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
                 </AdminTableCell>
                 <AdminTableCell className="capitalize">
                   {paymentModeLabel(row.payment_mode)}

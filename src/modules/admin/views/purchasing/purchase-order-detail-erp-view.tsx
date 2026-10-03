@@ -130,7 +130,11 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
       if (res.po.delivery.canSubmitDelivery) {
         const defaults: Record<string, number> = {};
         for (const line of res.po.purchase_order_items) {
-          defaults[line.id] = line.quantity;
+          const remaining = Math.max(
+            0,
+            line.quantity - Number(line.accepted_qty ?? 0),
+          );
+          defaults[line.id] = remaining > 0 ? remaining : line.quantity;
         }
         setDeliveredQty(defaults);
       }
@@ -173,9 +177,16 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
   const canCancel = po.status === "pending";
   const activeBill =
     po.linked_bill && po.linked_bill.status !== "cancelled" ? po.linked_bill : null;
+  const hasOpenDraftBill = activeBill?.status === "draft";
+  const hasRemainingToReceive = po.purchase_order_items.some(
+    (line) => Number(line.accepted_qty ?? 0) < line.quantity,
+  );
   const cancelledBill = po.linked_bill?.status === "cancelled" ? po.linked_bill : null;
   const canCreateBill =
-    !activeBill && po.status !== "cancelled" && po.purchase_order_items.length > 0;
+    !hasOpenDraftBill &&
+    po.status !== "cancelled" &&
+    po.purchase_order_items.length > 0 &&
+    (!po.linked_bill || hasRemainingToReceive);
 
   function handleCancel() {
     if (!confirm("Cancel this purchase order?")) return;
@@ -246,7 +257,11 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
               href={`/admin/erp/purchase-bills?form=new&poId=${poId}`}
               className={buttonVariants()}
             >
-              {cancelledBill ? "Re-issue draft invoice" : "Generate draft invoice"}
+              {cancelledBill
+                ? "Re-issue draft invoice"
+                : hasRemainingToReceive && activeBill?.status !== "draft"
+                  ? "Generate draft invoice (remaining qty)"
+                  : "Generate draft invoice"}
             </Link>
           ) : null}
           {activeBill ? (

@@ -37,6 +37,8 @@ import {
 } from "@/modules/erp/components/use-active-store-form-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 
@@ -57,6 +59,7 @@ type BillDetail = {
   notes: string | null;
   discount: number;
   status: string;
+  physical_receipt_on_bill?: boolean;
   erp_purchase_bill_lines: Array<{
     id: string;
     variant_id: string | null;
@@ -76,6 +79,17 @@ type BillDetail = {
     tax_rate_percent: number;
   }>;
 };
+
+function poLandedCostsToForm(po: ErpPurchaseOrderDetail): LandedCostFormRow[] {
+  return (po.purchase_order_landed_costs ?? []).map((lc) => ({
+    key: lc.id,
+    landedCostItemId: lc.landed_cost_item_id,
+    name: lc.name,
+    quantity: lc.quantity,
+    rate: lc.rate,
+    taxRatePercent: lc.tax_rate_percent,
+  }));
+}
 
 function poLinesToForm(po: ErpPurchaseOrderDetail): PurchaseLineFormRow[] {
   return po.purchase_order_items.map((item) => ({
@@ -148,6 +162,7 @@ export function PurchaseBillFormView({
   const [lines, setLines] = useState<PurchaseLineFormRow[]>([emptyPurchaseLine()]);
   const [landedCosts, setLandedCosts] = useState<LandedCostFormRow[]>([]);
   const [billNumber, setBillNumber] = useState<string | null>(null);
+  const [physicalReceiptOnBill, setPhysicalReceiptOnBill] = useState(true);
 
   useEffect(() => {
     if (mode === "create") {
@@ -179,6 +194,7 @@ export function PurchaseBillFormView({
         setReference(bill.reference ?? "");
         setNotes(bill.notes ?? "");
         setDiscount(Number(bill.discount ?? 0));
+        setPhysicalReceiptOnBill(bill.physical_receipt_on_bill ?? true);
         setBillNumber(bill.purchase_bill_number);
         setLines(
           bill.erp_purchase_bill_lines.length
@@ -222,6 +238,7 @@ export function PurchaseBillFormView({
       setNotes(po.notes ?? "");
       setDiscount(po.discount ?? 0);
       if (po.purchase_order_items.length) setLines(poLinesToForm(po));
+      setLandedCosts(poLandedCostsToForm(po));
     });
   }, [mode, poIdParam]);
 
@@ -304,6 +321,7 @@ export function PurchaseBillFormView({
       landedCosts: landedCostsToApiInput(landedCosts),
       discount,
       finalize: shouldFinalize,
+      physicalReceiptOnBill: poId ? false : physicalReceiptOnBill,
     };
 
     startTransition(async () => {
@@ -466,6 +484,24 @@ export function PurchaseBillFormView({
               <AdminFormField label="Notes" className="sm:col-span-2">
                 <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
               </AdminFormField>
+              {!poId ? (
+                <div className="flex items-start gap-3 sm:col-span-2">
+                  <Checkbox
+                    id={`${formId}-mark-received`}
+                    checked={physicalReceiptOnBill}
+                    onCheckedChange={(v) => setPhysicalReceiptOnBill(v === true)}
+                  />
+                  <div className="grid gap-1">
+                    <Label htmlFor={`${formId}-mark-received`} className="font-normal">
+                      Mark items as received
+                    </Label>
+                    <p className="text-muted-foreground text-sm">
+                      When finalized, increases store stock on this bill (Zoho-style). Turn off if
+                      you will record a purchase receive after the vendor invoice arrives.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
             </AdminFormGrid>
           </AdminFormSection>
 

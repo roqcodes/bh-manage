@@ -20,6 +20,7 @@ import {
   inputCls,
   selectCls,
 } from "@/modules/admin/components/modal";
+import { invalidateAdminProductCatalogQueries } from "@/modules/erp/lib/erp-product-live-search.client";
 
 export type QuickProductCreateModalProps = {
   /** Prefill product name from search query. */
@@ -99,7 +100,7 @@ export function QuickProductCreateModal({
 
         await ensureDefaultProductVariantAction(productId);
 
-        void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+        void invalidateAdminProductCatalogQueries(queryClient);
 
         onCreated({
           id: productId,

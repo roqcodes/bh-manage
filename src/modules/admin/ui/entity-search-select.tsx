@@ -1,23 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Loader2, Search, X } from "lucide-react";
 
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { useDebouncedValue } from "@/modules/admin/ui/use-debounced-value";
+import {
+  ENTITY_DOCUMENT_SEARCH_STALE_MS,
+  ENTITY_PARTY_SEARCH_STALE_MS,
+  ENTITY_SEARCH_DEBOUNCE_MS,
+  ENTITY_SEARCH_GC_MS,
+  entityLiveSearchQueryKey,
+  fetchCustomerSearchOptions,
+  fetchVendorSearchOptions,
+  resolveVendorPickerOption,
+  type EntitySearchOption,
+} from "@/modules/erp/lib/entity-live-search.client";
+import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrencyAmount } from "@/lib/format-currency";
+import { useSearchListKeyboard } from "@/modules/admin/ui/use-search-list-keyboard";
 
-export type EntitySearchOption = {
-  id: string;
-  label: string;
-  sublabel?: string;
-  meta?: string;
-  amount?: number;
-};
+export type { EntitySearchOption } from "@/modules/erp/lib/entity-live-search.client";
 
 type EntitySearchSelectProps = {
   value: string | null;
@@ -28,6 +35,11 @@ type EntitySearchSelectProps = {
   disabled?: boolean;
   className?: string;
   fetchOptions: (query: string) => Promise<EntitySearchOption[]>;
+  /** TanStack Query cache scope (e.g. `vendor`, `customer`, `invoice`). */
+  cacheScope: string;
+  staleTime?: number;
+  /** Resolve authoritative option on select (search rows are suggestions only). */
+  resolveSelectedOption?: (id: string) => Promise<EntitySearchOption>;
   selectedLabel?: string;
   minChars?: number;
   loadOnFocus?: boolean;
@@ -42,6 +54,9 @@ export function EntitySearchSelect({
   disabled,
   className,
   fetchOptions,
+  cacheScope,
+  staleTime = ENTITY_PARTY_SEARCH_STALE_MS,
+  resolveSelectedOption,
   selectedLabel,
   minChars = 1,
   loadOnFocus = true,
@@ -51,16 +66,98 @@ export function EntitySearchSelect({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fetchOptionsRef = useRef(fetchOptions);
   fetchOptionsRef.current = fetchOptions;
+  const resolveSelectedRef = useRef(resolveSelectedOption);
+  resolveSelectedRef.current = resolveSelectedOption;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [options, setOptions] = useState<EntitySearchOption[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [menuStyle, setMenuStyle] = useState<{
     top: number;
     left: number;
     width: number;
   } | null>(null);
-  const debouncedQuery = useDebouncedValue(query, 200);
+  const debouncedQuery = useDebouncedValue(query, ENTITY_SEARCH_DEBOUNCE_MS);
+  const listboxId = useId();
+
+  const trimmedDebounced = debouncedQuery.trim();
+  const searchQuery =
+    loadOnFocus || trimmedDebounced.length >= minChars ? trimmedDebounced : "";
+  const queryEnabled =
+    open &&
+    !disabled &&
+    (loadOnFocus || trimmedDebounced.length >= minChars);
+
+  const {
+    data: options = [],
+    error: queryError,
+    isFetching,
+    isPending,
+  } = useQuery({
+    queryKey: entityLiveSearchQueryKey(cacheScope, searchQuery),
+    queryFn: () => fetchOptionsRef.current(searchQuery),
+    enabled: queryEnabled,
+    staleTime,
+    gcTime: ENTITY_SEARCH_GC_MS,
+    placeholderData: keepPreviousData,
+  });
+
+  const loading = queryEnabled && isPending && options.length === 0;
+  const showBackgroundFetch = queryEnabled && isFetching && !loading;
+
+  useEffect(() => {
+    if (queryError instanceof Error) {
+      setFetchError(queryError.message);
+    } else {
+      setFetchError(null);
+    }
+  }, [queryError]);
+
+  const selectableCount =
+    open &&
+    !loading &&
+    !(trimmedDebounced.length < minChars && !loadOnFocus) &&
+    options.length > 0
+      ? options.length
+      : 0;
+
+  const selectOptionAt = useCallback(
+    (index: number) => {
+      const option = options[index];
+      if (!option) return;
+
+      const commit = (resolved: EntitySearchOption) => {
+        onChange(resolved.id, resolved);
+        setOpen(false);
+        setQuery("");
+      };
+
+      const resolver = resolveSelectedRef.current;
+      if (resolver) {
+        void resolver(option.id)
+          .then(commit)
+          .catch((err: unknown) => {
+            setFetchError(err instanceof Error ? err.message : "Could not load selection");
+          });
+        return;
+      }
+
+      commit(option);
+    },
+    [onChange, options],
+  );
+
+  const closeDropdown = useCallback(() => {
+    setOpen(false);
+    setQuery("");
+  }, []);
+
+  const { activeIndex, setActiveIndex, registerItemRef, handleKeyDown } =
+    useSearchListKeyboard({
+      open,
+      itemCount: selectableCount,
+      onSelectIndex: selectOptionAt,
+      onClose: closeDropdown,
+    });
 
   const updateMenuPosition = useCallback(() => {
     const anchor = anchorRef.current;
@@ -79,27 +176,6 @@ export function EntitySearchSelect({
     const match = options.find((o) => o.id === value);
     return match?.label ?? "";
   }, [open, query, selectedLabel, options, value]);
-
-  useEffect(() => {
-    if (!open) return;
-    const q = debouncedQuery.trim();
-    if (!loadOnFocus && q.length < minChars) {
-      setOptions([]);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    fetchOptionsRef.current(q)
-      .then((rows) => {
-        if (!cancelled) setOptions(rows);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedQuery, open, minChars, loadOnFocus]);
 
   useEffect(() => {
     if (!open) {
@@ -131,6 +207,9 @@ export function EntitySearchSelect({
     open && menuStyle ? (
       <div
         ref={dropdownRef}
+        id={listboxId}
+        role="listbox"
+        aria-label="Search results"
         className="fixed z-[100] max-h-72 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md"
         style={{
           top: menuStyle.top,
@@ -143,6 +222,8 @@ export function EntitySearchSelect({
             <Loader2 className="size-4 animate-spin" />
             Searching…
           </div>
+        ) : fetchError ? (
+          <p className="px-3 py-6 text-center text-xs text-destructive">{fetchError}</p>
         ) : debouncedQuery.trim().length < minChars && !loadOnFocus ? (
           <p className="px-3 py-6 text-center text-xs text-muted-foreground">
             Type at least {minChars} characters
@@ -150,19 +231,21 @@ export function EntitySearchSelect({
         ) : options.length === 0 ? (
           <p className="px-3 py-6 text-center text-xs text-muted-foreground">{emptyText}</p>
         ) : (
-          options.map((option) => (
+          options.map((option, index) => (
             <button
               key={option.id}
+              id={`${listboxId}-option-${index}`}
               type="button"
+              role="option"
+              aria-selected={value === option.id || activeIndex === index}
+              ref={(el) => registerItemRef(index, el)}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                onChange(option.id, option);
-                setOpen(false);
-                setQuery("");
-              }}
+              onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => selectOptionAt(index)}
               className={cn(
                 "flex w-full items-start gap-2 rounded-md px-2.5 py-2 text-left text-sm transition hover:bg-muted",
                 value === option.id && "bg-primary/5",
+                activeIndex === index && "bg-muted ring-1 ring-ring",
               )}
             >
               <div className="min-w-0 flex-1">
@@ -198,6 +281,14 @@ export function EntitySearchSelect({
           disabled={disabled}
           placeholder={value && !open ? placeholder : searchPlaceholder}
           className="h-10 pr-9 pl-9"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
+          }
+          onKeyDown={handleKeyDown}
           onFocus={() => {
             setOpen(true);
             if (!query && selectedLabel) setQuery("");
@@ -208,6 +299,9 @@ export function EntitySearchSelect({
             if (value) onChange(null);
           }}
         />
+        {showBackgroundFetch ? (
+          <Loader2 className="pointer-events-none absolute top-1/2 right-9 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+        ) : null}
         {value ? (
           <Button
             type="button"
@@ -253,28 +347,13 @@ export function CustomerSearchSelect({
       selectedLabel={selectedLabel}
       className={className}
       disabled={disabled}
+      cacheScope="customer"
       placeholder="Select customer"
       searchPlaceholder="Search name, email, phone…"
       emptyText="No customers found"
       minChars={1}
       loadOnFocus
-      fetchOptions={async (q) => {
-        const res = await adminGet<{
-          data: Array<{
-            id: string;
-            name: string | null;
-            email: string | null;
-            phone: string | null;
-            customer_number: string | null;
-          }>;
-        }>(`customers?view=search&q=${encodeURIComponent(q)}`);
-        return (res.data ?? []).map((c) => ({
-          id: c.id,
-          label: c.name?.trim() || c.email || c.phone || "Unnamed customer",
-          sublabel: [c.email, c.phone].filter(Boolean).join(" · ") || undefined,
-          meta: c.customer_number ? `Customer #${c.customer_number}` : undefined,
-        }));
-      }}
+      fetchOptions={fetchCustomerSearchOptions}
     />
   );
 }
@@ -299,20 +378,14 @@ export function VendorSearchSelect({
       selectedLabel={selectedLabel}
       className={className}
       disabled={disabled}
+      cacheScope="vendor"
+      resolveSelectedOption={resolveVendorPickerOption}
       placeholder="Select vendor"
-      searchPlaceholder="Search vendor name…"
+      searchPlaceholder="Search vendor name, TRN, phone…"
       emptyText="No vendors found"
       minChars={1}
       loadOnFocus
-      fetchOptions={async (q) => {
-        const res = await adminGet<{
-          data: Array<{ id: string; name: string | null }>;
-        }>(`vendors?view=search&q=${encodeURIComponent(q)}`);
-        return (res.data ?? []).map((v) => ({
-          id: v.id,
-          label: v.name ?? "Unnamed vendor",
-        }));
-      }}
+      fetchOptions={fetchVendorSearchOptions}
     />
   );
 }
@@ -351,6 +424,8 @@ export function ProductSearchSelect({
       selectedLabel={selectedLabel}
       className={className}
       disabled={disabled}
+      cacheScope={`product-select:${storeId ?? "none"}`}
+      staleTime={ENTITY_PARTY_SEARCH_STALE_MS}
       placeholder="Search product or barcode"
       searchPlaceholder="Name, SKU, barcode…"
       emptyText="No products found"
@@ -405,6 +480,8 @@ export function InvoiceSearchSelect({
       selectedLabel={selectedLabel}
       className={className}
       disabled={disabled}
+      cacheScope={`invoice-select:${storeId ?? "all"}:${openOnly ? "open" : "all"}`}
+      staleTime={ENTITY_DOCUMENT_SEARCH_STALE_MS}
       placeholder="Select invoice"
       searchPlaceholder="Invoice number or customer…"
       emptyText="No invoices found"
@@ -461,6 +538,8 @@ export function PurchaseBillSearchSelect({
       selectedLabel={selectedLabel}
       className={className}
       disabled={disabled}
+      cacheScope={`purchase-bill-select:${vendorId ?? "all"}:${storeId ?? "all"}`}
+      staleTime={ENTITY_DOCUMENT_SEARCH_STALE_MS}
       placeholder="Select purchase bill"
       searchPlaceholder="Bill number or vendor bill #…"
       emptyText="No purchase bills found"

@@ -27,8 +27,10 @@ import {
   AdminTableBody,
   AdminTableCell,
   AdminTableHeader,
-  AdminTableLink,
   AdminTableRow,
+  ErpDocumentTableGlance,
+  ErpStoreTableGlance,
+  ErpVendorTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useDebouncedValue,
@@ -216,32 +218,26 @@ export function SupplierPaymentsListView() {
               <AdminTableRow key={r.id}>
                 <AdminTableCell>{r.payment_date}</AdminTableCell>
                 <AdminTableCell>
-                  <AdminTableLink
-                    href={`/admin/erp/supplier-payments/${r.id}`}
-                    title={r.payment_number}
-                  >
-                    {formatErpDocRef("PM", r.id)}
-                  </AdminTableLink>
+                  <ErpDocumentTableGlance
+                    triggerLabel={formatErpDocRef("PM", r.id)}
+                    shellLabel="Supplier payment"
+                    title={r.payment_number?.trim() || formatErpDocRef("PM", r.id)}
+                    subtitle={r.vendor_name ?? undefined}
+                    viewHref={`/admin/erp/supplier-payments/${r.id}`}
+                    viewLabel="View payment →"
+                    stats={[
+                      { label: "Amount", value: formatCurrencyAmount(r.total_amount) },
+                      { label: "Mode", value: r.payment_mode },
+                    ]}
+                  />
                 </AdminTableCell>
                 <AdminTableCell>{r.payment_made_for ?? "—"}</AdminTableCell>
                 <AdminTableCell>
-                  {r.store_id && r.store_name ? (
-                    <AdminTableLink href={`/admin/erp/stores/${r.store_id}/edit`}>
-                      {r.store_name}
-                    </AdminTableLink>
-                  ) : (
-                    (r.store_name ?? "—")
-                  )}
+                  <ErpStoreTableGlance storeId={r.store_id} name={r.store_name} />
                 </AdminTableCell>
                 <AdminTableCell>{r.reference ?? "—"}</AdminTableCell>
                 <AdminTableCell>
-                  {r.vendor_id && r.vendor_name ? (
-                    <AdminTableLink href={`/admin/vendors/${r.vendor_id}/erp`}>
-                      {r.vendor_name}
-                    </AdminTableLink>
-                  ) : (
-                    (r.vendor_name ?? "—")
-                  )}
+                  <ErpVendorTableGlance vendorId={r.vendor_id} name={r.vendor_name} />
                 </AdminTableCell>
                 <AdminTableCell>{r.bill_numbers ?? "—"}</AdminTableCell>
                 <AdminTableCell>{r.payment_mode}</AdminTableCell>

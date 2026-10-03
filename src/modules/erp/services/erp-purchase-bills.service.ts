@@ -152,6 +152,8 @@ export async function createPurchaseBill(input: {
   notes?: string | null;
   expectedDeliveryDate?: string | null;
   finalize?: boolean;
+  /** Standalone bills: Zoho-style mark as received (stock on bill finalize). */
+  physicalReceiptOnBill?: boolean;
 }): Promise<string> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -175,6 +177,7 @@ export async function createPurchaseBill(input: {
     p_notes: input.notes ?? undefined,
     p_expected_delivery_date: input.expectedDeliveryDate ?? undefined,
     p_finalize: false,
+    p_physical_receipt_on_bill: input.physicalReceiptOnBill ?? true,
   });
 
   if (error) throw new Error(error.message);
@@ -298,6 +301,7 @@ export async function updateDraftPurchaseBill(
     batchReference?: string | null;
     reference?: string | null;
     notes?: string | null;
+    physicalReceiptOnBill?: boolean;
   },
 ): Promise<void> {
   await requireAdminOrManagerProfile();
@@ -339,6 +343,8 @@ export async function updateDraftPurchaseBill(
       landed_cost_total: totals.landedTotal,
       total_amount: totals.total,
       balance_due: 0,
+      physical_receipt_on_bill:
+        input.poId != null ? false : (input.physicalReceiptOnBill ?? true),
       updated_at: new Date().toISOString(),
     })
     .eq("id", billId)
@@ -389,6 +395,11 @@ export async function updateDraftPurchaseBill(
     const { error: lcError } = await supabase.from("erp_purchase_bill_landed_costs").insert(lcRows);
     if (lcError) throw new Error(lcError.message);
   }
+
+  const { error: refreshBillErr } = await supabase.rpc("refresh_purchase_bill_landed_allocations", {
+    p_bill_id: billId,
+  });
+  if (refreshBillErr) throw new Error(refreshBillErr.message);
 
   await logAuditEvent({
     action: "update",

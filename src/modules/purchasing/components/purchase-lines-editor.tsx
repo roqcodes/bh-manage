@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrencyAmount } from "@/lib/format-currency";
+import { resolvePurchaseLineDefaultsFromSelection } from "@/modules/erp/lib/resolve-product-line-defaults.client";
 import { QuickProductCreateModal } from "@/modules/products/components/quick-product-create-modal";
 
 function newLineKey() {
@@ -88,20 +89,24 @@ export function PurchaseLinesEditor({
   }
 
   function addProduct(row: ErpProductSearchRow) {
-    onChange([
-      ...lines,
-      {
-        key: newLineKey(),
-        productId: row.id,
-        variantId: null,
-        productName: row.product_name,
-        barcode: row.barcode ?? "",
-        expiryDate: "",
-        quantity: 1,
-        purchasePrice: row.purchase_price ?? 0,
-        taxRatePercent: row.tax_rate_percent ?? 0,
-      },
-    ]);
+    void (async () => {
+      const { purchasePrice, taxRatePercent } =
+        await resolvePurchaseLineDefaultsFromSelection(row, { storeId, vendorId });
+      onChange([
+        ...lines,
+        {
+          key: newLineKey(),
+          productId: row.id,
+          variantId: null,
+          productName: row.product_name,
+          barcode: row.barcode ?? "",
+          expiryDate: "",
+          quantity: 1,
+          purchasePrice,
+          taxRatePercent,
+        },
+      ]);
+    })();
   }
 
   function openCreateProduct(prefill = "") {

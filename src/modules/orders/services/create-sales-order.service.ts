@@ -2,9 +2,7 @@ import "server-only";
 
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
-import {
-  buildProductOrderItemSnapshot,
-} from "@/modules/orders/services/order-item-pricing.service";
+import { buildProductOrderItemSnapshots } from "@/modules/orders/services/order-item-pricing.service";
 import { commitOrderInventory } from "@/modules/orders/services/order-wallet-inventory.service";
 import { notifyOrderStatusChange } from "@/modules/admin/services/push-notifications.service";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
@@ -70,14 +68,19 @@ export async function createSalesOrder(input: CreateSalesOrderInput): Promise<{
   const orderId = orderData.id;
   const soNumber = orderData.sales_order_number ?? orderId;
 
-  const orderLineItems = [];
-  for (const item of input.items) {
-    const snapshot = await buildProductOrderItemSnapshot({
+  const snapshots = await buildProductOrderItemSnapshots(
+    input.items.map((item) => ({
       productId: item.productId,
       storeId,
       quantity: item.quantity,
       unitPriceOverride: item.unitPrice,
-    });
+    })),
+  );
+
+  const orderLineItems = [];
+  for (const item of input.items) {
+    const snapshot = snapshots.get(item.productId);
+    if (!snapshot) throw new Error("Product not found.");
     orderLineItems.push({
       productId: item.productId,
       quantity: item.quantity,

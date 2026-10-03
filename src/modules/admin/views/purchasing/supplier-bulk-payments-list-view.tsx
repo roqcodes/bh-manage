@@ -22,8 +22,9 @@ import {
   AdminTableBody,
   AdminTableCell,
   AdminTableHeader,
-  AdminTableLink,
   AdminTableRow,
+  ErpDocumentTableGlance,
+  ErpStoreTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useDebouncedValue,
@@ -167,14 +168,23 @@ export function SupplierBulkPaymentsListView() {
             {sorted.map((r) => (
               <AdminTableRow key={r.batch_id}>
                 <AdminTableCell>
-                  <AdminTableLink
-                    href={`/admin/erp/supplier-bulk-payments/${encodeURIComponent(r.batch_id)}`}
-                  >
-                    {formatErpDocRef("SPM", r.batch_id)}
-                  </AdminTableLink>
+                  <ErpDocumentTableGlance
+                    triggerLabel={formatErpDocRef("SPM", r.batch_id)}
+                    shellLabel="Supplier bulk payment"
+                    title={formatErpDocRef("SPM", r.batch_id)}
+                    subtitle={`${r.supplier_count} suppliers`}
+                    viewHref={`/admin/erp/supplier-bulk-payments/${encodeURIComponent(r.batch_id)}`}
+                    viewLabel="View batch →"
+                    stats={[
+                      { label: "Total", value: formatCurrencyAmount(r.total_amount) },
+                      { label: "Mode", value: r.payment_mode },
+                    ]}
+                  />
                 </AdminTableCell>
                 <AdminTableCell>{r.payment_date}</AdminTableCell>
-                <AdminTableCell>{r.store_name ?? "—"}</AdminTableCell>
+                <AdminTableCell>
+                  <ErpStoreTableGlance storeId={r.store_id} name={r.store_name} />
+                </AdminTableCell>
                 <AdminTableCell align="right" className="tabular-nums">
                   {formatCurrencyAmount(r.total_amount)}
                 </AdminTableCell>

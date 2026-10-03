@@ -77,7 +77,7 @@ export function SalaryBulkPaymentsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, period, debouncedSearch, reloadToken, activeStoreId]);
+  }, [page, storeId, period, debouncedSearch, reloadToken]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;

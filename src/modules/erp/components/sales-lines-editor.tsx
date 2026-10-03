@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrencyAmount } from "@/lib/format-currency";
+import { resolveSalesLineDefaultsFromSelection } from "@/modules/erp/lib/resolve-product-line-defaults.client";
 
 function newLineKey() {
   return `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -105,21 +106,27 @@ export function SalesLinesEditor({
   }
 
   function addFromSearch(row: ErpSalesProductSearchRow) {
-    onChange([
-      ...lines.filter((l) => l.productName.trim()),
-      {
-        key: newLineKey(),
-        productId: row.id,
-        variantId: null,
-        productName: row.product_name,
-        description: "",
-        barcode: row.barcode ?? "",
-        quantity: 1,
-        unitPrice: row.sales_price ?? 0,
-        taxRatePercent: row.tax_rate_percent ?? 0,
-        unitId: null,
-      },
-    ]);
+    void (async () => {
+      const { unitPrice, taxRatePercent } = await resolveSalesLineDefaultsFromSelection(row, {
+        storeId,
+        customerId,
+      });
+      onChange([
+        ...lines.filter((l) => l.productName.trim()),
+        {
+          key: newLineKey(),
+          productId: row.id,
+          variantId: null,
+          productName: row.product_name,
+          description: "",
+          barcode: row.barcode ?? "",
+          quantity: 1,
+          unitPrice,
+          taxRatePercent,
+          unitId: null,
+        },
+      ]);
+    })();
   }
 
   function updateLine(key: string, patch: Partial<SalesLineFormRow>) {

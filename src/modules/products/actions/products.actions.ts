@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { revalidatePublicCatalog } from "@/lib/cache/public-catalog-cache";
+
 import {
   deleteProduct,
   insertProduct,
@@ -59,6 +61,7 @@ export async function createProductAction(data: {
     await addProductVideos(id, data.videoUrls);
   }
   revalidatePath("/admin/products");
+  revalidatePublicCatalog();
   return id;
 }
 
@@ -104,6 +107,7 @@ export async function updateProductAction(
   }
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);
+  revalidatePublicCatalog();
 }
 
 export async function toggleProductAction(
@@ -113,6 +117,7 @@ export async function toggleProductAction(
   await setProductActive(id, isActive);
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);
+  revalidatePublicCatalog();
 }
 
 export async function updateProductSpecsAction(
@@ -122,11 +127,13 @@ export async function updateProductSpecsAction(
   await updateProductSpecs(id, specs);
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);
+  revalidatePublicCatalog();
 }
 
 export async function deleteProductAction(id: string): Promise<void> {
   await deleteProduct(id);
   revalidatePath("/admin/products");
+  revalidatePublicCatalog();
 }
 
 export async function bulkSetProductsActiveAction(
@@ -139,6 +146,7 @@ export async function bulkSetProductsActiveAction(
   for (const id of ids) {
     revalidatePath(`/admin/products/${id}`);
   }
+  revalidatePublicCatalog();
 }
 
 /** Create default online SKU for simple products (product-level price, no variants). */
@@ -148,6 +156,7 @@ export async function ensureDefaultProductVariantAction(
   const variantId = await ensureDefaultProductVariant(productId);
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${productId}`);
+  revalidatePublicCatalog();
   return variantId;
 }
 
@@ -159,6 +168,7 @@ export async function upgradeProductToGroupedLayoutAction(
   await upgradeProductToGroupedLayout(productId, groupName);
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${productId}`);
+  revalidatePublicCatalog();
 }
 
 /** Downgrade grouped catalog to flat variants; SKUs and stock are preserved. */
@@ -168,6 +178,7 @@ export async function downgradeProductToFlatLayoutAction(
   await downgradeProductToFlatLayout(productId);
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${productId}`);
+  revalidatePublicCatalog();
 }
 
 export async function bulkDeleteProductsAction(ids: string[]): Promise<void> {
@@ -175,4 +186,5 @@ export async function bulkDeleteProductsAction(ids: string[]): Promise<void> {
     await deleteProduct(id);
   }
   revalidatePath("/admin/products");
+  revalidatePublicCatalog();
 }

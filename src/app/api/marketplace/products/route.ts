@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { PUBLIC_CATALOG_LIST_CACHE_CONTROL } from "@/lib/http/public-cache-headers";
 import {
   getMarketplaceProducts,
   getMarketplaceCategories,
@@ -20,13 +21,16 @@ export async function GET(request: Request) {
       getMarketplaceCategories(),
     ]);
 
-    return NextResponse.json({
-      products: data,
-      total,
-      page,
-      hasMore,
-      categories,
-    });
+    return NextResponse.json(
+      {
+        products: data,
+        total,
+        page,
+        hasMore,
+        categories,
+      },
+      { headers: { "Cache-Control": PUBLIC_CATALOG_LIST_CACHE_CONTROL } },
+    );
   } catch (error) {
     console.error("Error fetching marketplace products:", error);
     return NextResponse.json(

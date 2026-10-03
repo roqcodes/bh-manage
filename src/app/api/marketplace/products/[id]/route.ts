@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { PUBLIC_PRODUCT_DETAIL_CACHE_CONTROL } from "@/lib/http/public-cache-headers";
 import { getMarketplaceProductById } from "@/modules/marketplace/services/marketplace-products.service";
 
 /**
@@ -22,7 +23,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ product });
+    return NextResponse.json(
+      { product },
+      { headers: { "Cache-Control": PUBLIC_PRODUCT_DETAIL_CACHE_CONTROL } },
+    );
   } catch (error) {
     console.error("Error fetching product:", error);
     return NextResponse.json(

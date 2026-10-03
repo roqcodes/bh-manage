@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Database } from "@/lib/integrations/supabase/types";
 import type {
@@ -58,16 +59,26 @@ async function customerOrderCounts(
   if (userIds.length === 0) return {};
 
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("orders")
-    .select("user_id")
-    .in("user_id", userIds);
+  const { data, error } = await invokeRpc(supabase, "get_user_order_counts", {
+    p_user_ids: userIds,
+  });
 
   const counts: Record<string, number> = {};
-  for (const row of data ?? []) {
-    const uid = row.user_id as string | null;
-    if (!uid) continue;
-    counts[uid] = (counts[uid] ?? 0) + 1;
+  if (error) {
+    const { data: fallback } = await supabase
+      .from("orders")
+      .select("user_id")
+      .in("user_id", userIds);
+    for (const row of fallback ?? []) {
+      const uid = row.user_id as string | null;
+      if (!uid) continue;
+      counts[uid] = (counts[uid] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  for (const row of (data ?? []) as { user_id: string; order_count: number }[]) {
+    counts[row.user_id] = Number(row.order_count ?? 0);
   }
   return counts;
 }
