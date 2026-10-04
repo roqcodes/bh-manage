@@ -1,6 +1,5 @@
 import "server-only";
 
-import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpProductSearchRow } from "@/common/erp/purchasing-types";
 import { searchActiveGoodsProducts } from "@/lib/erp/server/product-catalog-query";
@@ -10,7 +9,6 @@ export async function searchPurchaseProducts(
   query: string,
   limit = 25,
 ): Promise<ErpProductSearchRow[]> {
-  await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
   const rows = await searchActiveGoodsProducts(supabase, query, limit);
 

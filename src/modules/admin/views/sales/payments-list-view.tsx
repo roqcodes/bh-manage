@@ -258,18 +258,16 @@ export function PaymentsListView() {
                   <ErpCustomerTableGlance
                     userId={row.user_id}
                     name={row.customer_name}
-                    subtitle={row.invoice_number ? `Invoice ${row.invoice_number}` : undefined}
-                    stats={[
-                      { label: "This payment", value: formatCurrencyAmount(row.total_amount) },
-                      ...(row.unallocated_amount > 0
+                    stats={
+                      row.unallocated_amount > 0
                         ? [
                             {
-                              label: "Unallocated",
+                              label: "Unallocated credit",
                               value: formatCurrencyAmount(row.unallocated_amount),
                             },
                           ]
-                        : []),
-                    ]}
+                        : undefined
+                    }
                   />
                 </AdminTableCell>
                 <AdminTableCell className="capitalize">

@@ -17,6 +17,7 @@ import {
   resolveVendorPickerOption,
   type EntitySearchOption,
 } from "@/modules/erp/lib/entity-live-search.client";
+import type { ErpSalesProductSearchRow } from "@/common/erp/sales-types";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -349,10 +350,10 @@ export function CustomerSearchSelect({
       disabled={disabled}
       cacheScope="customer"
       placeholder="Select customer"
-      searchPlaceholder="Search name, email, phone…"
+      searchPlaceholder="Search by name or phone…"
       emptyText="No customers found"
       minChars={1}
-      loadOnFocus
+      loadOnFocus={false}
       fetchOptions={fetchCustomerSearchOptions}
     />
   );
@@ -432,24 +433,21 @@ export function ProductSearchSelect({
       minChars={1}
       loadOnFocus={Boolean(storeId)}
       fetchOptions={async (q) => {
-        const params = new URLSearchParams({ q });
-        if (storeId) params.set("storeId", storeId);
-        const res = await adminGet<{
-          data: Array<{
-            id: string;
-            product_name: string;
-            name: string | null;
-            barcode: string | null;
-            sales_price: number | null;
-            available_stock: number;
-          }>;
-        }>(`erp/sales-catalog?${params.toString()}`);
-        return (res.data ?? []).map((row) => ({
+        const { fetchErpProductLiveSearch } = await import(
+          "@/modules/erp/lib/erp-product-live-search.client"
+        );
+        const rows = (await fetchErpProductLiveSearch(
+          "sales",
+          q,
+          storeId,
+        )) as ErpSalesProductSearchRow[];
+        return rows.map((row) => ({
           id: row.id,
-          label: row.name ? `${row.product_name} — ${row.name}` : row.product_name,
-          sublabel: row.barcode ? `Barcode: ${row.barcode}` : undefined,
-          meta: `${row.sales_price ?? 0}|stock:${row.available_stock}`,
-          amount: row.sales_price ?? 0,
+          label: row.product_name,
+          sublabel: row.barcode
+            ? `Barcode: ${row.barcode} · Stock: ${row.available_stock ?? 0}`
+            : `Stock: ${row.available_stock ?? 0}`,
+          meta: `${row.sales_price ?? 0}|stock:${row.available_stock ?? 0}`,
         }));
       }}
     />

@@ -208,14 +208,7 @@ export function CreditNotesListView() {
                   <ErpStoreTableGlance storeId={row.store_id} name={row.store_name} />
                 </AdminTableCell>
                 <AdminTableCell className="max-w-[180px]">
-                  <ErpCustomerTableGlance
-                    userId={row.user_id}
-                    name={row.customer_name}
-                    stats={[
-                      { label: "Credit", value: formatCurrencyAmount(row.total_amount) },
-                      { label: "Remaining", value: formatCurrencyAmount(row.balance_remaining) },
-                    ]}
-                  />
+                  <ErpCustomerTableGlance userId={row.user_id} name={row.customer_name} />
                 </AdminTableCell>
                 <AdminTableCell>
                   <StatusBadge status={row.status} />

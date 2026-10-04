@@ -190,13 +190,7 @@ export function VendorCreditsListView() {
                   />
                 </AdminTableCell>
                 <AdminTableCell>
-                  <ErpVendorTableGlance
-                    vendorId={r.vendor_id}
-                    name={r.vendor_name}
-                    stats={[
-                      { label: "Remaining", value: formatCurrencyAmount(r.balance_remaining) },
-                    ]}
-                  />
+                  <ErpVendorTableGlance vendorId={r.vendor_id} name={r.vendor_name} />
                 </AdminTableCell>
                 <AdminTableCell>
                   <ErpStoreTableGlance storeId={r.store_id} name={r.store_name} />

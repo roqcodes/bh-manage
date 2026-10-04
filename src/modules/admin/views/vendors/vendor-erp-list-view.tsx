@@ -172,13 +172,7 @@ export function VendorsErpListView() {
                   {r.id.slice(0, 8)}
                 </AdminTableCell>
                 <AdminTableCell>
-                  <ErpVendorTableGlance
-                    vendorId={r.id}
-                    name={r.name}
-                    contact={r.phone}
-                    email={r.email}
-                    subtitle={r.trn ? `TRN ${r.trn}` : undefined}
-                  />
+                  <ErpVendorTableGlance vendorId={r.id} name={r.name} />
                 </AdminTableCell>
                 <AdminTableCell className="hidden max-w-[200px] truncate md:table-cell">
                   {r.address ?? "—"}

@@ -1,9 +1,14 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type ErpFormModalMode = "new" | "edit";
+
+type PendingNavigation = {
+  form: ErpFormModalMode;
+  id?: string;
+};
 
 export function useErpFormModal(listPath?: string) {
   const router = useRouter();
@@ -13,7 +18,25 @@ export function useErpFormModal(listPath?: string) {
   const basePath = listPath ?? pathname;
   const formMode = searchParams.get("form") as ErpFormModalMode | null;
   const editId = searchParams.get("id");
-  const isOpen = formMode === "new" || (formMode === "edit" && Boolean(editId));
+  const urlOpen = formMode === "new" || (formMode === "edit" && Boolean(editId));
+
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(
+    null,
+  );
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    if (urlOpen) {
+      setPendingNavigation(null);
+      setDismissed(false);
+    }
+  }, [urlOpen, formMode, editId]);
+
+  const isOpen = urlOpen || pendingNavigation !== null;
+  const dialogOpen = isOpen && !dismissed;
+
+  const resolvedFormMode = formMode ?? pendingNavigation?.form ?? null;
+  const resolvedEditId = editId ?? pendingNavigation?.id ?? null;
 
   const extraParams = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -42,32 +65,38 @@ export function useErpFormModal(listPath?: string) {
 
   const openNew = useCallback(
     (extra?: Record<string, string>) => {
-      router.push(buildUrl("new", null, extra));
+      setDismissed(false);
+      setPendingNavigation({ form: "new" });
+      router.push(buildUrl("new", null, extra), { scroll: false });
     },
     [router, buildUrl],
   );
 
   const openEdit = useCallback(
     (id: string, extra?: Record<string, string>) => {
-      router.push(buildUrl("edit", id, extra));
+      setDismissed(false);
+      setPendingNavigation({ form: "edit", id });
+      router.push(buildUrl("edit", id, extra), { scroll: false });
     },
     [router, buildUrl],
   );
 
   const close = useCallback(() => {
-    router.push(buildUrl(null));
+    setDismissed(true);
+    setPendingNavigation(null);
+    router.push(buildUrl(null), { scroll: false });
   }, [router, buildUrl]);
 
   return {
     isOpen,
-    formMode,
-    editId,
-    mode: formMode === "edit" ? ("edit" as const) : ("create" as const),
+    formMode: resolvedFormMode,
+    editId: resolvedEditId,
+    mode: resolvedFormMode === "edit" ? ("edit" as const) : ("create" as const),
     openNew,
     openEdit,
     close,
     modalProps: {
-      open: isOpen,
+      open: dialogOpen,
       onOpenChange: (open: boolean) => {
         if (!open) close();
       },

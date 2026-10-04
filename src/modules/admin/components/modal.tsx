@@ -61,6 +61,7 @@ export function Modal({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton
+        instant
         stacked={nested}
         className={cn(
           "gap-0 p-0",

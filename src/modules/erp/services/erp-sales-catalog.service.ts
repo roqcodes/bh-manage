@@ -60,13 +60,23 @@ export async function searchSalesProducts(
   storeId?: string,
   limit = 25,
 ): Promise<ErpSalesProductSearchRow[]> {
-  await requireAdminOrManagerProfile();
-
   const supabase = await createSupabaseServerClient();
-  const ctx = await getAdminErpContext();
-  const activeStoreId = storeId ?? ctx?.store_id ?? undefined;
+  const activeStoreId = storeId ?? undefined;
 
-  const rows = await searchActiveGoodsProducts(supabase, query, limit);
+  const rows = await searchActiveGoodsProducts(supabase, query, limit, activeStoreId);
+
+  if (rows.some((row) => row.available_stock != null)) {
+    return rows.map((row) => ({
+      id: row.id,
+      product_name: row.name ?? "Product",
+      barcode: row.barcode,
+      sales_price:
+        row.sales_price ?? (row.price != null ? Number(row.price) : null),
+      purchase_price: row.purchase_price != null ? Number(row.purchase_price) : null,
+      tax_rate_percent: row.tax_rate_percent != null ? Number(row.tax_rate_percent) : null,
+      available_stock: Number(row.available_stock ?? 0),
+    }));
+  }
 
   const storeStockMap = await loadStoreProductStockMap(
     supabase,

@@ -2,7 +2,7 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 
-import { getSupabaseEnv } from "@/lib/integrations/supabase/env";
+import { getSupabaseEnv, getSupabaseEnvOptional } from "@/lib/integrations/supabase/env";
 import type { Database } from "@/lib/integrations/supabase/types";
 
 let browserClient: ReturnType<typeof createBrowserClient<Database>> | undefined;
@@ -13,5 +13,16 @@ export function createSupabaseBrowserClient() {
 
   const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
   browserClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
+  return browserClient;
+}
+
+/** Returns null when public Supabase env is not embedded in the client bundle. */
+export function tryCreateSupabaseBrowserClient() {
+  if (browserClient) return browserClient;
+
+  const env = getSupabaseEnvOptional();
+  if (!env) return null;
+
+  browserClient = createBrowserClient<Database>(env.supabaseUrl, env.supabaseAnonKey);
   return browserClient;
 }

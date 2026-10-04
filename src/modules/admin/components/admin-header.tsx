@@ -1,11 +1,8 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
-import { PanelLeft, PanelLeftClose, RefreshCw } from "lucide-react";
+import { PanelLeft, PanelLeftClose } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { AdminRefreshStatusButton } from "@/modules/admin/components/admin-refresh-status-button";
 import { AdminQuickCreateMenu } from "@/modules/admin/components/admin-quick-create-menu";
 import { AdminProfileMenu } from "@/modules/admin/components/admin-profile-menu";
 import { AdminRecentActivityMenu } from "@/modules/admin/components/admin-recent-activity-menu";
@@ -26,11 +23,6 @@ export function AdminHeader({
   isMdViewport,
   onToggleSidebar,
 }: AdminHeaderProps) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
-  const [spinning, setSpinning] = useState(false);
-
   const navExpanded = isMdViewport ? !sidebarCollapsed : mobileNavOpen;
   const toggleLabel = isMdViewport
     ? sidebarCollapsed
@@ -40,33 +32,7 @@ export function AdminHeader({
       ? "Close navigation menu"
       : "Open navigation menu";
 
-  const refreshing = spinning || isPending;
-
-  const onRefresh = useCallback(() => {
-    if (refreshing) return;
-    setSpinning(true);
-    startTransition(() => {
-      void queryClient.invalidateQueries({ queryKey: ["admin"] });
-      router.refresh();
-    });
-    window.setTimeout(() => setSpinning(false), 650);
-  }, [queryClient, refreshing, router]);
-
-  const refreshBtn = (
-    <button
-      type="button"
-      onClick={onRefresh}
-      disabled={refreshing}
-      className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-200/60 hover:text-slate-900 disabled:opacity-60"
-      aria-label="Refresh data"
-      title="Refresh"
-    >
-      <RefreshCw
-        className={cn("size-[18px]", refreshing && "animate-spin")}
-        aria-hidden
-      />
-    </button>
-  );
+  const refreshBtn = <AdminRefreshStatusButton />;
 
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-slate-200/70 bg-[#F8FAFC]/85 backdrop-blur-md">

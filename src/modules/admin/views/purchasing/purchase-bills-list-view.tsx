@@ -252,13 +252,7 @@ export function PurchaseBillsListView() {
                     )}
                   </AdminTableCell>
                   <AdminTableCell>
-                    <ErpVendorTableGlance
-                      vendorId={r.vendor_id}
-                      name={r.vendor_name}
-                      stats={[
-                        { label: "Balance", value: formatCurrencyAmount(r.balance_due) },
-                      ]}
-                    />
+                    <ErpVendorTableGlance vendorId={r.vendor_id} name={r.vendor_name} />
                   </AdminTableCell>
                   <AdminTableCell>
                     <StatusBadge status={r.display_status} />

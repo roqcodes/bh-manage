@@ -4,6 +4,7 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { rpcSearchCustomers } from "@/modules/erp/lib/catalog-typeahead-rpc.client";
 
 export type EntitySearchOption = {
   id: string;
@@ -37,16 +38,25 @@ export async function fetchVendorSearchOptions(query: string): Promise<EntitySea
 }
 
 export async function fetchCustomerSearchOptions(query: string): Promise<EntitySearchOption[]> {
-  const res = await adminGet<{
-    data: Array<{
-      id: string;
-      name: string | null;
-      email: string | null;
-      phone: string | null;
-      customer_number: string | null;
-    }>;
-  }>(`customers?view=search&q=${encodeURIComponent(query)}`);
-  return (res.data ?? []).map((c) => ({
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const rpcRows = await rpcSearchCustomers(trimmed);
+  const rows =
+    rpcRows ??
+    (
+      await adminGet<{
+        data: Array<{
+          id: string;
+          name: string | null;
+          email: string | null;
+          phone: string | null;
+          customer_number: string | null;
+        }>;
+      }>(`customers?view=search&q=${encodeURIComponent(trimmed)}`)
+    ).data;
+
+  return (rows ?? []).map((c) => ({
     id: c.id,
     label: c.name?.trim() || c.email || c.phone || "Unnamed customer",
     sublabel: [c.email, c.phone].filter(Boolean).join(" · ") || undefined,

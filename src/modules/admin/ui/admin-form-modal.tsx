@@ -64,13 +64,14 @@ export function AdminFormModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton
+        instant
         className={cn(
           "gap-0 p-0",
           SIZE_CLASSES[size],
           isLandscape ? undefined : "flex max-h-[min(92vh,900px)] flex-col overflow-hidden",
         )}
       >
-        <DialogHeader className="shrink-0 gap-1 border-b border-border px-5 py-4 text-left">
+        <DialogHeader className="shrink-0 gap-1 border-b border-border px-5 py-4 pr-14 text-left">
           <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
           {description ? (
             <DialogDescription className="text-sm">{description}</DialogDescription>

@@ -50,18 +50,22 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@keyframes kg-global-nav-progress {
-  0% {
-    transform: translateX(-100%);
+@keyframes kg-refresh-dot-bounce {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
   }
 
-  100% {
-    transform: translateX(calc(100vw + 100%));
+  35% {
+    transform: translateY(-3px);
+    opacity: 1;
   }
 }
 
-.kg-global-nav-progress {
-  animation: kg-global-nav-progress 1.05s ease-in-out infinite;
+.kg-refresh-dot {
+  animation: kg-refresh-dot-bounce 0.9s ease-in-out infinite;
 }
 
 :root {

@@ -48,7 +48,7 @@ function NavigationProgressInner() {
   return null;
 }
 
-/** Activates the shared top progress bar during internal link navigations. */
+/** Drives header refresh status during internal link navigations. */
 export function NavigationProgress() {
   return (
     <Suspense fallback={null}>

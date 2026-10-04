@@ -1,17 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import {
-  Barcode,
-  Building2,
-  ChevronDown,
-  Mail,
-  MapPin,
-  Phone,
-  Store,
-  Tag,
-} from "lucide-react";
+import { Building2, ChevronDown, Mail, Phone } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { AdminUser, ProductWithCategoryListItem, Vendor } from "@/common/admin/types";
@@ -22,16 +12,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  formatCreditLimit,
-  formatCustomerId,
-  isCustomerBlocked,
-} from "@/modules/customers/components/customers-ui";
-import {
-  formatProductPrice,
-  formatSkuLabel,
-} from "@/modules/products/components/products-ui";
-import { formatVendorId } from "@/modules/vendors/components/vendors-ui";
+import { AdminTableLink } from "@/modules/admin/ui/admin-table-link";
+import { formatCustomerId, isCustomerBlocked } from "@/modules/customers/components/customers-ui";
+import { formatProductPrice } from "@/modules/products/components/products-ui";
 
 export function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -104,12 +87,9 @@ export function AdminTableGlanceStat({ label, value }: { label: string; value: s
 
 export function AdminTableGlanceFooterLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="inline-flex text-[11px] font-semibold text-primary hover:underline"
-    >
+    <AdminTableLink href={href} className="text-[11px]">
       {children}
-    </Link>
+    </AdminTableLink>
   );
 }
 
@@ -119,8 +99,6 @@ function AdminTableGlancePopover({
   shellLabel,
   title,
   subtitle,
-  footerHref,
-  footerLabel,
   stats,
   meta,
   avatarInitials,
@@ -131,8 +109,6 @@ function AdminTableGlancePopover({
   shellLabel: string;
   title: string;
   subtitle?: string;
-  footerHref?: string;
-  footerLabel?: string;
   stats?: { label: string; value: string }[];
   meta?: { icon: LucideIcon; content: ReactNode }[];
   avatarInitials?: string;
@@ -141,6 +117,26 @@ function AdminTableGlancePopover({
   const trimmedTitle = title.trim();
   if (!trimmedTitle || trimmedTitle === "—") {
     return <span className="text-muted-foreground">—</span>;
+  }
+
+  const hasBody =
+    Boolean(avatarInitials) ||
+    Boolean(meta?.length) ||
+    Boolean(stats?.length) ||
+    Boolean(subtitle?.trim());
+
+  if (!hasBody) {
+    return (
+      <span
+        className={cn(
+          "inline-block max-w-full truncate text-[13px]",
+          mutedTrigger ? "text-muted-foreground" : "font-medium text-foreground",
+          triggerClassName,
+        )}
+      >
+        {triggerLabel}
+      </span>
+    );
   }
 
   return (
@@ -161,16 +157,7 @@ function AdminTableGlancePopover({
         <ChevronDown className="size-3.5 shrink-0 opacity-50" aria-hidden />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[17.5rem] gap-0 p-0">
-        <AdminTableGlanceShell
-          label={shellLabel}
-          title={trimmedTitle}
-          subtitle={subtitle}
-          footer={
-            footerHref && footerLabel ? (
-              <AdminTableGlanceFooterLink href={footerHref}>{footerLabel}</AdminTableGlanceFooterLink>
-            ) : null
-          }
-        >
+        <AdminTableGlanceShell label={shellLabel} title={trimmedTitle} subtitle={subtitle}>
           {avatarInitials ? (
             <div className="flex items-center gap-2">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
@@ -201,6 +188,24 @@ function AdminTableGlancePopover({
   );
 }
 
+function plainEntityLabel(
+  display: string,
+  opts?: { muted?: boolean; className?: string },
+) {
+  if (display === "—") return <span className="text-muted-foreground">—</span>;
+  return (
+    <span
+      className={cn(
+        "inline-block max-w-full truncate text-[13px]",
+        opts?.muted ? "text-muted-foreground" : "font-medium text-foreground",
+        opts?.className,
+      )}
+    >
+      {display}
+    </span>
+  );
+}
+
 export function ErpCustomerTableGlance({
   userId,
   name,
@@ -226,17 +231,29 @@ export function ErpCustomerTableGlance({
   if (email?.trim()) meta.push({ icon: Mail, content: email.trim() });
   if (phone?.trim()) meta.push({ icon: Phone, content: phone.trim() });
 
+  const hasPopoverContent =
+    meta.length > 0 || Boolean(stats?.length) || Boolean(subtitle?.trim());
+
+  if (!hasPopoverContent) {
+    if (userId && display !== "—") {
+      return (
+        <AdminTableLink href={`/admin/customers/${userId}`} className="block max-w-full truncate text-[13px]">
+          {display}
+        </AdminTableLink>
+      );
+    }
+    return plainEntityLabel(display);
+  }
+
   return (
     <AdminTableGlancePopover
-      triggerLabel={display === "—" ? "—" : display}
+      triggerLabel={display}
       shellLabel="Customer"
       title={display}
       subtitle={subtitle}
       avatarInitials={display !== "—" ? initialsFromName(display) : undefined}
       meta={meta.length > 0 ? meta : undefined}
       stats={stats}
-      footerHref={userId ? `/admin/customers/${userId}` : undefined}
-      footerLabel={userId ? "View customer profile →" : undefined}
     />
   );
 }
@@ -261,6 +278,23 @@ export function ErpVendorTableGlance({
   if (contact?.trim()) meta.push({ icon: Phone, content: contact.trim() });
   if (email?.trim()) meta.push({ icon: Mail, content: email.trim() });
 
+  const hasPopoverContent =
+    meta.length > 0 || Boolean(stats?.length) || Boolean(subtitle?.trim());
+
+  if (!hasPopoverContent) {
+    if (vendorId && display !== "—") {
+      return (
+        <AdminTableLink
+          href={`/admin/vendors/${vendorId}/erp`}
+          className="block max-w-full truncate text-[13px]"
+        >
+          {display}
+        </AdminTableLink>
+      );
+    }
+    return plainEntityLabel(display);
+  }
+
   return (
     <AdminTableGlancePopover
       triggerLabel={display}
@@ -270,85 +304,58 @@ export function ErpVendorTableGlance({
       avatarInitials={display !== "—" ? initialsFromName(display) : undefined}
       meta={meta.length > 0 ? meta : undefined}
       stats={stats}
-      footerHref={vendorId ? `/admin/vendors/${vendorId}/erp` : undefined}
-      footerLabel={vendorId ? "View vendor ERP profile →" : undefined}
     />
   );
 }
 
+/** Store name only — list tables already show the branch; no popover. */
 export function ErpStoreTableGlance({
-  storeId,
   name,
 }: {
   storeId?: string | null;
   name?: string | null;
 }) {
-  const display = name?.trim() || "—";
-  return (
-    <AdminTableGlancePopover
-      triggerLabel={display}
-      mutedTrigger
-      shellLabel="Store / branch"
-      title={display}
-      meta={[{ icon: Store, content: "Inventory and sales are scoped to this branch." }]}
-      footerHref={storeId ? `/admin/erp/stores/${storeId}/edit` : undefined}
-      footerLabel={storeId ? "Open store settings →" : undefined}
-    />
-  );
+  return plainEntityLabel(name?.trim() || "—", { muted: true });
 }
 
+/** Document reference — row actions and amount columns carry the detail; link to open. */
 export function ErpDocumentTableGlance({
   triggerLabel,
-  shellLabel,
-  title,
-  subtitle,
   viewHref,
-  viewLabel,
-  stats,
 }: {
   triggerLabel: string;
-  shellLabel: string;
-  title: string;
-  subtitle?: string;
   viewHref: string;
-  viewLabel: string;
+  shellLabel?: string;
+  title?: string;
+  subtitle?: string;
+  viewLabel?: string;
   stats?: { label: string; value: string }[];
 }) {
+  const label = triggerLabel.trim() || "—";
+  if (label === "—") return <span className="text-muted-foreground">—</span>;
   return (
-    <AdminTableGlancePopover
-      triggerLabel={triggerLabel}
-      shellLabel={shellLabel}
-      title={title}
-      subtitle={subtitle}
-      stats={stats}
-      footerHref={viewHref}
-      footerLabel={viewLabel}
-    />
+    <AdminTableLink href={viewHref} className="text-[13px]">
+      {label}
+    </AdminTableLink>
   );
 }
 
 export function CatalogCustomerTableGlance({ user }: { user: AdminUser }) {
   const name = user.name ?? user.company_name ?? "Unnamed customer";
+  const orderStat =
+    user.order_count != null && user.order_count > 0
+      ? [{ label: "Lifetime orders", value: user.order_count.toLocaleString("en-IN") }]
+      : undefined;
+
+  if (!orderStat) {
+    return (
+      <AdminTableLink href={`/admin/customers/${user.id}`} className="text-[13px]">
+        {name}
+      </AdminTableLink>
+    );
+  }
+
   const blocked = isCustomerBlocked(user);
-  const stats: { label: string; value: string }[] = [];
-  if (user.receivables != null) {
-    stats.push({ label: "Receivables", value: formatCurrencyAmount(user.receivables) });
-  }
-  if (user.credit_limit != null) {
-    stats.push({ label: "Credit limit", value: formatCreditLimit(user.credit_limit) });
-  }
-  if (user.order_count != null) {
-    stats.push({ label: "Orders", value: user.order_count.toLocaleString("en-IN") });
-  }
-
-  const meta: { icon: LucideIcon; content: ReactNode }[] = [];
-  if (user.company_name?.trim() && user.company_name !== user.name) {
-    meta.push({ icon: Building2, content: user.company_name });
-  }
-  if (user.email?.trim()) meta.push({ icon: Mail, content: user.email });
-  if (user.phone?.trim()) meta.push({ icon: Phone, content: user.phone });
-  if (user.location?.trim()) meta.push({ icon: MapPin, content: user.location });
-
   return (
     <AdminTableGlancePopover
       triggerLabel={name}
@@ -356,63 +363,36 @@ export function CatalogCustomerTableGlance({ user }: { user: AdminUser }) {
       title={name}
       subtitle={`${formatCustomerId(user)}${blocked ? " · Blocked" : ""}`}
       avatarInitials={initialsFromName(name)}
-      meta={meta.length > 0 ? meta : undefined}
-      stats={stats.length > 0 ? stats : undefined}
-      footerHref={`/admin/customers/${user.id}`}
-      footerLabel="View customer profile →"
+      stats={orderStat}
     />
   );
 }
 
 export function CatalogVendorTableGlance({ vendor }: { vendor: Vendor }) {
   const name = vendor.name ?? "Unnamed vendor";
-  const meta: { icon: LucideIcon; content: ReactNode }[] = [];
-  if (vendor.contact?.trim()) meta.push({ icon: Phone, content: vendor.contact });
-
   return (
-    <AdminTableGlancePopover
-      triggerLabel={name}
-      shellLabel="Vendor"
-      title={name}
-      subtitle={formatVendorId(vendor)}
-      avatarInitials={initialsFromName(name)}
-      meta={meta.length > 0 ? meta : undefined}
-      stats={[
-        {
-          label: "Status",
-          value: vendor.is_active ? "Active" : "Inactive",
-        },
-      ]}
-      footerHref={`/admin/vendors/${vendor.id}`}
-      footerLabel="View vendor profile →"
-    />
+    <AdminTableLink href={`/admin/vendors/${vendor.id}`} className="text-[13px]">
+      {name}
+    </AdminTableLink>
   );
 }
 
 export function CatalogProductTableGlance({
   product,
-  storeName,
 }: {
   product: ProductWithCategoryListItem;
   storeName?: string | null;
 }) {
   const name = product.name ?? "Untitled item";
-  const displayStore = product.store_name ?? storeName ?? "—";
-  const stats: { label: string; value: string }[] = [
-    { label: "Stock", value: product.stock_total.toLocaleString("en-IN") },
-    { label: "Sales price", value: formatProductPrice(product.price_min) },
-  ];
-  if (product.purchase_price != null) {
-    stats.push({
-      label: "Purchase",
-      value: formatCurrencyAmount(product.purchase_price),
-    });
-  }
+  const multiSku = product.variant_count > 1;
 
-  const meta: { icon: LucideIcon; content: ReactNode }[] = [];
-  const sku = product.product_code ? `Code: ${product.product_code}` : formatSkuLabel(product);
-  if (sku && sku !== "—") meta.push({ icon: Tag, content: sku });
-  if (product.barcode?.trim()) meta.push({ icon: Barcode, content: product.barcode });
+  if (!multiSku) {
+    return (
+      <AdminTableLink href={`/admin/products/${product.id}`} className="text-[13px]">
+        {name}
+      </AdminTableLink>
+    );
+  }
 
   return (
     <AdminTableGlancePopover
@@ -420,16 +400,16 @@ export function CatalogProductTableGlance({
       shellLabel="Product"
       title={name}
       subtitle={product.categories?.name ?? "Uncategorized"}
-      stats={stats.slice(0, 4)}
-      meta={
-        meta.length > 0
-          ? meta
-          : displayStore !== "—"
-            ? [{ icon: Store, content: displayStore }]
-            : undefined
-      }
-      footerHref={`/admin/products/${product.id}`}
-      footerLabel="View product →"
+      stats={[
+        {
+          label: "SKUs",
+          value: product.variant_count.toLocaleString("en-IN"),
+        },
+        {
+          label: "From price",
+          value: formatProductPrice(product.price_min),
+        },
+      ]}
     />
   );
 }

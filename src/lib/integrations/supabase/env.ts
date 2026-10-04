@@ -1,6 +1,4 @@
-function requireEnv(
-  name: "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-) {
+function requireEnv(name: string) {
   const value = process.env[name];
 
   if (!value) {
@@ -10,9 +8,29 @@ function requireEnv(
   return value;
 }
 
+/** Client-safe read; returns null instead of throwing (typeahead can fall back to API routes). */
+export function getSupabaseEnvOptional() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+
+  return { supabaseUrl, supabaseAnonKey };
+}
+
 export function getSupabaseEnv() {
-  return {
-    supabaseUrl: requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    supabaseAnonKey: requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-  };
+  const env = getSupabaseEnvOptional();
+  if (!env) {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      throw new Error("Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL");
+    }
+    throw new Error(
+      "Missing required environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)",
+    );
+  }
+  return env;
 }

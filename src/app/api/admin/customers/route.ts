@@ -9,6 +9,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const view = searchParams.get("view");
     if (view === "search") {
+      const auth = await requireAdminApiProfile();
+      if (!auth.ok) return auth.response;
+
       const q = searchParams.get("q") ?? "";
       const data = await searchCustomers(q);
       return NextResponse.json({ data });

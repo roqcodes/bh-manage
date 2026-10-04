@@ -14,13 +14,10 @@ import { Loader2, Plus, Search } from "lucide-react";
 
 import type { ErpProductSearchRow } from "@/common/erp/purchasing-types";
 import type { ErpSalesProductSearchRow } from "@/common/erp/sales-types";
-import { useDebouncedValue } from "@/modules/admin/ui/use-debounced-value";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { formatCurrencyAmount } from "@/lib/format-currency";
 import { useSearchListKeyboard } from "@/modules/admin/ui/use-search-list-keyboard";
 import {
-  ERP_PRODUCT_SEARCH_DEBOUNCE_MS,
   ERP_PRODUCT_SEARCH_GC_MS,
   ERP_PURCHASE_SEARCH_STALE_MS,
   ERP_SALES_SEARCH_STALE_MS,
@@ -66,11 +63,8 @@ export function ProductLiveSearch({
   const listboxId = useId();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const debouncedQuery = useDebouncedValue(query, ERP_PRODUCT_SEARCH_DEBOUNCE_MS);
-
-  const trimmedDebounced = debouncedQuery.trim();
-  const searchEnabled =
-    open && !disabled && trimmedDebounced.length >= minChars;
+  const trimmedQuery = query.trim();
+  const searchEnabled = open && !disabled && trimmedQuery.length >= minChars;
 
   const staleTime =
     catalog === "purchase" ? ERP_PURCHASE_SEARCH_STALE_MS : ERP_SALES_SEARCH_STALE_MS;
@@ -81,9 +75,9 @@ export function ProductLiveSearch({
     isFetching,
     isPending,
   } = useQuery({
-    queryKey: erpProductLiveSearchQueryKey(catalog, storeId, trimmedDebounced),
+    queryKey: erpProductLiveSearchQueryKey(catalog, storeId, trimmedQuery),
     queryFn: () =>
-      fetchErpProductLiveSearch(catalog, trimmedDebounced, storeId) as Promise<
+      fetchErpProductLiveSearch(catalog, trimmedQuery, storeId) as Promise<
         ProductLiveSearchRow[]
       >,
     enabled: searchEnabled,
@@ -123,7 +117,7 @@ export function ProductLiveSearch({
     (showInitialLoading ||
       showBackgroundFetch ||
       results.length > 0 ||
-      trimmedDebounced.length >= minChars ||
+      trimmedQuery.length >= minChars ||
       Boolean(fetchError) ||
       canCreate);
 
@@ -134,7 +128,7 @@ export function ProductLiveSearch({
 
   const keyboardItemCount = useMemo(() => {
     if (!showDropdown || showInitialLoading) return 0;
-    if (trimmedDebounced.length < minChars) return canCreate ? 1 : 0;
+    if (trimmedQuery.length < minChars) return canCreate ? 1 : 0;
     if (results.length === 0) return canCreate ? 1 : 0;
     return results.length + (canCreate ? 1 : 0);
   }, [
@@ -143,7 +137,7 @@ export function ProductLiveSearch({
     results.length,
     showDropdown,
     showInitialLoading,
-    trimmedDebounced.length,
+    trimmedQuery.length,
   ]);
 
   const closeDropdown = useCallback(() => {
@@ -223,7 +217,7 @@ export function ProductLiveSearch({
             </div>
           ) : fetchError ? (
             <p className="px-3 py-6 text-center text-xs text-destructive">{fetchError}</p>
-          ) : trimmedDebounced.length < minChars ? (
+          ) : trimmedQuery.length < minChars ? (
             canCreate ? (
               <button
                 id={`${listboxId}-option-0`}
@@ -251,7 +245,7 @@ export function ProductLiveSearch({
             canCreate ? (
               <div className="py-1">
                 <p className="px-3 py-2 text-center text-xs text-muted-foreground">
-                  No products found for &ldquo;{trimmedDebounced}&rdquo;
+                  No products found for &ldquo;{trimmedQuery}&rdquo;
                 </p>
                 <button
                   id={`${listboxId}-option-0`}
@@ -268,7 +262,7 @@ export function ProductLiveSearch({
                   )}
                 >
                   <Plus className="size-4 shrink-0" />
-                  Create &ldquo;{trimmedDebounced}&rdquo;
+                  Create &ldquo;{trimmedQuery}&rdquo;
                 </button>
               </div>
             ) : (
@@ -321,7 +315,7 @@ export function ProductLiveSearch({
                 </div>
                 {isSalesRow(row) ? (
                   <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                    Stock: {row.available_stock} · {formatCurrencyAmount(row.sales_price ?? 0)}
+                    Stock: {row.available_stock}
                   </span>
                 ) : null}
               </button>
@@ -344,7 +338,7 @@ export function ProductLiveSearch({
                 )}
               >
                 <Plus className="size-3.5 shrink-0" />
-                {trimmedDebounced ? `Create "${trimmedDebounced}"` : "Create new product"}
+                {trimmedQuery ? `Create "${trimmedQuery}"` : "Create new product"}
               </button>
             </div>
           ) : null}

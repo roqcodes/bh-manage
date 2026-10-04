@@ -3,6 +3,7 @@ import {
   beginAsyncProgress,
   endAsyncProgress,
 } from "@/modules/navigation/lib/async-progress";
+import { labelForAdminApiRequest } from "@/modules/navigation/lib/admin-api-progress-label";
 function parseAdminApiError(status: number, statusText: string, body: string): string {
   if (body.trimStart().startsWith("<!DOCTYPE") || body.trimStart().startsWith("<html")) {
     return `${status} ${statusText} — API route not found`;
@@ -20,9 +21,11 @@ async function adminFetch<T>(
   pathAndQuery: string,
   init?: RequestInit,
 ): Promise<T> {
-  beginAsyncProgress();
+  const path = pathAndQuery.startsWith("/") ? pathAndQuery.slice(1) : pathAndQuery;
+  const progressToken = beginAsyncProgress(
+    labelForAdminApiRequest(path, init?.method ?? "GET"),
+  );
   try {
-    const path = pathAndQuery.startsWith("/") ? pathAndQuery.slice(1) : pathAndQuery;
     const res = await fetch(`/api/admin/${path}`, {
       credentials: "include",
       headers: { Accept: "application/json", ...(init?.headers ?? {}) },
@@ -34,7 +37,7 @@ async function adminFetch<T>(
     }
     return res.json() as Promise<T>;
   } finally {
-    endAsyncProgress();
+    endAsyncProgress(progressToken);
   }
 }
 
@@ -72,9 +75,9 @@ export async function adminDelete<T = { ok: boolean }>(pathAndQuery: string): Pr
 
 /** Returns `null` when the API responds with 404 (e.g. missing entity). */
 export async function adminGetNullable<T>(pathAndQuery: string): Promise<T | null> {
-  beginAsyncProgress();
+  const path = pathAndQuery.startsWith("/") ? pathAndQuery.slice(1) : pathAndQuery;
+  const progressToken = beginAsyncProgress(labelForAdminApiRequest(path, "GET"));
   try {
-    const path = pathAndQuery.startsWith("/") ? pathAndQuery.slice(1) : pathAndQuery;
     const res = await fetch(`/api/admin/${path}`, {
       credentials: "include",
       headers: { Accept: "application/json" },
@@ -86,6 +89,6 @@ export async function adminGetNullable<T>(pathAndQuery: string): Promise<T | nul
     }
     return res.json() as Promise<T>;
   } finally {
-    endAsyncProgress();
+    endAsyncProgress(progressToken);
   }
 }

@@ -3,10 +3,8 @@ import "server-only";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { PAGE_SIZE, type Order, type AdminUser, type Paginated } from "@/common/admin/types";
-import {
-  buildIlikePattern,
-  CUSTOMER_ROLE_OR_FILTER,
-} from "@/modules/customers/lib/customer-query";
+import { CUSTOMER_ROLE_OR_FILTER } from "@/modules/customers/lib/customer-query";
+import { searchCustomersTypeahead } from "@/modules/customers/lib/customer-typeahead-query";
 
 export interface CustomerStats {
   total: number;
@@ -136,28 +134,8 @@ export async function getCustomerDetails(
 export async function searchCustomers(query: string, limit = 20): Promise<
   Pick<AdminUser, "id" | "name" | "email" | "phone" | "customer_number">[]
 > {
-  await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
-  const pattern = buildIlikePattern(query);
-
-  let request = supabase
-    .from("users")
-    .select("id, name, email, phone, customer_number")
-    .or(CUSTOMER_ROLE_OR_FILTER);
-
-  if (pattern) {
-    request = request.or(
-      `name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},customer_number.ilike.${pattern}`,
-    );
-  }
-
-  const { data, error } = await request.order("name").limit(limit);
-
-  if (error) throw new Error(error.message);
-  return (data ?? []) as Pick<
-    AdminUser,
-    "id" | "name" | "email" | "phone" | "customer_number"
-  >[];
+  return searchCustomersTypeahead(supabase, query, limit);
 }
 
 export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & { stats: CustomerStats }> {

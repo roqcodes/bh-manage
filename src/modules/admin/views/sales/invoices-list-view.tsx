@@ -248,14 +248,7 @@ export function InvoicesListView() {
                   <InvoiceChannelBadge source={row.source} />
                 </AdminTableCell>
                 <AdminTableCell className="max-w-[180px]">
-                  <ErpCustomerTableGlance
-                    userId={row.user_id}
-                    name={row.customer_name}
-                    stats={[
-                      { label: "Balance", value: formatCurrencyAmount(row.balance_due) },
-                      { label: "Paid", value: formatCurrencyAmount(row.amount_paid) },
-                    ]}
-                  />
+                  <ErpCustomerTableGlance userId={row.user_id} name={row.customer_name} />
                 </AdminTableCell>
                 <AdminTableCell>
                   <StatusBadge status={row.status} />

@@ -20,8 +20,9 @@ export async function GET(request: Request) {
     | "name"
     | "stock_desc"
     | "stock_asc";
+  const defaultLimit = mode === "transfer" ? "50" : "20";
   const limit = Math.min(
-    Math.max(parseInt(searchParams.get("limit") ?? "50", 10), 1),
+    Math.max(parseInt(searchParams.get("limit") ?? defaultLimit, 10), 1),
     100,
   );
 
