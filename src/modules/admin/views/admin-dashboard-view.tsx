@@ -888,20 +888,59 @@ export function AdminDashboardView() {
   const [dateTo, setDateTo] = useState(defaults.dateTo);
   const [granularity, setGranularity] = useState<DashboardChartGranularity>("month");
 
-  const { data, isError, error, isPending, isFetching } = useQuery({
-    queryKey: adminQueryKeys.dashboard(storeId, dateFrom, dateTo, granularity),
+  const dashboardEnabled =
+    !erpContextLoading && Boolean(storeId || activeStoreId) && Boolean(dateFrom && dateTo);
+
+  const {
+    data: coreData,
+    isError,
+    error,
+    isPending,
+    isFetching: coreFetching,
+  } = useQuery({
+    queryKey: adminQueryKeys.dashboard(storeId, dateFrom, dateTo, granularity, "core"),
     queryFn: () => {
       const q = new URLSearchParams();
       if (storeId) q.set("storeId", storeId);
       q.set("dateFrom", dateFrom);
       q.set("dateTo", dateTo);
       q.set("granularity", granularity);
+      q.set("section", "core");
       return adminGet<AdminDashboardPayload>(`dashboard?${q.toString()}`);
     },
     placeholderData: keepPreviousData,
-    enabled:
-      !erpContextLoading && Boolean(storeId || activeStoreId) && Boolean(dateFrom && dateTo),
+    enabled: dashboardEnabled,
   });
+
+  const { data: extendedData, isFetching: extendedFetching } = useQuery({
+    queryKey: adminQueryKeys.dashboard(storeId, dateFrom, dateTo, granularity, "extended"),
+    queryFn: () => {
+      const q = new URLSearchParams();
+      if (storeId) q.set("storeId", storeId);
+      q.set("dateFrom", dateFrom);
+      q.set("dateTo", dateTo);
+      q.set("granularity", granularity);
+      q.set("section", "extended");
+      return adminGet<AdminDashboardPayload>(`dashboard?${q.toString()}`);
+    },
+    placeholderData: keepPreviousData,
+    enabled: dashboardEnabled,
+  });
+
+  const isFetching = coreFetching || extendedFetching;
+  const data = coreData
+    ? {
+        ...coreData,
+        erpFinancial: extendedData?.erpFinancial ?? coreData.erpFinancial,
+        erpActivity: extendedData?.erpActivity?.length
+          ? extendedData.erpActivity
+          : coreData.erpActivity,
+        erpMonthlySeries: extendedData?.erpMonthlySeries ?? coreData.erpMonthlySeries,
+        recentErpInvoices: extendedData?.recentErpInvoices?.length
+          ? extendedData.recentErpInvoices
+          : coreData.recentErpInvoices,
+      }
+    : undefined;
 
   useEffect(() => {
     function onStoreChanged() {
@@ -1072,7 +1111,7 @@ export function AdminDashboardView() {
         <InventoryPanel
           alerts={alerts}
           inventory={inventory}
-          lowStockCount={erpFinancial?.low_stock_count ?? 0}
+          lowStockCount={erpFinancial?.low_stock_count ?? inventory.productsNeedingRestock}
         />
       </section>
     </AdminPageLayout>

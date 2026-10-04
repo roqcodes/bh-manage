@@ -86,19 +86,22 @@ export const getCurrentSessionProfile = cache(async () => {
       };
     }
 
-    let profile: UserProfile | null;
-    try {
-      profile = await getUserProfileById(user.id);
-    } catch (profileError) {
-      if (isSupabaseConnectivityError(profileError)) {
-        throw new SupabaseConnectivityError(profileError);
+    const { data, error } = await supabase
+      .from("users")
+      .select("id,name,email,phone,role,is_verified")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      if (isSupabaseConnectivityError(error)) {
+        throw new SupabaseConnectivityError(error);
       }
-      throw profileError;
+      throw new Error(error.message);
     }
 
     return {
       user,
-      profile,
+      profile: normalizeUserProfile(data),
     };
   } catch (error) {
     if (error instanceof SupabaseConnectivityError) {

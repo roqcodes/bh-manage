@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 import type {
   AdminDashboardPayload,
   CatalogInventoryCoverage,
@@ -8,11 +9,9 @@ import type {
   DashboardChartGranularity,
   DashboardErpInvoiceRow,
   DashboardFulfillmentCounts,
-  DashboardMetrics,
   DashboardMonthlySeriesPoint,
   InventoryInsights,
   Order,
-  VendorSnapshotEntry,
 } from "@/common/admin/types";
 import { listAuditLogs } from "@/modules/erp/services/audit-log.service";
 import {
@@ -23,23 +22,13 @@ import { requireErpStoreId } from "@/modules/erp/services/store-context.service"
 import type { ErpFinancialDashboard } from "@/common/erp/finance-types";
 import type { AuditLogEntry } from "@/common/erp/types";
 
+export type DashboardPayloadSection = "core" | "extended" | "all";
+
 function sortAlertsBySeverity(alerts: DashboardAlert[]): DashboardAlert[] {
   const rank: Record<string, number> = { critical: 0, warning: 1, attention: 2 };
   return [...alerts].sort(
     (a, b) => (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9),
   );
-}
-
-function buildVendorSnapshot(
-  fulfillment: VendorSnapshotEntry[],
-  lowestPrice: VendorSnapshotEntry[],
-  reliability: VendorSnapshotEntry[],
-): AdminDashboardPayload["vendors"] {
-  return {
-    topByFulfillment: fulfillment.slice(0, 3),
-    lowestAvgPrice: lowestPrice.slice(0, 3),
-    topByPoReliability: reliability.slice(0, 3),
-  };
 }
 
 const MONTH_LABELS = [
@@ -57,6 +46,36 @@ const MONTH_LABELS = [
   "Dec",
 ] as const;
 
+function emptySeries(): DashboardMonthlySeriesPoint[] {
+  return MONTH_LABELS.map((month, i) => ({
+    month,
+    monthNum: i + 1,
+    income: 0,
+    cogs: 0,
+    expenses: 0,
+    netProfit: 0,
+  }));
+}
+
+type OpsSnapshot = {
+  store_name?: string;
+  daily_revenue?: number;
+  orders_today?: number;
+  pending?: number;
+  processing?: number;
+  shipped?: number;
+  delivered?: number;
+  unfulfilled?: number;
+  delayed?: number;
+  needs_assignment?: number;
+  ready_to_ship?: number;
+  invoices_today?: number;
+  available_units?: number;
+  out_of_stock?: number;
+  low_stock?: number;
+  margin_today?: number;
+  demand_today?: number;
+};
 
 async function loadInvoiceCustomerNames(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -78,207 +97,56 @@ async function loadInvoiceCustomerNames(
   return nameById;
 }
 
-/** One Supabase client + parallel queries for dashboard API (branch-scoped). */
-export async function getAdminDashboardPayload(
-  storeId?: string | null,
-  dateFrom?: string | null,
-  dateTo?: string | null,
-  granularity: DashboardChartGranularity = "month",
-): Promise<AdminDashboardPayload> {
-  const supabase = await createSupabaseServerClient();
-  const activeStoreId = await requireErpStoreId(storeId);
+function emptyVendors(): AdminDashboardPayload["vendors"] {
+  return {
+    topByFulfillment: [],
+    lowestAvgPrice: [],
+    topByPoReliability: [],
+  };
+}
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const year = today.getFullYear();
-  const periodFrom = dateFrom?.trim() || `${year}-01-01`;
-  const periodTo = dateTo?.trim() || today.toISOString().slice(0, 10);
-  const startOfDay = today.toISOString();
+const emptyCoverage: CatalogInventoryCoverage = {
+  productsWithStock: 0,
+  totalProducts: 0,
+};
 
-  const erpExtendedPromise = Promise.all([
-    getStoreFinancialDashboard(activeStoreId, periodFrom, periodTo),
-    listAuditLogs({ storeId: activeStoreId, limit: 15 }),
-    supabase
-      .from("invoices")
-      .select("id, invoice_number, user_id, total_amount, created_at, status")
-      .eq("store_id", activeStoreId)
-      .order("created_at", { ascending: false })
-      .limit(8),
-    supabase
-      .from("invoices")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .gte("created_at", startOfDay)
-      .in("status", ["issued", "partial", "paid"]),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .eq("fulfillment_status", "pending_assignment")
-      .not("status", "eq", "cancelled"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .in("fulfillment_status", [
-        "reserved",
-        "multi_shipment",
-        "partially_shipped",
-      ])
-      .not("status", "eq", "cancelled"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .eq("status", "shipped"),
-    buildStorePlSeries(activeStoreId, periodFrom, periodTo, granularity),
-  ]).catch(() => null);
-
-  const [
-    storeRowResult,
-    revenueResult,
-    unfulfilledResult,
-    delayedResult,
-    pendingPipe,
-    processingPipe,
-    shippedPipe,
-    deliveredPipe,
-    ordersTodayAgg,
-    inventoryStockRows,
-    recentResult,
-    erpExtendedResult,
-  ] = await Promise.all([
-    supabase.from("stores").select("name").eq("id", activeStoreId).maybeSingle(),
-    supabase
-      .from("orders")
-      .select("id,total_amount")
-      .eq("store_id", activeStoreId)
-      .gte("created_at", startOfDay)
-      .neq("status", "cancelled"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .in("status", ["pending", "processing", "shipped"]),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .in("status", ["pending", "processing", "shipped"])
-      .lt("created_at", startOfDay),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .eq("status", "pending"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .eq("status", "processing"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .eq("status", "shipped"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .eq("status", "delivered"),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("store_id", activeStoreId)
-      .gte("created_at", startOfDay)
-      .neq("status", "cancelled"),
-    supabase
-      .from("store_product_inventory")
-      .select("stock")
-      .eq("store_id", activeStoreId),
-    supabase
-      .from("orders")
-      .select(
-        "id,created_at,status,total_amount,fulfillment_status,source,users:users!orders_user_fkey(name,phone)",
-      )
-      .eq("store_id", activeStoreId)
-      .order("created_at", { ascending: false })
-      .limit(8),
-    erpExtendedPromise,
-  ]);
-
-  const storeName = storeRowResult.data?.name ?? "Store";
-
-  const todayOrders = revenueResult.data ?? [];
-  const todayIds = todayOrders.map((o) => o.id as string).filter(Boolean);
-
-  const [marginResult, demandItemsResult] = await Promise.all([
-    todayIds.length === 0
-      ? Promise.resolve({ data: [] as { margin_amount: number | null }[] })
-      : supabase
-          .from("order_items")
-          .select("margin_amount")
-          .in("order_id", todayIds),
-    todayIds.length === 0
-      ? Promise.resolve({ data: [] as { quantity: number | null }[] })
-      : supabase.from("order_items").select("quantity").in("order_id", todayIds),
-  ]);
-
-  const dailyRevenue = todayOrders.reduce(
-    (sum, o) => sum + Number(o.total_amount ?? 0),
-    0,
-  );
-
-  const ordersToday = ordersTodayAgg.count ?? 0;
-  const averageOrderValue =
-    ordersToday > 0 ? dailyRevenue / ordersToday : 0;
-
-  const marginRows = marginResult.data ?? [];
-  const marginToday = marginRows.reduce(
-    (sum, row) => sum + Number(row.margin_amount ?? 0),
-    0,
-  );
-
-  const demandItems = demandItemsResult.data ?? [];
-  const demandTodayUnits = demandItems.reduce(
-    (sum, row) => sum + Math.max(0, Math.floor(Number(row.quantity ?? 0))),
-    0,
-  );
-
-  const stockRows = inventoryStockRows.data ?? [];
-  const availableInventoryUnits = stockRows.reduce(
-    (sum, row) => sum + Math.max(0, Math.floor(Number(row.stock ?? 0))),
-    0,
-  );
-
-  let outOfStockCount = 0;
-  let lowStockItems = 0;
-  for (const row of stockRows) {
-    const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
-    if (stock < 1) outOfStockCount += 1;
-    else if (stock < 10) lowStockItems += 1;
-  }
-  const productsNeedingRestock = outOfStockCount + lowStockItems;
+function buildCoreFromOps(
+  activeStoreId: string,
+  periodFrom: string,
+  periodTo: string,
+  granularity: DashboardChartGranularity,
+  ops: OpsSnapshot,
+  recentOrders: Order[],
+): AdminDashboardPayload {
+  const dailyRevenue = Number(ops.daily_revenue ?? 0);
+  const ordersToday = Number(ops.orders_today ?? 0);
+  const pending = Number(ops.pending ?? 0);
+  const outOfStockCount = Number(ops.out_of_stock ?? 0);
+  const lowStockItems = Number(ops.low_stock ?? 0);
+  const delayed = Number(ops.delayed ?? 0);
+  const unfulfilled = Number(ops.unfulfilled ?? 0);
+  const delivered = Number(ops.delivered ?? 0);
 
   const inventory: InventoryInsights = {
-    availableInventoryUnits,
-    productsNeedingRestock,
-    demandTodayUnits,
+    availableInventoryUnits: Number(ops.available_units ?? 0),
+    productsNeedingRestock: outOfStockCount + lowStockItems,
+    demandTodayUnits: Number(ops.demand_today ?? 0),
     outOfStockSkus: outOfStockCount,
     lowStockSkus: lowStockItems,
   };
 
-  const metrics: DashboardMetrics = {
-    dailyRevenue,
-    pendingOrders: pendingPipe.count ?? 0,
-    lowStockItems,
+  const pipeline = {
+    pending,
+    processing: Number(ops.processing ?? 0),
+    shipped: Number(ops.shipped ?? 0),
+    delivered,
   };
 
-  const pipeline = {
-    pending: pendingPipe.count ?? 0,
-    processing: processingPipe.count ?? 0,
-    shipped: shippedPipe.count ?? 0,
-    delivered: deliveredPipe.count ?? 0,
+  const fulfillmentCounts: DashboardFulfillmentCounts = {
+    needsAssignment: Number(ops.needs_assignment ?? 0),
+    readyToShip: Number(ops.ready_to_ship ?? 0),
+    shipped: Number(ops.shipped ?? 0),
+    delivered,
   };
 
   const alerts: DashboardAlert[] = sortAlertsBySeverity([
@@ -292,7 +160,7 @@ export async function getAdminDashboardPayload(
     {
       id: "delayed",
       label: "Delayed orders (open from prior days)",
-      count: delayedResult.count ?? 0,
+      count: delayed,
       severity: "critical",
       href: "/admin/orders",
     },
@@ -306,104 +174,275 @@ export async function getAdminDashboardPayload(
     {
       id: "unfulfilled",
       label: "Unfulfilled orders (in flight)",
-      count: unfulfilledResult.count ?? 0,
+      count: unfulfilled,
       severity: "attention",
       href: "/admin/orders",
     },
   ]);
 
-  const business = {
-    revenueToday: dailyRevenue,
-    marginToday,
-    ordersToday,
-    averageOrderValue,
-  };
-
-  // Vendor snapshot + global catalog coverage are not rendered on the store dashboard UI.
-  const catalogCoverage: CatalogInventoryCoverage = {
-    productsWithStock: 0,
-    totalProducts: 0,
-  };
-  const vendors = buildVendorSnapshot([], [], []);
-
-  let erpFinancial: ErpFinancialDashboard | null = null;
-  let erpActivity: AuditLogEntry[] = [];
-  let erpMonthlySeries: DashboardMonthlySeriesPoint[] = MONTH_LABELS.map(
-    (month, i) => ({
-      month,
-      monthNum: i + 1,
-      income: 0,
-      cogs: 0,
-      expenses: 0,
-      netProfit: 0,
-    }),
-  );
-  let recentErpInvoices: DashboardErpInvoiceRow[] = [];
-  let erpInvoicesToday = 0;
-  let fulfillmentCounts: DashboardFulfillmentCounts = {
-    needsAssignment: 0,
-    readyToShip: 0,
-    shipped: 0,
-    delivered: deliveredPipe.count ?? 0,
-  };
-
-  if (erpExtendedResult) {
-    const [
-      financial,
-      activityResult,
-      recentInvoicesRaw,
-      erpInvoicesTodayResult,
-      fulfillPending,
-      fulfillReady,
-      fulfillShipped,
-      erpMonthlySeriesData,
-    ] = erpExtendedResult;
-
-    erpFinancial = financial;
-    erpActivity = activityResult.data;
-    erpMonthlySeries = erpMonthlySeriesData;
-    erpInvoicesToday = erpInvoicesTodayResult.count ?? 0;
-    fulfillmentCounts = {
-      needsAssignment: fulfillPending.count ?? 0,
-      readyToShip: fulfillReady.count ?? 0,
-      shipped: fulfillShipped.count ?? 0,
-      delivered: deliveredPipe.count ?? 0,
-    };
-
-    const invoiceRows = recentInvoicesRaw.data ?? [];
-    const customerNames = await loadInvoiceCustomerNames(
-      supabase,
-      invoiceRows.map((row) => row.user_id),
-    );
-    recentErpInvoices = invoiceRows.map((row) => ({
-      id: row.id,
-      invoice_number: row.invoice_number,
-      total_amount: Number(row.total_amount ?? 0),
-      created_at: row.created_at,
-      customer_name: customerNames.get(row.user_id) ?? null,
-      status: row.status,
-    }));
-  }
-
   return {
     storeId: activeStoreId,
-    storeName,
+    storeName: ops.store_name ?? "Store",
     periodFrom,
     periodTo,
     chartGranularity: granularity,
-    metrics,
+    metrics: {
+      dailyRevenue,
+      pendingOrders: pending,
+      lowStockItems,
+    },
     alerts,
     pipeline,
-    business,
+    business: {
+      revenueToday: dailyRevenue,
+      marginToday: Number(ops.margin_today ?? 0),
+      ordersToday,
+      averageOrderValue: ordersToday > 0 ? dailyRevenue / ordersToday : 0,
+    },
     inventory,
-    catalogCoverage,
-    vendors,
-    recentOrders: (recentResult.data ?? []) as unknown as Order[],
-    erpFinancial,
-    erpActivity,
-    erpMonthlySeries,
-    recentErpInvoices,
-    erpInvoicesToday,
+    catalogCoverage: emptyCoverage,
+    vendors: emptyVendors(),
+    recentOrders,
+    erpFinancial: null,
+    erpActivity: [],
+    erpMonthlySeries: emptySeries(),
+    recentErpInvoices: [],
+    erpInvoicesToday: Number(ops.invoices_today ?? 0),
     fulfillmentCounts,
+  };
+}
+
+/** Store-scoped dashboard. `core` skips P&L/audit; `extended` fills financial sections. */
+export async function getAdminDashboardPayload(
+  storeId?: string | null,
+  dateFrom?: string | null,
+  dateTo?: string | null,
+  granularity: DashboardChartGranularity = "month",
+  section: DashboardPayloadSection = "all",
+): Promise<AdminDashboardPayload> {
+  const supabase = await createSupabaseServerClient();
+  const activeStoreId = await requireErpStoreId(storeId);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const year = today.getFullYear();
+  const periodFrom = dateFrom?.trim() || `${year}-01-01`;
+  const periodTo = dateTo?.trim() || today.toISOString().slice(0, 10);
+  const startOfDay = today.toISOString();
+
+  const wantCore = section === "core" || section === "all";
+  const wantExtended = section === "extended" || section === "all";
+
+  const opsPromise = wantCore
+    ? invokeRpc(supabase, "get_admin_store_ops_snapshot", {
+        p_store_id: activeStoreId,
+        p_start_of_day: startOfDay,
+      })
+    : Promise.resolve({ data: null, error: null });
+
+  const recentPromise = wantCore
+    ? supabase
+        .from("orders")
+        .select(
+          "id,created_at,status,total_amount,fulfillment_status,source,users:users!orders_user_fkey(name,phone)",
+        )
+        .eq("store_id", activeStoreId)
+        .order("created_at", { ascending: false })
+        .limit(8)
+    : Promise.resolve({ data: [] });
+
+  const extendedPromise = wantExtended
+    ? Promise.all([
+        getStoreFinancialDashboard(activeStoreId, periodFrom, periodTo),
+        listAuditLogs({ storeId: activeStoreId, limit: 15, skipCount: true }),
+        buildStorePlSeries(activeStoreId, periodFrom, periodTo, granularity),
+      ]).catch(() => null)
+    : Promise.resolve(null);
+
+  const [opsResult, recentResult, extendedResult] = await Promise.all([
+    opsPromise,
+    recentPromise,
+    extendedPromise,
+  ]);
+
+  let ops = ((opsResult as { data?: OpsSnapshot | null }).data ?? {}) as OpsSnapshot;
+  if (wantCore && ("error" in opsResult && opsResult.error || !opsResult.data)) {
+    const [
+      storeRow,
+      todayOrders,
+      pendingPipe,
+      processingPipe,
+      shippedPipe,
+      deliveredPipe,
+      unfulfilledResult,
+      delayedResult,
+      fulfillPending,
+      fulfillReady,
+      inventoryStockRows,
+      invoicesToday,
+    ] = await Promise.all([
+      supabase.from("stores").select("name").eq("id", activeStoreId).maybeSingle(),
+      supabase
+        .from("orders")
+        .select("id,total_amount")
+        .eq("store_id", activeStoreId)
+        .gte("created_at", startOfDay)
+        .neq("status", "cancelled"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId)
+        .eq("status", "pending"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId)
+        .eq("status", "processing"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId)
+        .eq("status", "shipped"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId)
+        .eq("status", "delivered"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId)
+        .in("status", ["pending", "processing", "shipped"]),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId)
+        .in("status", ["pending", "processing", "shipped"])
+        .lt("created_at", startOfDay),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId)
+        .eq("fulfillment_status", "pending_assignment")
+        .not("status", "eq", "cancelled"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId)
+        .in("fulfillment_status", ["reserved", "multi_shipment", "partially_shipped"])
+        .not("status", "eq", "cancelled"),
+      supabase
+        .from("store_product_inventory")
+        .select("stock")
+        .eq("store_id", activeStoreId),
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId)
+        .gte("created_at", startOfDay)
+        .in("status", ["issued", "partial", "paid"]),
+    ]);
+    const todayIds = (todayOrders.data ?? []).map((row) => row.id as string);
+    const [marginResult, demandResult] = await Promise.all([
+      todayIds.length === 0
+        ? Promise.resolve({ data: [] as { margin_amount: number | null }[] })
+        : supabase.from("order_items").select("margin_amount").in("order_id", todayIds),
+      todayIds.length === 0
+        ? Promise.resolve({ data: [] as { quantity: number | null }[] })
+        : supabase.from("order_items").select("quantity").in("order_id", todayIds),
+    ]);
+    const stockRows = inventoryStockRows.data ?? [];
+    let outOfStockCount = 0;
+    let lowStockItems = 0;
+    let availableUnits = 0;
+    for (const row of stockRows) {
+      const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
+      availableUnits += stock;
+      if (stock < 1) outOfStockCount += 1;
+      else if (stock < 10) lowStockItems += 1;
+    }
+    ops = {
+      store_name: storeRow.data?.name ?? "Store",
+      daily_revenue: (todayOrders.data ?? []).reduce(
+        (sum, row) => sum + Number(row.total_amount ?? 0),
+        0,
+      ),
+      orders_today: todayOrders.data?.length ?? 0,
+      pending: pendingPipe.count ?? 0,
+      processing: processingPipe.count ?? 0,
+      shipped: shippedPipe.count ?? 0,
+      delivered: deliveredPipe.count ?? 0,
+      unfulfilled: unfulfilledResult.count ?? 0,
+      delayed: delayedResult.count ?? 0,
+      needs_assignment: fulfillPending.count ?? 0,
+      ready_to_ship: fulfillReady.count ?? 0,
+      invoices_today: invoicesToday.count ?? 0,
+      available_units: availableUnits,
+      out_of_stock: outOfStockCount,
+      low_stock: lowStockItems,
+      margin_today: (marginResult.data ?? []).reduce(
+        (sum, row) => sum + Number(row.margin_amount ?? 0),
+        0,
+      ),
+      demand_today: (demandResult.data ?? []).reduce(
+        (sum, row) => sum + Math.max(0, Math.floor(Number(row.quantity ?? 0))),
+        0,
+      ),
+    };
+  }
+  const recentOrders = (recentResult.data ?? []) as unknown as Order[];
+
+  const core = buildCoreFromOps(
+    activeStoreId,
+    periodFrom,
+    periodTo,
+    granularity,
+    ops,
+    recentOrders,
+  );
+
+  if (!wantExtended || !extendedResult) {
+    return core;
+  }
+
+  const [financial, activityResult, series] = extendedResult;
+  const rawRecent =
+    (
+      financial as ErpFinancialDashboard & {
+        recent_invoices?: Array<{
+          id: string;
+          invoice_number: string;
+          user_id: string;
+          total_amount: number;
+          created_at: string;
+          status: string;
+        }>;
+      }
+    ).recent_invoices ?? [];
+
+  const customerNames = await loadInvoiceCustomerNames(
+    supabase,
+    rawRecent.map((row) => row.user_id),
+  );
+  const recentErpInvoices: DashboardErpInvoiceRow[] = rawRecent.map((row) => ({
+    id: row.id,
+    invoice_number: row.invoice_number,
+    total_amount: Number(row.total_amount ?? 0),
+    created_at: row.created_at,
+    customer_name: customerNames.get(row.user_id) ?? null,
+    status: row.status,
+  }));
+
+  return {
+    ...core,
+    erpFinancial: financial
+      ? {
+          ...financial,
+          low_stock_count: core.inventory.productsNeedingRestock,
+        }
+      : null,
+    erpActivity: activityResult.data,
+    erpMonthlySeries: series,
+    recentErpInvoices,
   };
 }

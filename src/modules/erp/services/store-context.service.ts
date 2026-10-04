@@ -50,7 +50,7 @@ export async function listActiveStores(): Promise<Store[]> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("stores")
-    .select("*")
+    .select("id, name, code, company_id, is_active, is_default")
     .eq("is_active", true)
     .order("name");
   if (error) throw new Error(error.message);

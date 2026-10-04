@@ -5,6 +5,7 @@ import {
   requireAdminOrManagerProfile,
 } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 import type {
   InventoryCatalogStats,
   InventoryWithVariant,
@@ -53,6 +54,24 @@ export async function getInventoryCatalogStats(
 ): Promise<InventoryCatalogStats> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
+
+  const rpc = await invokeRpc(supabase, "get_inventory_catalog_stats", {
+    p_store_id: storeId ?? null,
+  });
+  if (!rpc.error && rpc.data && typeof rpc.data === "object") {
+    const row = rpc.data as {
+      total_skus?: number;
+      critical_skus?: number;
+      low_stock_skus?: number;
+      healthy_skus?: number;
+    };
+    return {
+      totalSkus: Number(row.total_skus ?? 0),
+      criticalSkus: Number(row.critical_skus ?? 0),
+      lowStockSkus: Number(row.low_stock_skus ?? 0),
+      healthySkus: Number(row.healthy_skus ?? 0),
+    };
+  }
 
   let query = supabase.from("inventory").select("stock,reorder_point,reserved_stock");
   if (storeId) query = query.eq("store_id", storeId);

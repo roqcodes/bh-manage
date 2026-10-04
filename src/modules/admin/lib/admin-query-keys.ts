@@ -17,8 +17,17 @@ export const adminQueryKeys = {
     dateFrom?: string,
     dateTo?: string,
     granularity?: string,
+    section?: string,
   ) =>
-    ["admin", "dashboard", storeId ?? "active", dateFrom ?? "", dateTo ?? "", granularity ?? "month"] as const,
+    [
+      "admin",
+      "dashboard",
+      storeId ?? "active",
+      dateFrom ?? "",
+      dateTo ?? "",
+      granularity ?? "month",
+      section ?? "all",
+    ] as const,
   navBadges: () => ["admin", "nav-badges"] as const,
   products: (page: number, categoryId: string | null, storeId?: string | null) =>
     ["admin", "products", page, categoryId ?? "all", storeId ?? "all"] as const,

@@ -278,6 +278,37 @@ export async function getOrdersCatalogStats(
   const supabase = await createSupabaseServerClient();
   const activeStoreId = await resolveErpStoreId(storeId);
 
+  if (activeStoreId) {
+    const rpc = await invokeRpc(supabase, "get_admin_order_channel_stats", {
+      p_store_id: activeStoreId,
+      p_channel: channel,
+    });
+    if (!rpc.error && rpc.data && typeof rpc.data === "object") {
+      const row = rpc.data as {
+        total_orders?: number;
+        pending_count?: number;
+        processing_count?: number;
+        shipped_count?: number;
+        delivered_count?: number;
+        cancelled_count?: number;
+        items_ordered?: number;
+        orders_fulfilled?: number;
+        sales_reversals?: number;
+      };
+      return {
+        totalOrders: Number(row.total_orders ?? 0),
+        pendingCount: Number(row.pending_count ?? 0),
+        processingCount: Number(row.processing_count ?? 0),
+        shippedCount: Number(row.shipped_count ?? 0),
+        deliveredCount: Number(row.delivered_count ?? 0),
+        cancelledCount: Number(row.cancelled_count ?? 0),
+        itemsOrdered: Number(row.items_ordered ?? 0),
+        ordersFulfilled: Number(row.orders_fulfilled ?? 0),
+        salesReversals: Number(row.sales_reversals ?? 0),
+      };
+    }
+  }
+
   const scopeOrders = (query: ReturnType<typeof supabase.from>) => {
     let scoped = applyOrderChannelFilter(query, channel);
     if (activeStoreId) scoped = scoped.eq("store_id", activeStoreId);

@@ -11,9 +11,13 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
   const p = href.split("?")[0];
 
   if (p === "/admin" || p === "") {
+    const ctx = qc.getQueryData<ErpContextQueryData>(adminQueryKeys.erpContext());
+    const storeId = ctx?.context?.store_id;
+    if (!storeId) return Promise.resolve();
     return qc.prefetchQuery({
-      queryKey: adminQueryKeys.dashboard(),
-      queryFn: () => adminGet("dashboard"),
+      queryKey: adminQueryKeys.dashboard(storeId, undefined, undefined, "month", "core"),
+      queryFn: () =>
+        adminGet(`dashboard?storeId=${encodeURIComponent(storeId)}&section=core`),
       staleTime: STALE,
     });
   }

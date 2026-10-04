@@ -128,17 +128,24 @@ export async function listAuditLogs(filters?: {
   storeId?: string;
   page?: number;
   limit?: number;
+  skipCount?: boolean;
 }): Promise<{ data: AuditLogEntry[]; total: number }> {
   const supabase = await createSupabaseServerClient();
   const page = filters?.page ?? 0;
   const limit = filters?.limit ?? 50;
   const from = page * limit;
 
-  let query = supabase
-    .from("audit_logs")
-    .select(AUDIT_LOG_SELECT, { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(from, from + limit - 1);
+  let query = filters?.skipCount
+    ? supabase
+        .from("audit_logs")
+        .select(AUDIT_LOG_SELECT)
+        .order("created_at", { ascending: false })
+        .range(from, from + limit - 1)
+    : supabase
+        .from("audit_logs")
+        .select(AUDIT_LOG_SELECT, { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, from + limit - 1);
 
   if (filters?.storeId) query = query.eq("store_id", filters.storeId);
   if (filters?.dateFrom) query = query.gte("created_at", `${filters.dateFrom}T00:00:00`);

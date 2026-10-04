@@ -3,6 +3,7 @@ import "server-only";
 import type { DashboardChartGranularity, DashboardMonthlySeriesPoint } from "@/common/admin/types";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 import type { ErpFinancialDashboard, ErpReconciliationSnapshot } from "@/common/erp/finance-types";
 
 const MONTH_LABELS = [
@@ -153,6 +154,38 @@ export async function buildStorePlSeries(
     buckets.map((bucket) => [bucket.monthKey ?? `${bucket.monthNum}`, bucket]),
   );
 
+  const rpc = await invokeRpc(supabase, "get_erp_store_pl_series", {
+    p_store_id: storeId,
+    p_date_from: from,
+    p_date_to: to,
+    p_granularity: granularity,
+  });
+
+  if (!rpc.error && rpc.data) {
+    const rows = Array.isArray(rpc.data)
+      ? rpc.data
+      : typeof rpc.data === "string"
+        ? (JSON.parse(rpc.data) as unknown)
+        : rpc.data;
+    if (Array.isArray(rows)) {
+      const byKey = new Map(
+        (rows as Array<{ period_key: string; income: number; expenses: number; net_profit: number }>).map(
+          (row) => [row.period_key, row],
+        ),
+      );
+      for (const bucket of buckets) {
+        const key = bucket.monthKey ?? `${bucket.monthNum}`;
+        const row = byKey.get(key);
+        if (!row) continue;
+        bucket.income = Number(row.income ?? 0);
+        bucket.expenses = Number(row.expenses ?? 0);
+        bucket.cogs = 0;
+        bucket.netProfit = Number(row.net_profit ?? bucket.income - bucket.expenses);
+      }
+      return buckets;
+    }
+  }
+
   const { data, error } = await supabase
     .from("journal_entries")
     .select(
@@ -227,6 +260,60 @@ export async function getStoreFinancialDashboard(
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const salesSince = thirtyDaysAgo.toISOString().slice(0, 10);
+
+  const snapRes = await invokeRpc(supabase, "get_admin_store_finance_snapshot", {
+    p_store_id: storeId,
+    p_date_from: from,
+    p_date_to: to,
+  });
+
+  if (!snapRes.error && snapRes.data && typeof snapRes.data === "object") {
+    const snap = snapRes.data as {
+      accounts_receivable?: number;
+      accounts_payable?: number;
+      invoice_status?: Array<{ status: string; count: number; total: number }>;
+      daily_sales?: Array<{ day: string; total: number }>;
+      recent_invoices?: Array<{
+        id: string;
+        invoice_number: string;
+        user_id: string;
+        total_amount: number;
+        created_at: string;
+        status: string;
+      }>;
+    };
+    const plPeriod = await callProfitAndLoss(supabase, from, to, storeId);
+    const totalIncome = Number(plPeriod.total_income ?? 0);
+    const totalExpenses = Number(plPeriod.total_expenses ?? 0);
+    return {
+      accounts_receivable: Number(snap.accounts_receivable ?? 0),
+      accounts_payable: Number(snap.accounts_payable ?? 0),
+      net_income_ytd: totalIncome,
+      cogs_ytd: 0,
+      expenses_ytd: totalExpenses,
+      net_profit_ytd: Number(plPeriod.net_profit ?? 0),
+      low_stock_count: 0,
+      daily_sales: (snap.daily_sales ?? []).map((row) => ({
+        day: row.day,
+        total: Number(row.total ?? 0),
+      })),
+      invoice_status_ytd: (snap.invoice_status ?? []).map((row) => ({
+        status: row.status,
+        count: Number(row.count ?? 0),
+        total: Number(row.total ?? 0),
+      })),
+      recent_invoices: snap.recent_invoices ?? [],
+    } as ErpFinancialDashboard & {
+      recent_invoices: Array<{
+        id: string;
+        invoice_number: string;
+        user_id: string;
+        total_amount: number;
+        created_at: string;
+        status: string;
+      }>;
+    };
+  }
 
   const [plPeriod, arResult, apResult, lowStockResult, invoiceStatusResult, dailySalesResult] =
     await Promise.all([

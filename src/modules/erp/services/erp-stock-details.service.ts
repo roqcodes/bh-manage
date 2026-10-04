@@ -40,10 +40,16 @@ export async function getStockDetails(input?: {
   const onlineStockMap = new Map<string, number>();
 
   if (productIds.length > 0) {
-    const { data: products } = await supabase
-      .from("products")
-      .select("id, name, barcode, price, purchase_price")
-      .in("id", productIds);
+    const [{ data: products }, { data: variants }] = await Promise.all([
+      supabase
+        .from("products")
+        .select("id, name, barcode, price, purchase_price")
+        .in("id", productIds),
+      supabase
+        .from("product_variants")
+        .select("id, product_id")
+        .in("product_id", productIds),
+    ]);
 
     for (const p of products ?? []) {
       productMap.set(p.id, {
@@ -53,11 +59,6 @@ export async function getStockDetails(input?: {
         purchase_price: p.purchase_price != null ? Number(p.purchase_price) : null,
       });
     }
-
-    const { data: variants } = await supabase
-      .from("product_variants")
-      .select("id, product_id")
-      .in("product_id", productIds);
 
     const variantIds = (variants ?? []).map((v) => v.id);
     const variantToProduct = new Map(
