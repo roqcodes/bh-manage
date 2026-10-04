@@ -1,16 +1,21 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { Check, Copy, RefreshCw } from "lucide-react";
 import { useSyncExternalStore } from "react";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useAdminLoadDebugPreference } from "@/modules/navigation/context/AdminLoadDebugPreferenceContext";
 import {
+  buildAsyncProgressDebugExport,
+  getAsyncProgressActivities,
   getGlobalProgressMessages,
   isGlobalProgressActive,
   subscribeGlobalProgress,
+  type AsyncProgressActivity,
 } from "@/modules/navigation/lib/async-progress";
 
 function subscribe(callback: () => void) {
@@ -29,6 +34,15 @@ function getMessagesSnapshot() {
   return getGlobalProgressMessages();
 }
 
+function getActivitiesSnapshot() {
+  return getAsyncProgressActivities();
+}
+
+function formatDurationMs(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  return `${(ms / 1000).toFixed(2)} s`;
+}
+
 function LoadingDots({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center justify-center gap-[3px]", className)} aria-hidden>
@@ -43,17 +57,58 @@ function LoadingDots({ className }: { className?: string }) {
   );
 }
 
+function DebugActivityRow({
+  op,
+  now,
+  live,
+}: {
+  op: AsyncProgressActivity;
+  now: number;
+  live: boolean;
+}) {
+  const ms = live ? now - op.startedAt : op.durationMs ?? 0;
+  return (
+    <li className="rounded-lg border border-slate-100 bg-slate-50/80 px-2 py-1.5 text-[10px] leading-snug text-slate-700">
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 font-medium text-slate-900">{op.label}</span>
+        <span className="shrink-0 tabular-nums text-slate-500">{formatDurationMs(ms)}</span>
+      </div>
+      {op.path ? (
+        <p className="mt-0.5 truncate font-mono text-[9px] text-slate-500">
+          {op.method ?? "GET"} {op.path}
+        </p>
+      ) : null}
+      {op.error ? <p className="mt-0.5 text-rose-600">{op.error}</p> : null}
+    </li>
+  );
+}
+
 export function AdminRefreshStatusButton() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { enabled: loadDebugEnabled } = useAdminLoadDebugPreference();
   const [isPending, startTransition] = useTransition();
   const [hoverOpen, setHoverOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const [copied, setCopied] = useState(false);
   const adminFetching = useIsFetching({ queryKey: ["admin"] });
 
   const globalActive = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const messages = useSyncExternalStore(subscribe, getMessagesSnapshot, () => []);
+  const activities = useSyncExternalStore(subscribe, getActivitiesSnapshot, () => ({
+    active: [],
+    completed: [],
+  }));
 
   const busy = globalActive || isPending || adminFetching > 0;
+  const hasActiveOps = activities.active.length > 0;
+  const recentCompleted = activities.completed.slice(-12).reverse();
+
+  useEffect(() => {
+    if (!loadDebugEnabled || !hasActiveOps) return;
+    const id = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [loadDebugEnabled, hasActiveOps]);
 
   const onRefresh = useCallback(() => {
     if (busy) return;
@@ -66,8 +121,30 @@ export function AdminRefreshStatusButton() {
   const activityMessages =
     messages.length > 0 ? messages : busy ? ["Syncing admin data with the database…"] : [];
 
-  const showActivityCard = hoverOpen && busy && activityMessages.length > 0;
-  const showIdleHint = hoverOpen && !busy;
+  const showDebugPanel =
+    loadDebugEnabled && hoverOpen && (busy || recentCompleted.length > 0);
+  const showSimpleActivityCard =
+    !loadDebugEnabled && hoverOpen && busy && activityMessages.length > 0;
+  const showIdleHint = hoverOpen && !busy && !showDebugPanel;
+
+  const onCopyDebug = useCallback(async () => {
+    const payload = buildAsyncProgressDebugExport(Date.now());
+    const extra = {
+      ...payload,
+      reactQuery: {
+        adminQueriesFetching: adminFetching,
+        transitionPending: isPending,
+      },
+    };
+    const text = JSON.stringify(extra, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }, [adminFetching, isPending]);
 
   return (
     <div
@@ -102,13 +179,70 @@ export function AdminRefreshStatusButton() {
         </span>
       </button>
 
-      {(showActivityCard || showIdleHint) && (
+      {(showDebugPanel || showSimpleActivityCard || showIdleHint) && (
         <div
-          className="pointer-events-none absolute right-0 top-[calc(100%+8px)] z-50 w-[min(18rem,calc(100vw-1.5rem))] animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200"
+          className={cn(
+            "absolute right-0 top-[calc(100%+8px)] z-50 animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200",
+            loadDebugEnabled ? "pointer-events-auto w-[min(22rem,calc(100vw-1.5rem))]" : "pointer-events-none w-[min(18rem,calc(100vw-1.5rem))]",
+          )}
           role="status"
         >
           <div className="rounded-xl border border-slate-200/90 bg-white p-3 text-left shadow-lg ring-1 ring-slate-900/5">
-            {showActivityCard ? (
+            {showDebugPanel ? (
+              <>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-medium text-slate-900">Load debug trace</p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+                      Timings for admin API and navigation (newest completed first).
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 shrink-0 gap-1 px-2 text-[10px]"
+                    onClick={() => void onCopyDebug()}
+                  >
+                    {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                    {copied ? "Copied" : "Copy JSON"}
+                  </Button>
+                </div>
+
+                {hasActiveOps ? (
+                  <div className="mt-2.5 border-t border-slate-100 pt-2.5">
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      In progress
+                    </p>
+                    <ul className="max-h-36 space-y-1 overflow-y-auto">
+                      {activities.active.map((op) => (
+                        <DebugActivityRow key={op.id} op={op} now={now} live />
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {recentCompleted.length > 0 ? (
+                  <div className="mt-2.5 border-t border-slate-100 pt-2.5">
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Completed
+                    </p>
+                    <ul className="max-h-44 space-y-1 overflow-y-auto">
+                      {recentCompleted.map((op) => (
+                        <DebugActivityRow key={`${op.id}-${op.endedAt}`} op={op} now={now} live={false} />
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {adminFetching > 0 ? (
+                  <p className="mt-2 text-[10px] text-slate-500">
+                    React Query: {adminFetching} admin query
+                    {adminFetching === 1 ? "" : "ies"} fetching
+                  </p>
+                ) : null}
+              </>
+            ) : showSimpleActivityCard ? (
               <>
                 <p className="text-xs font-medium text-slate-900">Working in the background</p>
                 <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
@@ -127,7 +261,9 @@ export function AdminRefreshStatusButton() {
               <>
                 <p className="text-xs font-medium text-slate-900">Refresh</p>
                 <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
-                  Reload this page and sync admin data with the database.
+                  {loadDebugEnabled
+                    ? "Load debug is on. Hover here during sync to see timings and copy a JSON trace."
+                    : "Reload this page and sync admin data with the database."}
                 </p>
               </>
             )}

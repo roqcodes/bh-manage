@@ -22,9 +22,14 @@ async function adminFetch<T>(
   init?: RequestInit,
 ): Promise<T> {
   const path = pathAndQuery.startsWith("/") ? pathAndQuery.slice(1) : pathAndQuery;
-  const progressToken = beginAsyncProgress(
-    labelForAdminApiRequest(path, init?.method ?? "GET"),
-  );
+  const method = init?.method ?? "GET";
+  const progressToken = beginAsyncProgress({
+    label: labelForAdminApiRequest(path, method),
+    kind: "api",
+    path: `/api/admin/${path}`,
+    method,
+  });
+  let progressError: string | undefined;
   try {
     const res = await fetch(`/api/admin/${path}`, {
       credentials: "include",
@@ -35,9 +40,12 @@ async function adminFetch<T>(
       const t = await res.text();
       throw new Error(parseAdminApiError(res.status, res.statusText, t));
     }
-    return res.json() as Promise<T>;
+    return (await res.json()) as T;
+  } catch (e) {
+    progressError = e instanceof Error ? e.message : String(e);
+    throw e;
   } finally {
-    endAsyncProgress(progressToken);
+    endAsyncProgress(progressToken, progressError);
   }
 }
 
@@ -76,7 +84,13 @@ export async function adminDelete<T = { ok: boolean }>(pathAndQuery: string): Pr
 /** Returns `null` when the API responds with 404 (e.g. missing entity). */
 export async function adminGetNullable<T>(pathAndQuery: string): Promise<T | null> {
   const path = pathAndQuery.startsWith("/") ? pathAndQuery.slice(1) : pathAndQuery;
-  const progressToken = beginAsyncProgress(labelForAdminApiRequest(path, "GET"));
+  const progressToken = beginAsyncProgress({
+    label: labelForAdminApiRequest(path, "GET"),
+    kind: "api",
+    path: `/api/admin/${path}`,
+    method: "GET",
+  });
+  let progressError: string | undefined;
   try {
     const res = await fetch(`/api/admin/${path}`, {
       credentials: "include",
@@ -88,7 +102,10 @@ export async function adminGetNullable<T>(pathAndQuery: string): Promise<T | nul
       throw new Error(parseAdminApiError(res.status, res.statusText, t));
     }
     return res.json() as Promise<T>;
+  } catch (e) {
+    progressError = e instanceof Error ? e.message : String(e);
+    throw e;
   } finally {
-    endAsyncProgress(progressToken);
+    endAsyncProgress(progressToken, progressError);
   }
 }

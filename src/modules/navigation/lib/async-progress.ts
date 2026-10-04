@@ -1,19 +1,48 @@
 type Listener = () => void;
 
-type ProgressOp = { id: number; label: string };
+export type AsyncProgressKind = "api" | "navigation";
+
+export type AsyncProgressActivity = {
+  id: number;
+  kind: AsyncProgressKind;
+  label: string;
+  path?: string;
+  method?: string;
+  startedAt: number;
+  endedAt?: number;
+  durationMs?: number;
+  status: "active" | "completed" | "failed";
+  error?: string;
+};
+
+export type BeginAsyncProgressInput = {
+  label: string;
+  kind?: AsyncProgressKind;
+  path?: string;
+  method?: string;
+};
 
 let nextOpId = 1;
-const activeOps: ProgressOp[] = [];
-let navigationActive = false;
+const activeById = new Map<number, AsyncProgressActivity>();
+const activeOrder: number[] = [];
+let navigationOpId: number | null = null;
+const completedTrace: AsyncProgressActivity[] = [];
+const MAX_COMPLETED_TRACE = 80;
+
 const listeners = new Set<Listener>();
 let cachedMessages: string[] = [];
 let cachedMessagesKey = "";
+let cachedActivitiesSnapshot: {
+  active: AsyncProgressActivity[];
+  completed: AsyncProgressActivity[];
+} = { active: [], completed: [] };
 
-function rebuildMessageCache() {
+function rebuildCaches() {
   const messages: string[] = [];
-  if (navigationActive) messages.push("Opening page…");
   const seen = new Set<string>();
-  for (const op of activeOps) {
+  for (const id of activeOrder) {
+    const op = activeById.get(id);
+    if (!op) continue;
     if (!seen.has(op.label)) {
       seen.add(op.label);
       messages.push(op.label);
@@ -24,16 +53,23 @@ function rebuildMessageCache() {
     cachedMessagesKey = key;
     cachedMessages = messages;
   }
+
+  cachedActivitiesSnapshot = {
+    active: activeOrder
+      .map((id) => activeById.get(id))
+      .filter((op): op is AsyncProgressActivity => Boolean(op)),
+    completed: [...completedTrace],
+  };
 }
 
 function notify() {
-  rebuildMessageCache();
+  rebuildCaches();
   for (const listener of listeners) {
     listener();
   }
 }
 
-rebuildMessageCache();
+rebuildCaches();
 
 export function subscribeGlobalProgress(listener: Listener) {
   listeners.add(listener);
@@ -41,42 +77,151 @@ export function subscribeGlobalProgress(listener: Listener) {
 }
 
 export function isGlobalProgressActive() {
-  return activeOps.length > 0 || navigationActive;
+  return activeOrder.length > 0;
 }
 
-/** Distinct user-facing messages for in-flight work (navigation + API). */
+/** Distinct user-facing messages for in-flight work. */
 export function getGlobalProgressMessages(): readonly string[] {
   return cachedMessages;
 }
 
+export function getAsyncProgressActivities(): {
+  active: readonly AsyncProgressActivity[];
+  completed: readonly AsyncProgressActivity[];
+} {
+  return cachedActivitiesSnapshot;
+}
+
+function normalizeBeginInput(
+  labelOrDetails?: string | BeginAsyncProgressInput,
+): BeginAsyncProgressInput {
+  if (typeof labelOrDetails === "string") {
+    return { label: labelOrDetails, kind: "api" };
+  }
+  if (labelOrDetails) {
+    return { kind: "api", ...labelOrDetails };
+  }
+  return { label: "Syncing with database…", kind: "api" };
+}
+
+function finalizeActivity(activity: AsyncProgressActivity, error?: string) {
+  activity.endedAt = Date.now();
+  activity.durationMs = activity.endedAt - activity.startedAt;
+  activity.status = error ? "failed" : "completed";
+  if (error) activity.error = error;
+  completedTrace.push({ ...activity });
+  if (completedTrace.length > MAX_COMPLETED_TRACE) {
+    completedTrace.splice(0, completedTrace.length - MAX_COMPLETED_TRACE);
+  }
+}
+
 /** Tracks in-flight admin API / async DB operations. Returns a token for `endAsyncProgress`. */
-export function beginAsyncProgress(label?: string): number {
+export function beginAsyncProgress(labelOrDetails?: string | BeginAsyncProgressInput): number {
+  const details = normalizeBeginInput(labelOrDetails);
   const id = nextOpId++;
-  activeOps.push({ id, label: label ?? "Syncing with database…" });
+  const activity: AsyncProgressActivity = {
+    id,
+    kind: details.kind ?? "api",
+    label: details.label,
+    path: details.path,
+    method: details.method,
+    startedAt: Date.now(),
+    status: "active",
+  };
+  activeById.set(id, activity);
+  activeOrder.push(id);
   notify();
   return id;
 }
 
-export function endAsyncProgress(token: number) {
-  const idx = activeOps.findIndex((op) => op.id === token);
-  if (idx >= 0) activeOps.splice(idx, 1);
+export function endAsyncProgress(token: number, error?: string) {
+  const activity = activeById.get(token);
+  if (!activity) return;
+  const idx = activeOrder.indexOf(token);
+  if (idx >= 0) activeOrder.splice(idx, 1);
+  activeById.delete(token);
+  finalizeActivity(activity, error);
+  if (navigationOpId === token) navigationOpId = null;
   notify();
 }
 
 export async function withAsyncProgress<T>(
   fn: () => Promise<T>,
-  label?: string,
+  labelOrDetails?: string | BeginAsyncProgressInput,
 ): Promise<T> {
-  const token = beginAsyncProgress(label);
+  const token = beginAsyncProgress(labelOrDetails);
+  let progressError: string | undefined;
   try {
     return await fn();
+  } catch (e) {
+    progressError = e instanceof Error ? e.message : String(e);
+    throw e;
   } finally {
-    endAsyncProgress(token);
+    endAsyncProgress(token, progressError);
   }
 }
 
 export function setNavigationProgressActive(active: boolean) {
-  if (navigationActive === active) return;
-  navigationActive = active;
+  if (active) {
+    if (navigationOpId === null) {
+      navigationOpId = beginAsyncProgress({
+        label: "Opening page…",
+        kind: "navigation",
+      });
+    }
+    return;
+  }
+  if (navigationOpId !== null) {
+    endAsyncProgress(navigationOpId);
+    navigationOpId = null;
+  }
+}
+
+export type AsyncProgressDebugExport = {
+  exportedAt: string;
+  url: string;
+  userAgent: string;
+  summary: {
+    activeCount: number;
+    completedCount: number;
+    slowestCompletedMs: number | null;
+    totalCompletedDurationMs: number;
+  };
+  active: AsyncProgressActivity[];
+  completed: AsyncProgressActivity[];
+};
+
+export function buildAsyncProgressDebugExport(
+  now = Date.now(),
+): AsyncProgressDebugExport {
+  const { active, completed } = getAsyncProgressActivities();
+  const activeWithElapsed = active.map((op) => ({
+    ...op,
+    durationMs: now - op.startedAt,
+  }));
+  const completedDurations = completed
+    .map((op) => op.durationMs ?? 0)
+    .filter((ms) => ms > 0);
+  const totalCompletedDurationMs = completedDurations.reduce((a, b) => a + b, 0);
+  const slowestCompletedMs =
+    completedDurations.length > 0 ? Math.max(...completedDurations) : null;
+
+  return {
+    exportedAt: new Date(now).toISOString(),
+    url: typeof window !== "undefined" ? window.location.href : "",
+    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+    summary: {
+      activeCount: active.length,
+      completedCount: completed.length,
+      slowestCompletedMs,
+      totalCompletedDurationMs,
+    },
+    active: activeWithElapsed,
+    completed: [...completed],
+  };
+}
+
+export function clearAsyncProgressDebugTrace() {
+  completedTrace.length = 0;
   notify();
 }

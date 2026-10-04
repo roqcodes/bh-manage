@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
   Bot,
+  Bug,
   CloudUpload,
   Headphones,
   Keyboard,
@@ -17,6 +18,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { useAiAssistantPreference } from "@/modules/ai-assistant";
+import { useAdminLoadDebugPreference } from "@/modules/navigation/context/AdminLoadDebugPreferenceContext";
 import { useOutboxActivityPreference } from "@/modules/pwa/context/OutboxActivityPreferenceContext";
 import { cn } from "@/lib/utils";
 import { useAdminSession } from "@/modules/admin/providers/admin-session-provider";
@@ -158,6 +160,8 @@ export function AdminProfileMenu() {
     useAiAssistantPreference();
   const { enabled: outboxActivityEnabled, setEnabled: setOutboxActivityEnabled } =
     useOutboxActivityPreference();
+  const { enabled: loadDebugEnabled, setEnabled: setLoadDebugEnabled } =
+    useAdminLoadDebugPreference();
   const isMd = useIsMdUp();
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -312,6 +316,32 @@ export function AdminProfileMenu() {
                   checked={outboxActivityEnabled}
                   onCheckedChange={setOutboxActivityEnabled}
                   aria-label="Enable sync activity bar"
+                />
+              </div>
+
+              <div
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/70 bg-white/90 px-3 py-2.5 shadow-sm"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span
+                    className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700"
+                    aria-hidden
+                  >
+                    <Bug className="size-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-900">Load debug</p>
+                    <p className="text-[10px] leading-snug text-slate-500">
+                      Header refresh timings & JSON export
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  size="sm"
+                  checked={loadDebugEnabled}
+                  onCheckedChange={setLoadDebugEnabled}
+                  aria-label="Enable load debug trace"
                 />
               </div>
             </div>
