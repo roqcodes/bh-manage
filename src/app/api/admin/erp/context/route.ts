@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 import {
-  getAdminErpContext,
-  listActiveStores,
+  getAdminErpShell,
   setActiveStore,
 } from "@/modules/erp/services/store-context.service";
 
@@ -12,10 +11,7 @@ export async function GET() {
   if (!auth.ok) return auth.response;
 
   try {
-    const [context, stores] = await Promise.all([
-      getAdminErpContext(),
-      listActiveStores(),
-    ]);
+    const { context, stores } = await getAdminErpShell();
     return NextResponse.json({ context, stores });
   } catch (error) {
     console.error("[GET /api/admin/erp/context]", error);

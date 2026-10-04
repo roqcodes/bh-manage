@@ -21,6 +21,7 @@ import {
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { prefetchAdminRoute } from "@/modules/admin/lib/admin-prefetch-nav";
 import { isAdminRouteHidden } from "@/modules/admin/lib/hidden-admin-routes";
+import { useErpContextQuery } from "@/modules/erp/components/use-erp-stores";
 import { BuyHubLogo } from "@/modules/brand/components/buyhub-logo";
 
 const DASHBOARD_ITEM = ADMIN_DASHBOARD_ITEM;
@@ -393,17 +394,18 @@ export function AdminSidebar({
     }
   }, [activeSectionLabel]);
 
-  /** Load badge counts after first paint so they do not compete with page data. */
+  /**
+   * Badges are non-critical. Do not start until ERP context has settled, then
+   * wait so list/dashboard requests get the connection first.
+   * requestIdleCallback during session wait previously fired immediately.
+   */
+  const { isSuccess: erpContextReady } = useErpContextQuery();
   const [navBadgesEnabled, setNavBadgesEnabled] = useState(false);
   useEffect(() => {
-    const enable = () => setNavBadgesEnabled(true);
-    if (typeof window.requestIdleCallback === "function") {
-      const id = window.requestIdleCallback(enable, { timeout: 3_000 });
-      return () => window.cancelIdleCallback(id);
-    }
-    const t = window.setTimeout(enable, 2_000);
+    if (!erpContextReady) return;
+    const t = window.setTimeout(() => setNavBadgesEnabled(true), 4_000);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [erpContextReady]);
 
   const { data: navBadgesData } = useQuery({
     queryKey: adminQueryKeys.navBadges(),

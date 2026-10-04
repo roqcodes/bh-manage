@@ -16,11 +16,17 @@ export type ErpContextQueryData = {
   stores: StoreOption[];
 };
 
+export const ERP_CONTEXT_STALE_MS = 90_000;
+
+export const erpContextQueryOptions = {
+  queryKey: adminQueryKeys.erpContext(),
+  queryFn: () => adminGet<ErpContextQueryData>("erp/context"),
+  staleTime: ERP_CONTEXT_STALE_MS,
+} as const;
+
 export function useErpContextQuery() {
   return useQuery({
-    queryKey: adminQueryKeys.erpContext(),
-    queryFn: () => adminGet<ErpContextQueryData>("erp/context"),
-    staleTime: 30_000,
+    ...erpContextQueryOptions,
     placeholderData: keepPreviousData,
   });
 }

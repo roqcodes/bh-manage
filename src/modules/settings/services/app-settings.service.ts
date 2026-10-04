@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import {
   DEFAULT_CURRENCY_SETTINGS,
   SAR_CURRENCY_SYMBOL,
@@ -86,7 +88,7 @@ async function fetchAppSettingsRow(
   return withFlags;
 }
 
-export async function getAppSettings(): Promise<CurrencySettings> {
+export const getAppSettings = cache(async (): Promise<CurrencySettings> => {
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await fetchAppSettingsRow(supabase);
@@ -94,7 +96,7 @@ export async function getAppSettings(): Promise<CurrencySettings> {
   if (error) throw new Error(error.message);
   if (!data) return { ...DEFAULT_CURRENCY_SETTINGS };
   return rowToSettings(data, true);
-}
+});
 
 export async function getAppSettingsForAdmin(): Promise<CurrencySettings> {
   await requireAdminOrManagerProfile();

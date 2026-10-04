@@ -7,9 +7,27 @@ import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpContext, Store } from "@/common/erp/types";
 import { getErpContext } from "@/modules/erp/services/audit-log.service";
 
+const fetchActiveStores = cache(async (): Promise<Store[]> => {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("stores")
+    .select("id, name, code, company_id, is_active, is_default")
+    .eq("is_active", true)
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Store[];
+});
+
 export const getAdminErpContext = cache(async (): Promise<ErpContext | null> => {
   await requireAdminOrManagerProfile();
   return getErpContext();
+});
+
+/** Active store + store list for the admin shell. One auth check, parallel PostgREST. */
+export const getAdminErpShell = cache(async () => {
+  await requireAdminOrManagerProfile();
+  const [context, stores] = await Promise.all([getErpContext(), fetchActiveStores()]);
+  return { context, stores };
 });
 
 export const resolveErpStoreId = cache(
@@ -45,17 +63,10 @@ export function withAccountStoreScope<T extends { or: (filter: string) => T }>(
   return query.or(`store_id.eq.${storeId},store_id.is.null`);
 }
 
-export async function listActiveStores(): Promise<Store[]> {
+export const listActiveStores = cache(async (): Promise<Store[]> => {
   await requireAdminOrManagerProfile();
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("stores")
-    .select("id, name, code, company_id, is_active, is_default")
-    .eq("is_active", true)
-    .order("name");
-  if (error) throw new Error(error.message);
-  return (data ?? []) as Store[];
-}
+  return fetchActiveStores();
+});
 
 export async function setActiveStore(storeId: string): Promise<ErpContext | null> {
   await requireAdminOrManagerProfile();

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import {
@@ -39,11 +39,20 @@ export function CurrencySettingsProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const [settingsEnabled, setSettingsEnabled] = useState(false);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setSettingsEnabled(true), 4_000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const { data, isLoading } = useQuery({
     queryKey: adminQueryKeys.appSettings(),
     queryFn: () =>
       adminGet<{ settings: CurrencySettings }>("settings").then((r) => r.settings),
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
+    enabled: settingsEnabled,
+    placeholderData: DEFAULT_CURRENCY_SETTINGS,
   });
 
   const settings = data ?? DEFAULT_CURRENCY_SETTINGS;

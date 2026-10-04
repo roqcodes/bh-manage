@@ -17,6 +17,7 @@ import { AdminSessionProvider } from "@/modules/admin/providers/admin-session-pr
 import { CurrencySettingsProvider } from "@/modules/settings/providers/currency-settings-provider";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { erpContextQueryOptions } from "@/modules/erp/components/use-erp-stores";
 
 function AdminRootSkeleton() {
   return (
@@ -45,6 +46,12 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => adminGet<{ profile: UserProfile }>("session"),
     retry: false,
     staleTime: 60_000,
+  });
+  /** Start with session so ERP context is not gated behind the shell paint. */
+  useQuery({
+    ...erpContextQueryOptions,
+    retry: false,
+    enabled: !invoicePrintLayout,
   });
   const [storeViewKey, setStoreViewKey] = useState("init");
 

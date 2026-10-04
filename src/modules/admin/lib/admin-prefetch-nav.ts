@@ -6,13 +6,18 @@ import type { ErpContextQueryData } from "@/modules/erp/components/use-erp-store
 
 const STALE = 90_000;
 
-/** Warm TanStack cache on sidebar hover for snappier navigations. */
+function activeStoreIdFromCache(qc: QueryClient): string | undefined {
+  const storeId = qc.getQueryData<ErpContextQueryData>(adminQueryKeys.erpContext())
+    ?.context?.store_id;
+  return storeId || undefined;
+}
+
+/** Warm TanStack cache on sidebar hover. Cache key + URL must match the destination page. */
 export function prefetchAdminRoute(qc: QueryClient, href: string) {
   const p = href.split("?")[0];
+  const storeId = activeStoreIdFromCache(qc);
 
   if (p === "/admin" || p === "") {
-    const ctx = qc.getQueryData<ErpContextQueryData>(adminQueryKeys.erpContext());
-    const storeId = ctx?.context?.store_id;
     if (!storeId) return Promise.resolve();
     return qc.prefetchQuery({
       queryKey: adminQueryKeys.dashboard(storeId, undefined, undefined, "month", "core"),
@@ -25,8 +30,7 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
   if (p === "/admin/products") {
     return qc.prefetchQuery({
       queryKey: adminQueryKeys.products(0, null),
-      queryFn: () =>
-        adminGet("products?page=0"),
+      queryFn: () => adminGet("products?page=0"),
       staleTime: STALE,
     });
   }
@@ -56,9 +60,11 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
   }
 
   if (p === "/admin/inventory") {
+    if (!storeId) return Promise.resolve();
     return qc.prefetchQuery({
-      queryKey: adminQueryKeys.inventory(0, null),
-      queryFn: () => adminGet("inventory?page=0"),
+      queryKey: adminQueryKeys.inventory(0, storeId),
+      queryFn: () =>
+        adminGet(`inventory?page=0&storeId=${encodeURIComponent(storeId)}`),
       staleTime: STALE,
     });
   }
@@ -72,29 +78,11 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
   }
 
   if (p === "/admin/erp/sales-orders") {
-    const ctx = qc.getQueryData<ErpContextQueryData>(adminQueryKeys.erpContext());
-    const storeId = ctx?.context?.store_id ?? "";
     if (!storeId) return Promise.resolve();
     const qs = `?storeId=${encodeURIComponent(storeId)}`;
     return qc.prefetchQuery({
       queryKey: adminQueryKeys.salesOrders("all", null, 0, storeId),
       queryFn: () => adminGet(`erp/sales-orders${qs}`),
-      staleTime: STALE,
-    });
-  }
-
-  if (p === "/admin/analytics") {
-    return qc.prefetchQuery({
-      queryKey: adminQueryKeys.analytics(""),
-      queryFn: () => adminGet("analytics"),
-      staleTime: STALE,
-    });
-  }
-
-  if (p === "/admin/purchase-orders") {
-    return qc.prefetchQuery({
-      queryKey: adminQueryKeys.purchaseOrders("all", null, null, 0),
-      queryFn: () => adminGet("purchase-orders"),
       staleTime: STALE,
     });
   }
