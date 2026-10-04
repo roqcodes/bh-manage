@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import {
   Table,
   TableBody,
@@ -185,15 +186,16 @@ export function AllocateOnlineTransferDialog({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Input
-                      type="number"
+                    <NumericInput
                       min={0}
                       value={row.quantity}
-                      onChange={(e) => {
+                      onValueChange={(quantity) => {
                         const next = [...allocations];
                         next[idx] = {
                           ...row,
-                          quantity: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                          quantity: Number.isNaN(quantity)
+                            ? quantity
+                            : Math.max(0, Math.floor(quantity)),
                         };
                         setAllocations(next);
                       }}

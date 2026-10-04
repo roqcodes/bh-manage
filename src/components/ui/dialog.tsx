@@ -69,8 +69,9 @@ function DialogContent({
             data-slot="dialog-close"
             render={
               <Button
+                type="button"
                 variant="ghost"
-                className="absolute top-2 right-2"
+                className="absolute top-2 right-2 z-20 pointer-events-auto"
                 size="icon-sm"
               />
             }

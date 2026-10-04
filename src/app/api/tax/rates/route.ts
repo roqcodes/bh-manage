@@ -1,23 +1,20 @@
 import { NextResponse } from "next/server";
 
+import { PUBLIC_CATEGORIES_CACHE_CONTROL } from "@/lib/http/public-cache-headers";
 import {
-  getAllTaxRates,
   createTaxRate,
   calculateTax,
-  getDefaultTaxRate,
+  getPublicTaxRatesSnapshot,
 } from "@/modules/tax/services/tax-rates.service";
 
 export async function GET() {
   try {
-    const [rates, defaultRate] = await Promise.all([
-      getAllTaxRates(),
-      getDefaultTaxRate(),
-    ]);
+    const { rates, defaultRate } = await getPublicTaxRatesSnapshot();
 
-    return NextResponse.json({
-      rates,
-      defaultRate,
-    });
+    return NextResponse.json(
+      { rates, defaultRate },
+      { headers: { "Cache-Control": PUBLIC_CATEGORIES_CACHE_CONTROL } },
+    );
   } catch (error) {
     console.error("Error fetching tax rates:", error);
     return NextResponse.json(

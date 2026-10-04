@@ -9,6 +9,7 @@ import {
   createVendorAction,
   updateVendorAction,
 } from "@/modules/vendors/actions/vendors.actions";
+import { invalidateAdminVendorCatalogQueries } from "@/modules/erp/lib/entity-live-search.client";
 import {
   FieldLabel,
   FormError,
@@ -45,7 +46,7 @@ export function VendorManageModal({
         } else {
           await createVendorAction({ name, contact });
         }
-        void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
+        void invalidateAdminVendorCatalogQueries(queryClient);
         onClose();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong.");

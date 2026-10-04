@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { NO_STORE_CACHE_CONTROL } from "@/lib/http/public-cache-headers";
 import { searchMarketplaceProducts } from "@/modules/marketplace/services/marketplace-products.service";
 
 /**
@@ -25,13 +26,16 @@ export async function GET(request: Request) {
       page,
     );
 
-    return NextResponse.json({
-      products: data,
-      total,
-      page,
-      hasMore,
-      query: query.trim(),
-    });
+    return NextResponse.json(
+      {
+        products: data,
+        total,
+        page,
+        hasMore,
+        query: query.trim(),
+      },
+      { headers: { "Cache-Control": NO_STORE_CACHE_CONTROL } },
+    );
   } catch (error) {
     console.error("Error searching products:", error);
     return NextResponse.json(

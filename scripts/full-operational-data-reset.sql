@@ -4,6 +4,7 @@
 --
 -- ⚠️  DESTRUCTIVE. Back up first. Cannot undo.
 -- Run in Supabase SQL Editor as postgres / service_role.
+-- Execute the whole transaction: from BEGIN through COMMIT (step 1 pre-truncate is required).
 --
 -- Clears ALL transactional data (storefront + ERP + accounting + inventory ops).
 -- Shared public schema — affects both buyhub app and bh-manage admin.
@@ -29,12 +30,27 @@
 --   Accounting: journals, account transactions, VAT returns/payments, fixed assets
 --   HR payroll runs (employees kept)
 --   Audit logs, analytics reach tables, push campaigns, notifications
+--   Idempotency ledgers: pos_checkout_operations, purchase_po_delivery_operations
 --
 -- =============================================================================
 
 BEGIN;
 
--- ─── 1. Truncate all operational tables (single statement = FK-safe) ─────────
+-- ─── 1. RESTRICT FK children (must empty before orders / PO bills / receives) ─
+-- Phase 2: pos_checkout_operations → orders (ON DELETE RESTRICT)
+-- Phase 3: purchase_po_delivery_operations → po, bill, receive (ON DELETE RESTRICT)
+
+DO $pre$
+BEGIN
+  IF to_regclass('public.pos_checkout_operations') IS NOT NULL THEN
+    EXECUTE 'TRUNCATE TABLE public.pos_checkout_operations RESTART IDENTITY';
+  END IF;
+  IF to_regclass('public.purchase_po_delivery_operations') IS NOT NULL THEN
+    EXECUTE 'TRUNCATE TABLE public.purchase_po_delivery_operations RESTART IDENTITY';
+  END IF;
+END $pre$;
+
+-- ─── 2. Truncate all other operational tables (one statement + CASCADE) ─────
 
 TRUNCATE TABLE
   -- Online → physical + online pool transfers
@@ -42,15 +58,14 @@ TRUNCATE TABLE
   public.online_to_physical_transfers,
   public.online_stock_transfer_allocations,
   public.online_stock_transfers,
-  -- Order fulfillment
+  -- Orders / invoicing (include all dependents; orders.invoice_id ↔ invoices.order_id)
   public.order_fulfillment_items,
   public.order_fulfillments,
   public.order_funnel_reach,
   public.order_items,
-  public.orders,
-  -- Invoicing (orders ↔ invoices cycle handled in one TRUNCATE)
   public.invoice_items,
   public.invoices,
+  public.orders,
   public.returns,
   -- Storefront session / wallet
   public.cart_items,
@@ -68,7 +83,8 @@ TRUNCATE TABLE
   public.stock_movements,
   public.store_product_inventory,
   public.store_inventory,
-  -- Purchasing
+  -- Purchasing (purchase_po_delivery_operations cleared in step 1)
+  public.purchase_order_landed_costs,
   public.purchase_order_items,
   public.purchase_orders,
   public.erp_purchase_bill_landed_costs,
@@ -115,9 +131,9 @@ TRUNCATE TABLE
   -- Audit + customer ops
   public.audit_logs,
   public.customer_credit_limits          -- comment out to keep credit limits
-RESTART IDENTITY;
+RESTART IDENTITY CASCADE;
 
--- ─── 2. Reset online (variant-level) inventory balances ─────────────────────
+-- ─── 3. Reset online (variant-level) inventory balances ─────────────────────
 -- Rows kept (per store × variant); quantities zeroed.
 
 UPDATE public.inventory
@@ -130,7 +146,7 @@ SET
 -- Optional: reset vendor supply stock on vendor_products
 -- UPDATE public.vendor_products SET stock = 0, updated_at = now();
 
--- ─── 3. Reset ERP document number counters ──────────────────────────────────
+-- ─── 4. Reset ERP document number counters ──────────────────────────────────
 
 UPDATE public.erp_document_sequences
 SET next_number = 1, updated_at = now();
@@ -140,13 +156,13 @@ UPDATE public.erp_document_sequences
 SET next_number = 101, updated_at = now()
 WHERE document_type IN ('vat_return', 'vat_payment');
 
--- ─── 4. Reset customer opening balances ─────────────────────────────────────
+-- ─── 5. Reset customer opening balances ─────────────────────────────────────
 
 UPDATE public.users
 SET opening_balance = 0
 WHERE opening_balance IS DISTINCT FROM 0;
 
--- ─── 5. Clean up integration test stores (optional) ─────────────────────────
+-- ─── 6. Clean up integration test stores (optional) ─────────────────────────
 
 UPDATE public.app_settings
 SET default_store_id = (
@@ -223,6 +239,8 @@ UNION ALL SELECT 'erp_estimates', count(*) FROM public.erp_estimates
 UNION ALL SELECT 'erp_credit_notes', count(*) FROM public.erp_credit_notes
 UNION ALL SELECT 'erp_salary_payments', count(*) FROM public.erp_salary_payments
 UNION ALL SELECT 'push_campaigns', count(*) FROM public.push_campaigns
+UNION ALL SELECT 'pos_checkout_operations', count(*) FROM public.pos_checkout_operations
+UNION ALL SELECT 'purchase_po_delivery_operations', count(*) FROM public.purchase_po_delivery_operations
 UNION ALL SELECT '--- masters ---', NULL::bigint
 UNION ALL SELECT 'users', count(*) FROM public.users
 UNION ALL SELECT 'products', count(*) FROM public.products

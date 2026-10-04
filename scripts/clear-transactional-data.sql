@@ -10,6 +10,8 @@
 --   account_types, accounts, erp_posting_rules, erp_landed_cost_items,
 --   user_erp_preferences, erp_employees, erp_recurring_schedules
 --
+-- Prefer: scripts/full-operational-data-reset.sql (more complete, incl. Phase 2/3 ledgers).
+--
 -- CLEARED (operational):
 --   orders, carts, wallets, invoices, ERP sales/purchase/inventory docs,
 --   purchase receives, HR payroll runs, journal entries, stock movements,
@@ -18,7 +20,18 @@
 
 BEGIN;
 
--- ─── 1. Transactional tables (FK-safe single TRUNCATE) ─────────────────────
+-- RESTRICT FK children first (Phase 2/3 idempotency ledgers)
+DO $pre$
+BEGIN
+  IF to_regclass('public.pos_checkout_operations') IS NOT NULL THEN
+    EXECUTE 'TRUNCATE TABLE public.pos_checkout_operations RESTART IDENTITY';
+  END IF;
+  IF to_regclass('public.purchase_po_delivery_operations') IS NOT NULL THEN
+    EXECUTE 'TRUNCATE TABLE public.purchase_po_delivery_operations RESTART IDENTITY';
+  END IF;
+END $pre$;
+
+-- ─── 1. Transactional tables (FK-safe single TRUNCATE + CASCADE) ───────────
 
 TRUNCATE TABLE
   public.online_to_physical_transfer_lines,
@@ -29,9 +42,9 @@ TRUNCATE TABLE
   public.order_fulfillments,
   public.order_funnel_reach,
   public.order_items,
-  public.orders,
   public.invoice_items,
   public.invoices,
+  public.orders,
   public.returns,
   public.cart_items,
   public.carts,
@@ -45,6 +58,7 @@ TRUNCATE TABLE
   public.push_campaigns,
   public.product_view_reach,
   public.stock_movements,
+  public.purchase_order_landed_costs,
   public.purchase_order_items,
   public.purchase_orders,
   public.audit_logs,
@@ -88,7 +102,7 @@ TRUNCATE TABLE
   public.erp_fixed_assets,
   public.store_product_inventory,
   public.store_inventory
-RESTART IDENTITY;
+RESTART IDENTITY CASCADE;
 
 -- ─── 2. Reset online inventory (variants + stores remain) ───────────────────
 

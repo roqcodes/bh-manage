@@ -477,7 +477,7 @@ export function PaymentFormView({
       formId={formId}
       footer={footer}
     >
-      <form id={formId} onSubmit={handleSubmit} className="space-y-4">
+      <form id={formId} onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
         {formContent}
         {error ? (
           <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">

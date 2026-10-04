@@ -1,12 +1,29 @@
 "use client";
 
-import { useId, useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import type { SalesLineFormRow } from "@/common/erp/sales-types";
 import { calcSalesLine, roundSalesMoney } from "@/common/erp/sales-types";
-import { adminPost } from "@/modules/admin/lib/admin-api-client";
+import { createSupabaseBrowserClient } from "@/lib/integrations/supabase/client";
+import { ERP_CLIENT_OPERATION_TYPES } from "@/lib/erp/client-operations/operation-types";
+import { dispatchOutboxChanged } from "@/lib/sync/outbox-browser-events";
+import { broadcastSyncWake } from "@/lib/sync/sync-network";
+import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
+import { createOutboxStore } from "@/lib/sync/outbox-store";
+import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
+import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
+import type { SalesOrderCreatePayload } from "@/modules/orders/types/sales-order-create-payload";
+import type { SalesOrderUpdatePayload } from "@/modules/orders/types/sales-order-update-payload";
+import { salesOrderResourceScope } from "@/modules/orders/types/sales-order-update-payload";
+import type { SalesOrderDetail } from "@/modules/orders/services/sales-order-detail.service";
+import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import type { CurrencySettings } from "@/lib/format-currency";
+import type { LineProductContextMap } from "@/common/erp/line-product-context";
+import { getSalesLinesStockFeedback } from "@/modules/erp/lib/sales-line-stock-validation";
 import {
   AdminFormActions,
   AdminFormField,
@@ -20,7 +37,6 @@ import {
 } from "@/modules/admin/ui";
 import {
   SalesLinesEditor,
-  emptySalesLine,
   salesLinesToApiInput,
 } from "@/modules/erp/components/sales-lines-editor";
 import {
@@ -30,11 +46,18 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import { Label } from "@/components/ui/label";
 
-export type SalesOrderFormViewProps = ErpFormViewBaseProps;
+export type SalesOrderFormViewProps = ErpFormViewBaseProps & {
+  mode?: "create" | "edit";
+  orderId?: string;
+};
 
 export function SalesOrderFormView({
+  mode = "create",
+  orderId,
   variant = "page",
   open = true,
   onOpenChange,
@@ -42,11 +65,23 @@ export function SalesOrderFormView({
 }: SalesOrderFormViewProps) {
   const router = useRouter();
   const formId = useId();
+  const isEdit = mode === "edit" && Boolean(orderId);
   const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
-    useActiveStoreFormField({ mode: "create" });
+    useActiveStoreFormField({ mode: isEdit ? "edit" : "create" });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [localSaveNotice, setLocalSaveNotice] = useState<string | null>(null);
+  const [stockWarning, setStockWarning] = useState<string | null>(null);
+  const [loadingOrder, setLoadingOrder] = useState(isEdit);
   const isModal = variant === "modal";
+
+  const { data: appSettings } = useQuery({
+    queryKey: adminQueryKeys.appSettings(),
+    queryFn: () =>
+      adminGet<{ settings: CurrencySettings }>("settings").then((r) => r.settings),
+    staleTime: 60_000,
+  });
+  const allowNegativeStoreStock = appSettings?.allow_negative_store_stock ?? false;
 
   const [customerId, setCustomerId] = useState("");
   const [customerLabel, setCustomerLabel] = useState("");
@@ -57,7 +92,45 @@ export function SalesOrderFormView({
   const [salesPerson, setSalesPerson] = useState("");
   const [discount, setDiscount] = useState(0);
   const [taxInclusive, setTaxInclusive] = useState(true);
-  const [lines, setLines] = useState<SalesLineFormRow[]>([emptySalesLine()]);
+  const [lines, setLines] = useState<SalesLineFormRow[]>([]);
+
+  useEffect(() => {
+    if (!isEdit || !orderId) return;
+
+    adminGet<{ order: SalesOrderDetail }>(`erp/sales-orders/${orderId}`)
+      .then(({ order }) => {
+        setCustomerId(order.user_id);
+        setCustomerLabel(
+          order.users?.name ?? order.users?.email ?? order.users?.phone ?? "",
+        );
+        setStoreId(order.store_id);
+        setReferenceNumber(order.reference_number ?? "");
+        setShipmentDate(order.shipment_date ?? new Date().toISOString().slice(0, 10));
+        setDeliveryMethod(order.delivery_method ?? "");
+        setDiscount(Number(order.discount ?? 0));
+        setTaxInclusive(order.tax_inclusive);
+        setLines(
+          order.order_items.length > 0
+            ? order.order_items.map((item) => ({
+                key: `line-${item.id}`,
+                productId: item.product_id,
+                variantId: null,
+                productName: item.product_name ?? "",
+                description: "",
+                barcode: "",
+                quantity: item.quantity,
+                unitPrice: item.final_price ?? item.price,
+                taxRatePercent: item.tax_rate_percent,
+                unitId: null,
+              }))
+            : [],
+        );
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load sales order");
+      })
+      .finally(() => setLoadingOrder(false));
+  }, [isEdit, orderId, setStoreId]);
 
   const totals = useMemo(() => {
     let subtotal = 0;
@@ -73,28 +146,52 @@ export function SalesOrderFormView({
       tax += taxAmount;
     }
     const gross = roundSalesMoney(subtotal + tax);
-    const net = roundSalesMoney(Math.max(0, gross - discount));
+    const net = roundSalesMoney(Math.max(0, gross - coalesceNumber(discount)));
     return { subtotal: roundSalesMoney(subtotal), tax: roundSalesMoney(tax), total: net };
   }, [lines, taxInclusive, discount]);
+
+  const detailHref = orderId ? `/admin/erp/sales-orders/${orderId}` : "/admin/erp/sales-orders";
 
   function handleCancel() {
     if (isModal) {
       onOpenChange?.(false);
     } else {
-      router.push("/admin/erp/sales-orders");
+      router.push(isEdit ? detailHref : "/admin/erp/sales-orders");
     }
   }
 
-  function handleSuccessNavigate(orderId: string) {
-    if (isModal) {
-      onOpenChange?.(false);
-      onSuccess?.(orderId);
+  function resetForm() {
+    setCustomerId("");
+    setCustomerLabel("");
+    setReferenceNumber("");
+    setOrderDate(new Date().toISOString().slice(0, 10));
+    setShipmentDate(new Date().toISOString().slice(0, 10));
+    setDeliveryMethod("");
+    setSalesPerson("");
+    setDiscount(0);
+    setTaxInclusive(true);
+    setLines([]);
+    setStockWarning(null);
+    setError(null);
+  }
+
+  function handleSuccessAfterSave() {
+    if (isEdit) {
+      if (isModal) {
+        onOpenChange?.(false);
+        onSuccess?.(orderId);
+      } else {
+        router.push(detailHref);
+      }
+      return;
     }
-    router.push(`/admin/erp/sales-orders/${orderId}`);
+    onSuccess?.();
   }
 
   function handleSubmit() {
     setError(null);
+    setLocalSaveNotice(null);
+    setStockWarning(null);
     if (!customerId) {
       setError("Customer is required");
       return;
@@ -120,35 +217,123 @@ export function SalesOrderFormView({
       setError("Select products from catalog search");
       return;
     }
+    const lineWithoutPrice = items.find((i) => !i.unitPrice || i.unitPrice <= 0);
+    if (lineWithoutPrice) {
+      setError(
+        "Each line needs a unit price above zero. Enter a price on the line or set the product’s catalog selling price.",
+      );
+      return;
+    }
 
     startTransition(async () => {
       try {
-        const res = await adminPost<{ orderId: string; salesOrderNumber: string }>(
-          "erp/sales-orders",
-          {
-            userId: customerId,
-            storeId: effectiveStoreId,
-            referenceNumber: referenceNumber || undefined,
-            shipmentDate: shipmentDate || undefined,
-            deliveryMethod: deliveryMethod || undefined,
-            subtotal: totals.subtotal,
-            tax: totals.tax,
-            discount,
-            totalAmount: totals.total,
-            taxInclusive,
-            items,
-          },
+        const productIds = [
+          ...new Set(items.map((i) => i.productId).filter(Boolean)),
+        ];
+        if (productIds.length > 0 && effectiveStoreId) {
+          const stockCtx = await adminGet<{ data: LineProductContextMap }>(
+            `erp/line-product-context?storeId=${encodeURIComponent(effectiveStoreId)}&productIds=${productIds.join(",")}`,
+          );
+          const feedback = getSalesLinesStockFeedback(
+            lines,
+            stockCtx.data ?? {},
+            allowNegativeStoreStock,
+          );
+          if (feedback.blocking) {
+            setError(feedback.blocking);
+            return;
+          }
+          if (feedback.warning) {
+            setStockWarning(feedback.warning);
+          }
+        }
+
+        const supabase = createSupabaseBrowserClient();
+        const staffUserId = await resolveOutboxUserId(supabase);
+        if (!staffUserId) {
+          setError("You must be signed in to save a sales order.");
+          return;
+        }
+
+        const basePayload: SalesOrderCreatePayload = {
+          userId: customerId,
+          referenceNumber: referenceNumber || undefined,
+          shipmentDate: shipmentDate || undefined,
+          deliveryMethod: deliveryMethod || undefined,
+          subtotal: totals.subtotal,
+          tax: totals.tax,
+          discount: coalesceNumber(discount),
+          totalAmount: totals.total,
+          taxInclusive,
+          items,
+        };
+
+        const store = createOutboxStore();
+        try {
+          if (isEdit && orderId) {
+            const updatePayload: SalesOrderUpdatePayload = {
+              ...basePayload,
+              orderId,
+            };
+            await store.enqueue({
+              operationType: ERP_CLIENT_OPERATION_TYPES.salesOrder.update,
+              schemaVersion: 1,
+              payload: updatePayload,
+              userId: staffUserId,
+              storeId: effectiveStoreId,
+              terminalId: getOrCreateErpTerminalId(),
+              resourceScope: salesOrderResourceScope(orderId),
+            });
+          } else {
+            await store.enqueue({
+              operationType: ERP_CLIENT_OPERATION_TYPES.salesOrder.create,
+              schemaVersion: 1,
+              payload: basePayload,
+              userId: staffUserId,
+              storeId: effectiveStoreId,
+              terminalId: getOrCreateErpTerminalId(),
+            });
+          }
+        } catch (enqueueErr) {
+          if (enqueueErr instanceof OutboxEnqueueError) {
+            setError(enqueueErr.message);
+          } else {
+            setError(
+              enqueueErr instanceof Error
+                ? enqueueErr.message
+                : "Could not save sales order locally. Check browser storage.",
+            );
+          }
+          return;
+        } finally {
+          await store.close();
+        }
+
+        dispatchOutboxChanged();
+        broadcastSyncWake();
+        if (!isEdit) {
+          resetForm();
+        }
+        setLocalSaveNotice(
+          isEdit
+            ? "Update saved locally — pending sync"
+            : "Saved locally — pending sync",
         );
-        handleSuccessNavigate(res.orderId);
+        handleSuccessAfterSave();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to create sales order");
+        setError(err instanceof Error ? err.message : "Failed to queue sales order");
       }
     });
   }
 
   if (isModal && !open) return null;
+  if (loadingOrder) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">Loading sales order…</div>
+    );
+  }
 
-  const title = "Add sales order";
+  const title = isEdit ? "Edit sales order" : "Add sales order";
 
   const totalsSidebar = (
     <Card className="h-fit">
@@ -166,12 +351,11 @@ export function SalesOrderFormView({
         </div>
         <div className="space-y-1">
           <Label>Discount</Label>
-          <Input
-            type="number"
+          <NumericInput
             min={0}
             step="0.01"
-            value={discount || ""}
-            onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+            value={discount}
+            onValueChange={setDiscount}
           />
         </div>
         <div className="flex justify-between border-t pt-3 text-base font-semibold">
@@ -194,8 +378,9 @@ export function SalesOrderFormView({
     <AdminFormActions
       formId={formId}
       onCancel={handleCancel}
-      submitLabel="Save"
+      submitLabel={isEdit ? "Save changes" : "Save & next"}
       pending={pending}
+      loadingLabel="Saving locally…"
     />
   ) : undefined;
 
@@ -206,9 +391,10 @@ export function SalesOrderFormView({
       onOpenChange={onOpenChange}
       title={title}
       description="Create a sales order with line items, shipment details, and pricing."
-      backHref="/admin/erp/sales-orders"
+      backHref={isEdit ? detailHref : "/admin/erp/sales-orders"}
       breadcrumb={[
         { label: "Sales orders", href: "/admin/erp/sales-orders" },
+        ...(isEdit ? [{ label: "Order", href: detailHref }] : []),
         { label: title },
       ]}
       size="landscape"
@@ -218,6 +404,7 @@ export function SalesOrderFormView({
       <form
         id={formId}
         className="space-y-4"
+        autoComplete="off"
         onSubmit={(e) => {
           e.preventDefault();
           handleSubmit();
@@ -273,7 +460,7 @@ export function SalesOrderFormView({
               </AdminFormField>
               <AdminFormField label="Store" required>
                 <ActiveStoreFormField
-                  mode="create"
+                  mode={isEdit ? "edit" : "create"}
                   stores={stores}
                   activeStoreId={activeStoreId}
                   storeId={storeId}
@@ -295,6 +482,12 @@ export function SalesOrderFormView({
             />
           </AdminFormSection>
 
+          {stockWarning ? (
+            <p className="text-sm text-amber-700 dark:text-amber-400">{stockWarning}</p>
+          ) : null}
+          {localSaveNotice ? (
+            <p className="text-sm text-muted-foreground">{localSaveNotice}</p>
+          ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           {!isModal ? (
@@ -306,7 +499,7 @@ export function SalesOrderFormView({
                 Save as draft
               </Button>
               <Button disabled={pending} onClick={handleSubmit}>
-                {pending ? "Saving…" : "Save"}
+                {pending ? "Saving locally…" : "Save & next"}
               </Button>
             </div>
           ) : null}

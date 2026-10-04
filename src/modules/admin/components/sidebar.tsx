@@ -8,13 +8,16 @@ import { ChevronRight } from "lucide-react";
 
 import type { AdminNavBadge } from "@/common/admin/types";
 import { cn } from "@/lib/utils";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import {
   ADMIN_DASHBOARD_ITEM,
   ADMIN_NAV_SECTIONS,
   type AdminNavItem,
   type AdminNavSection,
 } from "@/modules/admin/lib/admin-nav-items";
+import {
+  adminNavBadgesQueryOptions,
+  fetchAdminNavBadges,
+} from "@/modules/admin/lib/admin-nav-badges-query";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { prefetchAdminRoute } from "@/modules/admin/lib/admin-prefetch-nav";
 import { isAdminRouteHidden } from "@/modules/admin/lib/hidden-admin-routes";
@@ -230,6 +233,8 @@ function NavSectionGroup({
         <button
           ref={triggerRef}
           type="button"
+          data-bh-nav-section={section.label}
+          aria-expanded={flyoutOpen}
           title={section.label}
           onClick={() => {
             updateFlyoutPosition();
@@ -262,6 +267,8 @@ function NavSectionGroup({
 
         {flyoutOpen && flyoutPos ? (
           <div
+            data-bh-sidebar-flyout="true"
+            data-bh-flyout-section={section.label}
             className="fixed z-[100] pl-2"
             style={{ top: flyoutPos.top, left: flyoutPos.left }}
             onMouseEnter={onFlyoutOpen}
@@ -299,6 +306,7 @@ function NavSectionGroup({
     <div className="pt-1">
       <button
         type="button"
+        data-bh-nav-section={section.label}
         onClick={onToggle}
         aria-expanded={open}
         className={cn(
@@ -385,11 +393,23 @@ export function AdminSidebar({
     }
   }, [activeSectionLabel]);
 
+  /** Load badge counts after first paint so they do not compete with page data. */
+  const [navBadgesEnabled, setNavBadgesEnabled] = useState(false);
+  useEffect(() => {
+    const enable = () => setNavBadgesEnabled(true);
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(enable, { timeout: 3_000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(enable, 2_000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const { data: navBadgesData } = useQuery({
     queryKey: adminQueryKeys.navBadges(),
-    queryFn: () => adminGet<{ badges: Record<string, AdminNavBadge> }>("nav-badges"),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    queryFn: fetchAdminNavBadges,
+    enabled: navBadgesEnabled,
+    ...adminNavBadgesQueryOptions,
   });
 
   const navAlerts = navBadgesData?.badges ?? {};
@@ -402,6 +422,8 @@ export function AdminSidebar({
 
   return (
     <aside
+      data-bh-admin-sidebar="true"
+      data-bh-sidebar-collapsed={collapsed ? "true" : "false"}
       className={cn(
         "flex h-full shrink-0 flex-col border-r border-slate-200/60 bg-white/80 shadow-[4px_0_24px_-8px_rgba(15,23,42,0.12)] backdrop-blur-xl md:shadow-none",
         "fixed left-0 top-0 z-40 will-change-transform md:relative md:will-change-auto",

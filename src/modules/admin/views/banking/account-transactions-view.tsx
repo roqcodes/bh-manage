@@ -112,7 +112,7 @@ export function AccountTransactionsView({ accountId }: { accountId: string }) {
 
   useEffect(() => {
     reload().finally(() => setLoading(false));
-  }, [accountId, storeFilter, activeStoreId]);
+  }, [accountId, storeFilter]);
 
   useEffect(() => {
     if (loading) return;

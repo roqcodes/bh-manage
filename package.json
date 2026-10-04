@@ -3,11 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "prebuild": "node -e \"try{require('node:fs').rmSync('.next/dev',{recursive:true,force:true,maxRetries:3,retryDelay:200})}catch(e){if(e&&e.code!=='EPERM'&&e.code!=='EBUSY')throw e}\"",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "dev:stop": "node scripts/stop-next-dev.mjs",
+    "prebuild": "node scripts/prebuild-clean-next-dev.mjs",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "pwa:validate": "node scripts/validate-pwa-phase1.mjs",
+    "outbox:validate": "tsx scripts/validate-outbox-phase2.ts",
+    "outbox:validate:sync": "tsx scripts/validate-outbox-phase3.ts",
+    "erp:idempotency:validate": "tsx scripts/validate-erp-idempotency-phase4.ts",
+    "erp:sales-order:validate": "tsx scripts/validate-sales-order-phase5.ts",
+    "erp:sales-order-update:validate": "tsx scripts/validate-sales-order-update-phase6.ts",
+    "erp:sales-order-cancel:validate": "tsx scripts/validate-sales-order-cancel-phase7.ts",
+    "erp:sales-order-invoice:validate": "tsx scripts/validate-sales-order-invoice-phase8.ts",
+    "erp:sales-invoice:validate": "tsx scripts/validate-sales-invoice-phase9-12.ts",
+    "erp:purchase:validate": "tsx scripts/validate-purchase-module-phase13-19.ts",
+    "ai:sitemap": "npx tsx scripts/generate-app-sitemap.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -34,13 +47,17 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@serwist/next": "^9.5.12",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "fake-indexeddb": "^6.2.5",
+    "serwist": "^9.5.12",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

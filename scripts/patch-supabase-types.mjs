@@ -196,28 +196,6 @@ content = content.replace(
             foreignKeyName: "erp_expenses_created_by_fkey"`,
 );
 
-content = content.replace(
-  "      erp_fixed_assets: {",
-  `${RECURRING_BLOCK}      erp_fixed_assets: {`,
-);
-
-content = content.replace(
-  `          p_opening_balance: number
-          p_store_id: string
-          p_updated_by?: string
-        }
-        Returns: undefined
-      }
-      user_has_store_access: {`,
-  `          p_opening_balance: number
-          p_store_id: string | null
-          p_updated_by?: string
-        }
-        Returns: undefined
-      }
-      user_has_store_access: {`,
-);
-
 const RECURRING_BLOCK = `      erp_recurring_schedules: {
         Row: {
           created_at: string
@@ -298,7 +276,28 @@ const RECURRING_BLOCK = `      erp_recurring_schedules: {
           },
         ]
       }
-      erp_fixed_assets: {`,
+`;
+
+content = content.replace(
+  "      erp_fixed_assets: {",
+  `${RECURRING_BLOCK}      erp_fixed_assets: {`,
+);
+
+content = content.replace(
+  `          p_opening_balance: number
+          p_store_id: string
+          p_updated_by?: string
+        }
+        Returns: undefined
+      }
+      user_has_store_access: {`,
+  `          p_opening_balance: number
+          p_store_id: string | null
+          p_updated_by?: string
+        }
+        Returns: undefined
+      }
+      user_has_store_access: {`,
 );
 
 content = content.replace(
@@ -555,20 +554,6 @@ content = content.replace(
         Returns: string
       }
       place_customer_order: {`,
-);
-content = content.replace(
-  `          p_store_id: string
-          p_updated_by?: string
-        }
-        Returns: undefined
-      }
-      user_has_store_access: {`,
-  `          p_store_id: string | null
-          p_updated_by?: string
-        }
-        Returns: undefined
-      }
-      user_has_store_access: {`,
 );
 content = content.replaceAll(
   `user_role: "admin" | "customer" | "vendor" | "delivery"`,

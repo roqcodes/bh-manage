@@ -66,18 +66,32 @@ export async function getJournalEntryDetail(journalId: string) {
     .order("line_order");
   if (linesError) throw new Error(linesError.message);
 
-  const lineRows: JournalEntryLineRow[] = [];
-  for (const l of lines ?? []) {
-    const { data: acc } = await supabase.from("accounts").select("code, name").eq("id", l.account_id).single();
-    lineRows.push({
+  const accountIds = [...new Set((lines ?? []).map((l) => l.account_id as string))];
+  const accountById = new Map<string, { code: string; name: string }>();
+  if (accountIds.length > 0) {
+    const { data: accounts } = await supabase
+      .from("accounts")
+      .select("id, code, name")
+      .in("id", accountIds);
+    for (const acc of accounts ?? []) {
+      accountById.set(acc.id as string, {
+        code: (acc.code as string) ?? "—",
+        name: (acc.name as string) ?? "—",
+      });
+    }
+  }
+
+  const lineRows: JournalEntryLineRow[] = (lines ?? []).map((l) => {
+    const acc = accountById.get(l.account_id as string);
+    return {
       id: l.id,
       account_code: acc?.code ?? "—",
       account_name: acc?.name ?? "—",
       debit_amount: Number(l.debit_amount),
       credit_amount: Number(l.credit_amount),
       description: l.description,
-    });
-  }
+    };
+  });
 
   return { header, lines: lineRows };
 }

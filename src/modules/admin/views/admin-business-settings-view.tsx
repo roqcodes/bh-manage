@@ -1,5 +1,6 @@
 "use client";
 
+import { InventorySettingsCard } from "@/modules/settings/components/inventory-settings-card";
 import { PaymentSettingsCard } from "@/modules/settings/components/payment-settings-card";
 import { RegionCurrencySettingsCard } from "@/modules/settings/components/region-currency-settings-card";
 
@@ -15,6 +16,7 @@ export function AdminBusinessSettingsView() {
 
       <div className="flex flex-col gap-4">
         <RegionCurrencySettingsCard />
+        <InventorySettingsCard />
         <PaymentSettingsCard />
       </div>
     </div>

@@ -1,5 +1,11 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
+
+import {
+  PUBLIC_TAX_RATES_CACHE_TAG,
+  revalidatePublicTaxRates,
+} from "@/lib/cache/public-catalog-cache";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { Database } from "@/lib/integrations/supabase/types";
 import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
@@ -19,6 +25,29 @@ export interface TaxCalculationResult {
   rate_percent: number;
   tax_amount: number;
   total_amount: number;
+}
+
+export type PublicTaxRatesSnapshot = {
+  rates: TaxRateRow[];
+  defaultRate: number;
+};
+
+/** Cached reference rates for storefront/tax API (not POS transactional tax). */
+export async function getPublicTaxRatesSnapshot(): Promise<PublicTaxRatesSnapshot> {
+  return unstable_cache(
+    async () => {
+      const [rates, defaultRate] = await Promise.all([
+        getAllTaxRates(),
+        getDefaultTaxRate(),
+      ]);
+      return { rates, defaultRate };
+    },
+    ["public-tax-rates-snapshot"],
+    {
+      tags: [PUBLIC_TAX_RATES_CACHE_TAG],
+      revalidate: 300,
+    },
+  )();
 }
 
 export async function getAllTaxRates(): Promise<TaxRateRow[]> {
@@ -94,6 +123,8 @@ export async function createTaxRate(
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Failed to create tax rate");
 
+  revalidatePublicTaxRates();
+
   return data.id;
 }
 
@@ -138,6 +169,8 @@ export async function updateTaxRate(
     .eq("id", id);
 
   if (error) throw new Error(error.message);
+
+  revalidatePublicTaxRates();
 }
 
 export async function deleteTaxRate(id: string): Promise<void> {
@@ -148,6 +181,8 @@ export async function deleteTaxRate(id: string): Promise<void> {
   const { error } = await supabase.from("tax_rates").delete().eq("id", id);
 
   if (error) throw new Error(error.message);
+
+  revalidatePublicTaxRates();
 }
 
 export function calculateTax(

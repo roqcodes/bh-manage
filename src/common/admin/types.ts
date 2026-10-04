@@ -423,6 +423,7 @@ export interface OrderWithItems {
   linked_invoice?: { id: string; status: string } | null;
   tax_inclusive?: boolean | null;
   store_name?: string | null;
+  store_id?: string | null;
   users: OrderUser | null;
   addresses: OrderAddress | null;
   order_items: OrderItem[];

@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 
 import type { LineProductContext } from "@/common/erp/line-product-context";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { ERP_PRODUCT_SEARCH_STALE_MS } from "@/modules/erp/lib/erp-product-live-search.client";
 import { Button } from "@/components/ui/button";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { cn } from "@/lib/utils";
@@ -110,7 +111,7 @@ export function LineProductDetailsPanel({
       return res.data[productId] ?? null;
     },
     enabled: enabled && Boolean(storeId && productId && counterpartyId),
-    staleTime: 30_000,
+    staleTime: ERP_PRODUCT_SEARCH_STALE_MS,
   });
 
   if (!storeId || !productId || !counterpartyId) {
@@ -147,17 +148,25 @@ export function LineProductDetailsPanel({
   return (
     <div className="flex flex-wrap gap-4 rounded-lg border border-border/60 bg-muted/20 px-3 py-3">
       <MetricBlock
-        label="Available stock (in store)"
-        value={formatStock(data.availableStock)}
+        label="On-hand stock (store)"
+        value={
+          data.onHandStock < 0
+            ? `${formatStock(data.onHandStock)} (short)`
+            : formatStock(data.onHandStock)
+        }
         emphasize
       />
       <MetricBlock
-        label="Avg purchase price"
+        label="Avg inventory cost (WAC)"
         value={formatPrice(data.avgPurchasePrice)}
       />
       <MetricBlock
-        label="Last purchase price"
+        label="Last purchase unit (loaded)"
         value={formatPrice(data.lastPurchasePrice)}
+      />
+      <MetricBlock
+        label="Avg selling price"
+        value={formatPrice(data.avgSellingPrice)}
       />
       <MetricBlock
         label="Last selling price"

@@ -4,6 +4,7 @@ import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.serv
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpSalesProductSearchRow } from "@/common/erp/sales-types";
 import { getAdminErpContext } from "@/modules/erp/services/store-context.service";
+import { searchActiveGoodsProducts } from "@/lib/erp/server/product-catalog-query";
 import { buildIlikePattern } from "@/lib/postgrest-search";
 
 async function loadStoreProductStockMap(
@@ -60,31 +61,12 @@ export async function searchSalesProducts(
   limit = 25,
 ): Promise<ErpSalesProductSearchRow[]> {
   await requireAdminOrManagerProfile();
-  const pattern = buildIlikePattern(query);
-  if (!pattern) return [];
 
   const supabase = await createSupabaseServerClient();
   const ctx = await getAdminErpContext();
   const activeStoreId = storeId ?? ctx?.store_id ?? undefined;
 
-  const { data, error } = await supabase
-    .from("products")
-    .select("id, name, barcode, price, purchase_price, tax_rate_percent")
-    .eq("is_active", true)
-    .eq("item_type", "goods")
-    .or(`name.ilike.${pattern},barcode.ilike.${pattern}`)
-    .limit(limit);
-
-  if (error) throw new Error(error.message);
-
-  const rows = (data ?? []) as {
-    id: string;
-    name: string | null;
-    barcode: string | null;
-    price: number | null;
-    purchase_price: number | null;
-    tax_rate_percent: number | null;
-  }[];
+  const rows = await searchActiveGoodsProducts(supabase, query, limit);
 
   const storeStockMap = await loadStoreProductStockMap(
     supabase,
@@ -92,7 +74,19 @@ export async function searchSalesProducts(
     rows.map((row) => row.id),
   );
 
-  return rows.map((row) => mapProductRow(row, storeStockMap));
+  return rows.map((row) =>
+    mapProductRow(
+      {
+        id: row.id,
+        name: row.name,
+        barcode: row.barcode,
+        price: row.price,
+        purchase_price: row.purchase_price,
+        tax_rate_percent: row.tax_rate_percent,
+      },
+      storeStockMap,
+    ),
+  );
 }
 
 export type TransferCatalogStockFilter = "all" | "in_stock" | "out_of_stock";

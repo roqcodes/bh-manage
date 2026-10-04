@@ -18,6 +18,7 @@ function rowToSettings(
   row: Record<string, unknown>,
   showMrpDefault = true,
   capturePaymentsDefault = true,
+  allowNegativeStoreStockDefault = false,
 ): CurrencySettings {
   const currencyCode = String(row.currency_code ?? DEFAULT_CURRENCY_SETTINGS.currency_code);
   const currencySymbol = normalizeCurrencySymbol(
@@ -37,6 +38,10 @@ function rowToSettings(
       "capture_payments" in row
         ? row.capture_payments !== false
         : capturePaymentsDefault,
+    allow_negative_store_stock:
+      "allow_negative_store_stock" in row
+        ? row.allow_negative_store_stock === true
+        : allowNegativeStoreStockDefault,
   };
 }
 
@@ -48,13 +53,17 @@ async function fetchAppSettingsRow(
 ) {
   const withFlags = await supabase
     .from("app_settings")
-    .select(`${APP_SETTINGS_BASE_SELECT},show_mrp,capture_payments`)
+    .select(
+      `${APP_SETTINGS_BASE_SELECT},show_mrp,capture_payments,allow_negative_store_stock`,
+    )
     .eq("id", 1)
     .maybeSingle();
 
   if (!withFlags.error) return withFlags;
 
-  if (/show_mrp|capture_payments/i.test(withFlags.error.message)) {
+  if (
+    /show_mrp|capture_payments|allow_negative_store_stock/i.test(withFlags.error.message)
+  ) {
     const withMrp = await supabase
       .from("app_settings")
       .select(`${APP_SETTINGS_BASE_SELECT},show_mrp`)
@@ -110,6 +119,8 @@ export async function updateAppSettings(
     locale: patch.locale?.trim() || current.locale,
     show_mrp: patch.show_mrp ?? current.show_mrp,
     capture_payments: patch.capture_payments ?? current.capture_payments,
+    allow_negative_store_stock:
+      patch.allow_negative_store_stock ?? current.allow_negative_store_stock,
   };
 
   const updatedAt = new Date().toISOString();
@@ -121,10 +132,14 @@ export async function updateAppSettings(
 
   let { error } = await supabase.from("app_settings").upsert(upsertPayload);
 
-  if (error && /show_mrp|capture_payments/i.test(error.message)) {
+  if (
+    error &&
+    /show_mrp|capture_payments|allow_negative_store_stock/i.test(error.message)
+  ) {
     const {
       show_mrp: _omitMrp,
       capture_payments: _omitCapture,
+      allow_negative_store_stock: _omitNeg,
       ...withoutFlags
     } = upsertPayload;
     ({ error } = await supabase.from("app_settings").upsert(withoutFlags));

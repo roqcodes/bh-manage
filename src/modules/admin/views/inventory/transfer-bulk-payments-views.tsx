@@ -14,6 +14,8 @@ import { formatCurrencyAmount } from "@/lib/format-currency";
 import { formatErpDocRef } from "@/lib/erp-document-ref";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import {
   AdminFormActions,
   AdminFormColumns,
@@ -193,8 +195,11 @@ export function TransferBulkPaymentFormView({
     e.preventDefault();
     setError(null);
     const items = Object.entries(allocations)
-      .filter(([, amt]) => amt > 0)
-      .map(([transferId, amount]) => ({ transferId, amount }));
+      .filter(([, amt]) => coalesceNumber(amt) > 0)
+      .map(([transferId, amount]) => ({
+        transferId,
+        amount: coalesceNumber(amount),
+      }));
 
     if (items.length === 0) {
       setError("Select at least one transfer with a payment amount");
@@ -317,16 +322,15 @@ export function TransferBulkPaymentFormView({
                           {formatCurrencyAmount(row.balance_due)}
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            type="number"
+                          <NumericInput
                             min={0}
                             max={row.balance_due}
                             step="0.01"
-                            value={allocations[row.transfer_id] ?? 0}
-                            onChange={(e) =>
+                            value={allocations[row.transfer_id] ?? Number.NaN}
+                            onValueChange={(amount) =>
                               setAllocations({
                                 ...allocations,
-                                [row.transfer_id]: parseFloat(e.target.value) || 0,
+                                [row.transfer_id]: amount,
                               })
                             }
                             className="w-28"

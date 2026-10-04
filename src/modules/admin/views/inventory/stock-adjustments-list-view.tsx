@@ -25,6 +25,7 @@ import {
   AdminTableHeader,
   AdminTableLink,
   AdminTableRow,
+  ErpStoreTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useDebouncedValue,
@@ -65,7 +66,7 @@ export function StockAdjustmentsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, storeId, reloadToken, activeStoreId]);
+  }, [page, debouncedSearch, storeId, reloadToken]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
@@ -161,13 +162,7 @@ export function StockAdjustmentsListView() {
                   </AdminTableLink>
                 </AdminTableCell>
                 <AdminTableCell>
-                  {r.store_id && r.store_name ? (
-                    <AdminTableLink href={`/admin/erp/stores/${r.store_id}/edit`}>
-                      {r.store_name}
-                    </AdminTableLink>
-                  ) : (
-                    (r.store_name ?? "—")
-                  )}
+                  <ErpStoreTableGlance storeId={r.store_id} name={r.store_name} />
                 </AdminTableCell>
                 <AdminTableCell>{r.adjustment_date}</AdminTableCell>
                 <AdminTableCell>

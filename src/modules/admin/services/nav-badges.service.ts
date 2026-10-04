@@ -56,7 +56,9 @@ export async function getAdminNavBadges(): Promise<AdminNavBadgesPayload> {
       .from("erp_transfer_requests")
       .select("id", { count: "exact", head: true })
       .eq("status", "submitted"),
-    supabase.from("inventory").select("stock,reorder_point"),
+    supabase.rpc(
+      "count_inventory_nav_badges" as Parameters<typeof supabase.rpc>[0],
+    ),
     supabase
       .from("purchase_orders")
       .select("id", { count: "exact", head: true })
@@ -87,17 +89,23 @@ export async function getAdminNavBadges(): Promise<AdminNavBadgesPayload> {
     "warning",
   );
 
-  const criticalSkus =
-    (inventoryHealthRes.data ?? []).filter((row) => {
-      const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
-      return stock < 1;
-    }).length;
-  const lowSkus =
-    (inventoryHealthRes.data ?? []).filter((row) => {
-      const stock = Math.max(0, Math.floor(Number(row.stock ?? 0)));
-      const reorderPoint = Math.max(0, Math.floor(Number(row.reorder_point ?? 10)));
-      return stock >= 1 && stock < reorderPoint;
-    }).length;
+  let criticalSkus = 0;
+  let lowSkus = 0;
+  if (inventoryHealthRes.error) {
+    console.warn(
+      "[nav-badges] count_inventory_nav_badges failed:",
+      inventoryHealthRes.error.message,
+    );
+  } else {
+    const inventoryCounts =
+      inventoryHealthRes.data &&
+      typeof inventoryHealthRes.data === "object" &&
+      !Array.isArray(inventoryHealthRes.data)
+        ? (inventoryHealthRes.data as { critical?: number; low?: number })
+        : null;
+    criticalSkus = Math.max(0, inventoryCounts?.critical ?? 0);
+    lowSkus = Math.max(0, inventoryCounts?.low ?? 0);
+  }
   const inventoryCount = criticalSkus + lowSkus;
   const inventoryTone: AdminNavBadgeTone =
     criticalSkus > 0 ? "critical" : lowSkus > 0 ? "warning" : "info";

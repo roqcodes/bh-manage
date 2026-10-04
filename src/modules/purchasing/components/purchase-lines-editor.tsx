@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { PackagePlus, Plus, Trash2 } from "lucide-react";
 
 import type { ErpProductSearchRow, PurchaseLineFormRow } from "@/common/erp/purchasing-types";
@@ -12,6 +12,8 @@ import {
 } from "@/modules/erp/components/line-product-details-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import {
   Table,
   TableBody,
@@ -21,6 +23,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrencyAmount } from "@/lib/format-currency";
+import {
+  purchaseLineDefaultsFromSearchRow,
+  resolvePurchaseLineDefaultsFromSelection,
+} from "@/modules/erp/lib/resolve-product-line-defaults.client";
 import { QuickProductCreateModal } from "@/modules/products/components/quick-product-create-modal";
 
 function newLineKey() {
@@ -59,6 +65,10 @@ export function PurchaseLinesEditor({
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [createProductOpen, setCreateProductOpen] = useState(false);
   const [createProductName, setCreateProductName] = useState("");
+  const linesRef = useRef(lines);
+  useEffect(() => {
+    linesRef.current = lines;
+  }, [lines]);
 
   const colSpan =
     (showSerial ? 1 : 0) + 5 + (showExpiry ? 1 : 0) + 2;
@@ -88,20 +98,42 @@ export function PurchaseLinesEditor({
   }
 
   function addProduct(row: ErpProductSearchRow) {
-    onChange([
-      ...lines,
-      {
-        key: newLineKey(),
-        productId: row.id,
-        variantId: null,
-        productName: row.product_name,
-        barcode: row.barcode ?? "",
-        expiryDate: "",
-        quantity: 1,
-        purchasePrice: row.purchase_price ?? 0,
-        taxRatePercent: row.tax_rate_percent ?? 0,
+    const key = newLineKey();
+    const { purchasePrice, taxRatePercent } = purchaseLineDefaultsFromSearchRow(row);
+    const newLine: PurchaseLineFormRow = {
+      key,
+      productId: row.id,
+      variantId: null,
+      productName: row.product_name,
+      barcode: row.barcode ?? "",
+      expiryDate: "",
+      quantity: 1,
+      purchasePrice,
+      taxRatePercent,
+    };
+    const next = [...lines, newLine];
+    linesRef.current = next;
+    onChange(next);
+
+    if (!storeId) return;
+
+    void resolvePurchaseLineDefaultsFromSelection(row, { storeId, vendorId }).then(
+      (resolved) => {
+        const current = linesRef.current;
+        if (!current.some((l) => l.key === key)) return;
+        const updated = current.map((l) =>
+          l.key === key
+            ? {
+                ...l,
+                purchasePrice: resolved.purchasePrice,
+                taxRatePercent: resolved.taxRatePercent,
+              }
+            : l,
+        );
+        linesRef.current = updated;
+        onChange(updated);
       },
-    ]);
+    );
   }
 
   function openCreateProduct(prefill = "") {
@@ -177,9 +209,9 @@ export function PurchaseLinesEditor({
           <TableBody>
             {lines.map((line, index) => {
               const { lineTotal } = calcPurchaseLine(
-                line.quantity,
-                line.purchasePrice,
-                line.taxRatePercent,
+                coalesceNumber(line.quantity),
+                coalesceNumber(line.purchasePrice),
+                coalesceNumber(line.taxRatePercent),
               );
               const detailsOpen = expandedKeys.has(line.key);
               const canShowDetails = Boolean(line.productId && storeId && vendorId);
@@ -198,38 +230,33 @@ export function PurchaseLinesEditor({
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         step="any"
                         className="w-20"
                         value={line.quantity}
-                        onChange={(e) =>
-                          updateLine(index, { quantity: parseFloat(e.target.value) || 0 })
-                        }
+                        onValueChange={(quantity) => updateLine(index, { quantity })}
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         step="any"
                         className="w-24"
                         value={line.purchasePrice}
-                        onChange={(e) =>
-                          updateLine(index, { purchasePrice: parseFloat(e.target.value) || 0 })
+                        onValueChange={(purchasePrice) =>
+                          updateLine(index, { purchasePrice })
                         }
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         step="any"
                         className="w-20"
                         value={line.taxRatePercent}
-                        onChange={(e) =>
-                          updateLine(index, { taxRatePercent: parseFloat(e.target.value) || 0 })
+                        onValueChange={(taxRatePercent) =>
+                          updateLine(index, { taxRatePercent })
                         }
                       />
                     </TableCell>

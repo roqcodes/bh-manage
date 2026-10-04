@@ -8,6 +8,12 @@ import { searchBillingVariants } from "@/app/admin/billing/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import {
+  coalesceNumber,
+  formatNumberInputValue,
+  parseNumberInputValue,
+} from "@/lib/numeric-input";
 import { Label } from "@/components/ui/label";
 import {
   InputGroup,
@@ -156,14 +162,15 @@ export function OrderEditModal({
 
   const totals = useMemo(() => {
     const subtotal = lines.reduce(
-      (sum, line) => sum + line.listPrice * line.quantity,
+      (sum, line) => sum + line.listPrice * coalesceNumber(line.quantity),
       0,
     );
     const lineDiscountTotal = lines.reduce(
-      (sum, line) => sum + line.discount * line.quantity,
+      (sum, line) =>
+        sum + coalesceNumber(line.discount) * coalesceNumber(line.quantity),
       0,
     );
-    const extraDiscount = roundMoney2(Math.max(0, orderDiscount));
+    const extraDiscount = roundMoney2(Math.max(0, coalesceNumber(orderDiscount)));
     const totalDiscount = roundMoney2(lineDiscountTotal + extraDiscount);
     const tax = 0;
     const grandTotal = roundMoney2(
@@ -173,7 +180,7 @@ export function OrderEditModal({
   }, [lines, orderDiscount]);
 
   const hasStockIssue = lines.some(
-    (line) => line.quantity > line.stock + line.reservedQty,
+    (line) => coalesceNumber(line.quantity) > line.stock + line.reservedQty,
   );
 
   function updateLine(key: string, patch: Partial<EditableLine>) {
@@ -418,32 +425,31 @@ export function OrderEditModal({
                               type="number"
                               min={1}
                               max={maxQty}
-                              value={line.quantity}
-                              onChange={(e) =>
+                              value={formatNumberInputValue(line.quantity)}
+                              onChange={(e) => {
+                                const n = parseNumberInputValue(e.target.value);
                                 updateLine(line.key, {
-                                  quantity: Math.max(
-                                    1,
-                                    parseInt(e.target.value, 10) || 1,
-                                  ),
-                                })
-                              }
+                                  quantity: Number.isNaN(n)
+                                    ? Number.NaN
+                                    : Math.max(1, Math.floor(n)),
+                                });
+                              }}
                             />
                           </TableCell>
                           <TableCell className="tabular-nums text-sm">
                             {formatInr(line.listPrice)}
                           </TableCell>
                           <TableCell>
-                            <Input
+                            <NumericInput
                               className="h-8 w-24 tabular-nums"
-                              type="number"
                               min={0}
                               step="0.01"
-                              value={roundMoney2(line.discount).toFixed(2)}
-                              onChange={(e) =>
+                              value={line.discount}
+                              onValueChange={(discount) =>
                                 updateLine(line.key, {
-                                  discount: roundMoney2(
-                                    parseFloat(e.target.value) || 0,
-                                  ),
+                                  discount: Number.isNaN(discount)
+                                    ? discount
+                                    : roundMoney2(discount),
                                 })
                               }
                             />
@@ -533,15 +539,14 @@ export function OrderEditModal({
                 </div>
                 <div className="flex w-full max-w-sm items-center justify-between gap-3 text-muted-foreground">
                   <span>Extra order discount</span>
-                  <Input
+                  <NumericInput
                     className="h-8 w-28 tabular-nums"
-                    type="number"
                     min={0}
                     step="0.01"
-                    value={roundMoney2(orderDiscount).toFixed(2)}
-                    onChange={(e) =>
+                    value={orderDiscount}
+                    onValueChange={(discount) =>
                       setOrderDiscount(
-                        roundMoney2(parseFloat(e.target.value) || 0),
+                        Number.isNaN(discount) ? discount : roundMoney2(discount),
                       )
                     }
                   />

@@ -168,6 +168,7 @@ export type Database = {
       }
       app_settings: {
         Row: {
+          allow_negative_store_stock: boolean
           capture_payments: boolean
           country_code: string
           country_name: string
@@ -181,6 +182,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          allow_negative_store_stock?: boolean
           capture_payments?: boolean
           country_code?: string
           country_name?: string
@@ -194,6 +196,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          allow_negative_store_stock?: boolean
           capture_payments?: boolean
           country_code?: string
           country_name?: string
@@ -2046,6 +2049,7 @@ export type Database = {
           barcode: string | null
           expiry_date: string | null
           id: string
+          landed_cost_allocated: number
           line_total: number
           original_quantity: number | null
           product_name: string
@@ -2057,6 +2061,7 @@ export type Database = {
           tax_amount: number
           tax_rate_percent: number
           unit_id: string | null
+          unit_loaded_cost: number | null
           variant_id: string | null
           product_id: string | null
         }
@@ -2064,6 +2069,7 @@ export type Database = {
           barcode?: string | null
           expiry_date?: string | null
           id?: string
+          landed_cost_allocated?: number
           line_total?: number
           product_name: string
           purchase_bill_id: string
@@ -2072,6 +2078,7 @@ export type Database = {
           tax_amount?: number
           tax_rate_percent?: number
           unit_id?: string | null
+          unit_loaded_cost?: number | null
           variant_id?: string | null
           product_id?: string | null
         }
@@ -2079,6 +2086,7 @@ export type Database = {
           barcode?: string | null
           expiry_date?: string | null
           id?: string
+          landed_cost_allocated?: number
           line_total?: number
           product_name?: string
           purchase_bill_id?: string
@@ -2087,6 +2095,7 @@ export type Database = {
           tax_amount?: number
           tax_rate_percent?: number
           unit_id?: string | null
+          unit_loaded_cost?: number | null
           variant_id?: string | null
           product_id?: string | null
         }
@@ -2134,6 +2143,7 @@ export type Database = {
           landed_cost_total: number
           legacy_stock_via_bill: boolean
           notes: string | null
+          physical_receipt_on_bill: boolean
           po_id: string | null
           purchase_bill_number: string
           purchase_date: string
@@ -2166,6 +2176,7 @@ export type Database = {
           landed_cost_total?: number
           legacy_stock_via_bill?: boolean
           notes?: string | null
+          physical_receipt_on_bill?: boolean
           po_id?: string | null
           purchase_bill_number: string
           purchase_date?: string
@@ -2198,6 +2209,7 @@ export type Database = {
           landed_cost_total?: number
           legacy_stock_via_bill?: boolean
           notes?: string | null
+          physical_receipt_on_bill?: boolean
           po_id?: string | null
           purchase_bill_number?: string
           purchase_date?: string
@@ -2260,6 +2272,8 @@ export type Database = {
           bill_line_id: string | null
           expiry_date: string | null
           id: string
+          landed_cost_allocated: number
+          loaded_unit_cost: number | null
           ordered_qty: number
           billed_qty: number
           po_line_id: string | null
@@ -2280,6 +2294,8 @@ export type Database = {
           bill_line_id?: string | null
           expiry_date?: string | null
           id?: string
+          landed_cost_allocated?: number
+          loaded_unit_cost?: number | null
           ordered_qty?: number
           billed_qty?: number
           po_line_id?: string | null
@@ -2300,6 +2316,8 @@ export type Database = {
           bill_line_id?: string | null
           expiry_date?: string | null
           id?: string
+          landed_cost_allocated?: number
+          loaded_unit_cost?: number | null
           ordered_qty?: number
           billed_qty?: number
           po_line_id?: string | null
@@ -4362,11 +4380,66 @@ export type Database = {
           },
         ]
       }
+      purchase_order_landed_costs: {
+        Row: {
+          created_at: string
+          id: string
+          landed_cost_item_id: string | null
+          line_total: number
+          name: string
+          po_id: string
+          quantity: number
+          rate: number
+          tax_amount: number
+          tax_rate_percent: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          landed_cost_item_id?: string | null
+          line_total?: number
+          name: string
+          po_id: string
+          quantity?: number
+          rate?: number
+          tax_amount?: number
+          tax_rate_percent?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          landed_cost_item_id?: string | null
+          line_total?: number
+          name?: string
+          po_id?: string
+          quantity?: number
+          rate?: number
+          tax_amount?: number
+          tax_rate_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_landed_costs_landed_cost_item_id_fkey"
+            columns: ["landed_cost_item_id"]
+            isOneToOne: false
+            referencedRelation: "erp_landed_cost_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_landed_costs_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_order_items: {
         Row: {
           accepted_qty: number
           discount: number
           id: string
+          landed_cost_allocated: number
           line_total: number
           po_id: string | null
           price: number | null
@@ -4375,30 +4448,35 @@ export type Database = {
           rejected_qty: number
           tax_amount: number
           tax_rate_percent: number
+          unit_loaded_cost: number | null
           variant_id: string | null
           product_id: string | null
         }
         Insert: {
           discount?: number
           id?: string
+          landed_cost_allocated?: number
           line_total?: number
           po_id?: string | null
           price?: number | null
           quantity?: number | null
           tax_amount?: number
           tax_rate_percent?: number
+          unit_loaded_cost?: number | null
           variant_id?: string | null
           product_id?: string | null
         }
         Update: {
           discount?: number
           id?: string
+          landed_cost_allocated?: number
           line_total?: number
           po_id?: string | null
           price?: number | null
           quantity?: number | null
           tax_amount?: number
           tax_rate_percent?: number
+          unit_loaded_cost?: number | null
           variant_id?: string | null
           product_id?: string | null
         }
@@ -4425,6 +4503,7 @@ export type Database = {
           discount: number
           expected_delivery_date: string | null
           id: string
+          landed_cost_total: number
           notes: string | null
           po_date: string | null
           po_number: string | null
@@ -4442,6 +4521,7 @@ export type Database = {
           discount?: number
           expected_delivery_date?: string | null
           id?: string
+          landed_cost_total?: number
           notes?: string | null
           po_date?: string | null
           po_number?: string | null
@@ -4459,6 +4539,7 @@ export type Database = {
           discount?: number
           expected_delivery_date?: string | null
           id?: string
+          landed_cost_total?: number
           notes?: string | null
           po_date?: string | null
           po_number?: string | null
@@ -5645,6 +5726,24 @@ export type Database = {
         Args: { p_order_amount: number; p_user_id: string }
         Returns: boolean
       }
+      complete_pos_counter_sale: {
+        Args: {
+          p_company?: string
+          p_created_by?: string
+          p_customer_name?: string
+          p_customer_user_id?: string
+          p_discount: number
+          p_gst_number?: string
+          p_idempotency_key: string
+          p_lines: Json
+          p_phone?: string
+          p_store_id: string
+          p_subtotal: number
+          p_tax: number
+          p_total_amount: number
+        }
+        Returns: Json
+      }
       check_storefront_signup_email: {
         Args: { p_email: string }
         Returns: Json
@@ -5808,11 +5907,13 @@ export type Database = {
           p_created_by?: string
           p_discount?: number
           p_due_date?: string
+          p_expected_delivery_date?: string
           p_finalize?: boolean
           p_grn_reference?: string
           p_landed_costs?: Json
           p_lines?: Json
           p_notes?: string
+          p_physical_receipt_on_bill?: boolean
           p_po_id?: string
           p_purchase_date: string
           p_reference?: string
@@ -5913,6 +6014,18 @@ export type Database = {
           p_store_id: string
         }
         Returns: Json
+      }
+      refresh_purchase_bill_landed_allocations: {
+        Args: {
+          p_bill_id: string
+        }
+        Returns: undefined
+      }
+      refresh_purchase_order_landed_allocations: {
+        Args: {
+          p_po_id: string
+        }
+        Returns: undefined
       }
       refresh_erp_vat_return: {
         Args: {
@@ -6043,6 +6156,7 @@ export type Database = {
       submit_erp_po_delivery_and_finalize: {
         Args: {
           p_actor?: string
+          p_idempotency_key?: string
           p_lines: Json
           p_notes?: string
           p_po_id: string
@@ -6106,6 +6220,15 @@ export type Database = {
       get_available_credit: { Args: { p_user_id: string }; Returns: number }
       get_cart_with_items: { Args: { p_user_id: string }; Returns: Json }
       get_default_store_id: { Args: never; Returns: string }
+      get_store_stock_shortages: {
+        Args: { p_store_id: string }
+        Returns: {
+          product_id: string
+          product_name: string
+          stock: number
+          suggested_qty: number
+        }[]
+      }
       get_default_tax_rate: { Args: never; Returns: number }
       get_erp_context: { Args: { p_user_id?: string }; Returns: Json }
       get_erp_financial_dashboard: { Args: never; Returns: Json }
@@ -6321,6 +6444,8 @@ export type Database = {
       record_erp_supplier_bulk_payment: {
         Args: {
           p_account_id?: string
+          p_bank_charges?: number
+          p_bank_charges_account_id?: string
           p_created_by?: string
           p_lines: Json
           p_notes?: string

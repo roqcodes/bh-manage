@@ -35,6 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { CatalogCustomerTableGlance } from "@/modules/admin/ui";
 import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import {
   blockUserAction,
@@ -357,14 +358,7 @@ export function CustomersDataTable({
                 {formatCustomerId(user)}
               </TableCell>
               <TableCell>
-                <div className="min-w-0">
-                  <Link
-                    href={`/admin/customers/${user.id}`}
-                    className="text-[13px] font-medium leading-snug text-foreground hover:text-primary hover:underline"
-                  >
-                    {user.name ?? user.company_name ?? "Unnamed customer"}
-                  </Link>
-                </div>
+                <CatalogCustomerTableGlance user={user} />
               </TableCell>
               <TableCell className="hidden max-w-[160px] truncate text-sm text-muted-foreground md:table-cell">
                 {user.company_name?.trim() ? user.company_name : "—"}

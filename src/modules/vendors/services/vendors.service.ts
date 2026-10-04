@@ -15,6 +15,11 @@ import type {
 import { PAGE_SIZE } from "@/common/admin/types";
 import type { VendorErpListRow } from "@/common/erp/purchasing-types";
 import { logAuditEvent } from "@/modules/erp/services/audit-log.service";
+import {
+  listActiveVendorsForPicker,
+  searchActiveVendorsQuery,
+  VENDOR_PICKER_SEARCH_LIMIT,
+} from "@/lib/erp/server/vendor-catalog-search";
 
 export async function getVendors(
   page = 0,
@@ -87,26 +92,11 @@ export async function getVendorsErp(
   };
 }
 
-export async function searchActiveVendors(query: string, limit = 20): Promise<
-  Pick<Vendor, "id" | "name">[]
-> {
-  await requireAdminOrManagerProfile();
-  const q = query.trim();
-  if (!q) return listVendorsForPurchaseOrderFilter();
-
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("vendors")
-    .select("id, name")
-    .eq("is_active", true)
-    .or(
-      `name.ilike.%${q}%,contact.ilike.%${q}%,email.ilike.%${q}%,trn.ilike.%${q}%,phone.ilike.%${q}%`,
-    )
-    .order("name")
-    .limit(limit);
-
-  if (error) throw new Error(error.message);
-  return (data ?? []) as Pick<Vendor, "id" | "name">[];
+export async function searchActiveVendors(
+  query: string,
+  limit = VENDOR_PICKER_SEARCH_LIMIT,
+): Promise<Pick<Vendor, "id" | "name">[]> {
+  return searchActiveVendorsQuery(query, limit);
 }
 
 export async function getVendorCatalogStats(): Promise<VendorCatalogStats> {
@@ -136,15 +126,7 @@ export async function getVendorCatalogStats(): Promise<VendorCatalogStats> {
 export async function listVendorsForPurchaseOrderFilter(): Promise<
   Pick<Vendor, "id" | "name">[]
 > {
-  await requireAdminOrManagerProfile();
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("vendors")
-    .select("id,name")
-    .order("name", { ascending: true })
-    .limit(500);
-
-  return (data ?? []) as Pick<Vendor, "id" | "name">[];
+  return listActiveVendorsForPicker(VENDOR_PICKER_SEARCH_LIMIT);
 }
 
 export async function getVendorById(id: string): Promise<Vendor | null> {

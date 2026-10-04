@@ -1,11 +1,25 @@
 import type { LineProductContextMap } from "@/common/erp/line-product-context";
 import type { SalesLineFormRow } from "@/common/erp/sales-types";
 
+export type SalesStockValidationResult = {
+  blocking: string | null;
+  warning: string | null;
+};
+
 /** Client-side pre-check before issuing sales docs that deduct store stock. */
 export function validateSalesLinesStoreStock(
   lines: SalesLineFormRow[],
   context: LineProductContextMap,
+  allowNegativeStoreStock = false,
 ): string | null {
+  return getSalesLinesStockFeedback(lines, context, allowNegativeStoreStock).blocking;
+}
+
+export function getSalesLinesStockFeedback(
+  lines: SalesLineFormRow[],
+  context: LineProductContextMap,
+  allowNegativeStoreStock = false,
+): SalesStockValidationResult {
   const byProduct = new Map<string, { name: string; qty: number }>();
 
   for (const line of lines) {
@@ -21,10 +35,22 @@ export function validateSalesLinesStoreStock(
     }
   }
 
+  const warnings: string[] = [];
+
   for (const [productId, { name, qty }] of byProduct) {
-    const available = context[productId]?.availableStock ?? 0;
-    if (qty > available) {
-      return `Insufficient stock for ${name} (available ${formatQty(available)}, requested ${formatQty(qty)})`;
+    const onHand = context[productId]?.onHandStock ?? context[productId]?.availableStock ?? 0;
+    if (qty > onHand) {
+      if (allowNegativeStoreStock) {
+        const after = onHand - qty;
+        warnings.push(
+          `${name}: on-hand ${formatQty(onHand)} → ${formatQty(after)} after issue`,
+        );
+      } else {
+        return {
+          blocking: `Insufficient stock for ${name} (available ${formatQty(onHand)}, requested ${formatQty(qty)})`,
+          warning: null,
+        };
+      }
     }
   }
 
@@ -32,10 +58,16 @@ export function validateSalesLinesStoreStock(
     (line) => line.productName.trim() && line.quantity > 0 && !line.productId,
   );
   if (missingProduct) {
-    return `Select a product from search for "${missingProduct.productName.trim()}" so stock can be validated.`;
+    return {
+      blocking: `Select a product from search for "${missingProduct.productName.trim()}" so stock can be validated.`,
+      warning: null,
+    };
   }
 
-  return null;
+  return {
+    blocking: null,
+    warning: warnings.length > 0 ? warnings.join("; ") : null,
+  };
 }
 
 function formatQty(value: number) {

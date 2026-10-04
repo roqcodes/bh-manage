@@ -14,7 +14,7 @@ import {
   AdminTableBody,
   AdminTableCell,
   AdminTableHeader,
-  AdminTableLink,
+  ErpStoreTableGlance,
   AdminTableRow,
   SortableTableHead,
   useDebouncedValue,
@@ -68,7 +68,7 @@ export function ItemTransactionsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [storeId, type, dateFrom, dateTo, debouncedSearch, activeStoreId]);
+  }, [storeId, type, dateFrom, dateTo, debouncedSearch]);
 
   if (loading && rows.length === 0) return <AdminPageSkeleton />;
 
@@ -182,13 +182,7 @@ export function ItemTransactionsListView() {
                   {new Date(r.created_at).toLocaleDateString()}
                 </AdminTableCell>
                 <AdminTableCell>
-                  {r.store_id && r.store_name ? (
-                    <AdminTableLink href={`/admin/erp/stores/${r.store_id}/edit`}>
-                      {r.store_name}
-                    </AdminTableLink>
-                  ) : (
-                    (r.store_name ?? "—")
-                  )}
+                  <ErpStoreTableGlance storeId={r.store_id} name={r.store_name} />
                 </AdminTableCell>
                 <AdminTableCell>{r.type}</AdminTableCell>
                 <AdminTableCell>

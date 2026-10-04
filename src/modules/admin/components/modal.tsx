@@ -68,7 +68,7 @@ export function Modal({
           isLandscape ? undefined : "flex max-h-[min(90vh,840px)] flex-col overflow-hidden",
         )}
       >
-        <DialogHeader className="shrink-0 gap-0.5 border-b border-border px-3 py-2 text-left sm:gap-1 sm:px-4 sm:py-2.5 min-[1100px]:px-5 min-[1100px]:py-3">
+        <DialogHeader className="shrink-0 gap-0.5 border-b border-border px-3 py-2 pr-14 text-left sm:gap-1 sm:px-4 sm:py-2.5 min-[1100px]:px-5 min-[1100px]:py-3">
           <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
           {subtitle ? (
             <DialogDescription className="text-sm">{subtitle}</DialogDescription>

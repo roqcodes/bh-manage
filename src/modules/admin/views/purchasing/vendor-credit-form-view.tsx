@@ -28,7 +28,6 @@ import {
   useActiveStoreFormField,
 } from "@/modules/erp/components/use-active-store-form-field";
 import {
-  emptyPurchaseLine,
   linesToApiInput,
   PurchaseLinesEditor,
 } from "@/modules/purchasing/components/purchase-lines-editor";
@@ -141,7 +140,7 @@ export function VendorCreditFormView({
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [creditNumber, setCreditNumber] = useState("");
   const [skipBillPrefill, setSkipBillPrefill] = useState(mode === "edit");
-  const [lines, setLines] = useState<PurchaseLineFormRow[]>([emptyPurchaseLine()]);
+  const [lines, setLines] = useState<PurchaseLineFormRow[]>([]);
 
   useEffect(() => {
     if (!prefillBillId || mode !== "create") return;

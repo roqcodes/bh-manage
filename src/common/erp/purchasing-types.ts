@@ -157,6 +157,14 @@ export interface ErpPurchaseOrderDetail {
   } | null;
   stores: { id: string; name: string | null } | null;
   purchase_order_items: ErpPurchaseOrderLineRow[];
+  purchase_order_landed_costs?: Array<{
+    id: string;
+    landed_cost_item_id: string | null;
+    name: string;
+    quantity: number;
+    rate: number;
+    tax_rate_percent: number;
+  }>;
   linked_bill: ErpPurchaseOrderLinkedBillDetail | null;
   delivery: ErpPurchaseOrderDeliverySummary;
   discrepancies: ErpPurchaseOrderLineDiscrepancy[];

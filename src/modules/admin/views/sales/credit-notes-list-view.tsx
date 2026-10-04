@@ -22,8 +22,10 @@ import {
   AdminTableBody,
   AdminTableCell,
   AdminTableHeader,
-  AdminTableLink,
   AdminTableRow,
+  ErpCustomerTableGlance,
+  ErpDocumentTableGlance,
+  ErpStoreTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useErpFormModal,
@@ -81,7 +83,7 @@ export function CreditNotesListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken, activeStoreId]);
+  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken]);
 
   if (loading && rows.length === 0) return <AdminPageSkeleton />;
 
@@ -189,24 +191,31 @@ export function CreditNotesListView() {
                   {row.credit_note_date}
                 </AdminTableCell>
                 <AdminTableCell>
-                  <AdminTableLink
-                    href={`/admin/erp/credit-notes/${row.id}`}
-                    title={row.credit_note_number}
-                  >
-                    {formatErpDocRef("CN", row.id)}
-                  </AdminTableLink>
+                  <ErpDocumentTableGlance
+                    triggerLabel={formatErpDocRef("CN", row.id)}
+                    shellLabel="Credit note"
+                    title={row.credit_note_number?.trim() || formatErpDocRef("CN", row.id)}
+                    subtitle={row.customer_name ?? undefined}
+                    viewHref={`/admin/erp/credit-notes/${row.id}`}
+                    viewLabel="View credit note →"
+                    stats={[
+                      { label: "Total", value: formatCurrencyAmount(row.total_amount) },
+                      { label: "Remaining", value: formatCurrencyAmount(row.balance_remaining) },
+                    ]}
+                  />
                 </AdminTableCell>
-                <AdminTableCell className="hidden text-muted-foreground md:table-cell">
-                  {row.store_id && row.store_name ? (
-                    <AdminTableLink href={`/admin/erp/stores/${row.store_id}/edit`}>
-                      {row.store_name}
-                    </AdminTableLink>
-                  ) : (
-                    (row.store_name ?? "—")
-                  )}
+                <AdminTableCell className="hidden md:table-cell">
+                  <ErpStoreTableGlance storeId={row.store_id} name={row.store_name} />
                 </AdminTableCell>
-                <AdminTableCell className="max-w-[160px] truncate">
-                  {row.customer_name ?? "—"}
+                <AdminTableCell className="max-w-[180px]">
+                  <ErpCustomerTableGlance
+                    userId={row.user_id}
+                    name={row.customer_name}
+                    stats={[
+                      { label: "Credit", value: formatCurrencyAmount(row.total_amount) },
+                      { label: "Remaining", value: formatCurrencyAmount(row.balance_remaining) },
+                    ]}
+                  />
                 </AdminTableCell>
                 <AdminTableCell>
                   <StatusBadge status={row.status} />

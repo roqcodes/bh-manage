@@ -16,6 +16,11 @@ import type { Brand, Category, ProductImage, ProductVariant, ProductVideo, Produ
 import type { ItemUnit } from "@/common/erp/types";
 import { formatCategoryOptionLabel } from "@/modules/products/lib/categories.utils";
 import { formatActionError } from "@/modules/admin/lib/format-action-error";
+import {
+  formatNumberInputValue,
+  parseNumberInputValue,
+  coalesceNumber,
+} from "@/lib/numeric-input";
 import { useAdminAction } from "@/modules/admin/hooks/use-admin-action";
 import {
   createProductAction,
@@ -47,6 +52,7 @@ import {
   type GroupDraft,
 } from "@/modules/products/components/group-variants-step";
 import { adminGet, adminGetNullable } from "@/modules/admin/lib/admin-api-client";
+import { invalidateAdminProductCatalogQueries } from "@/modules/erp/lib/erp-product-live-search.client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { cn } from "@/lib/utils";
 import { RequiredFieldMark, showRequiredMark } from "@/lib/required-field-label";
@@ -500,7 +506,7 @@ async function syncProductCatalogImage(
     itemType: detail.product.item_type ?? "goods",
     hsnSac: detail.product.hsn_sac ?? null,
   });
-  await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+  await invalidateAdminProductCatalogQueries(queryClient);
 }
 
 // Removed old wizard components
@@ -1217,8 +1223,14 @@ function variantErpFieldsFromDraft(draft: ProductDraft) {
   return {
     barcode: draft.barcode.trim() || null,
     productCode: draft.productCode.trim() || null,
-    purchasePrice: draft.purchasePrice > 0 ? roundMoney2(draft.purchasePrice) : null,
-    taxRatePercent: draft.taxRatePercent > 0 ? roundMoney2(draft.taxRatePercent) : null,
+    purchasePrice:
+      coalesceNumber(draft.purchasePrice) > 0
+        ? roundMoney2(coalesceNumber(draft.purchasePrice))
+        : null,
+    taxRatePercent:
+      coalesceNumber(draft.taxRatePercent) > 0
+        ? roundMoney2(coalesceNumber(draft.taxRatePercent))
+        : null,
     unitId: draft.unitId,
     markupPercent: draft.markupPercent > 0 ? roundMoney2(draft.markupPercent) : null,
   };
@@ -1326,9 +1338,12 @@ function DetailsStepForm({
                     type="number"
                     step="0.001"
                     min="0.01"
-                    value={draft.defaultPrice || ""}
+                    value={formatNumberInputValue(draft.defaultPrice)}
                     onChange={(e) =>
-                      onDraftChange({ ...draft, defaultPrice: parseFloat(e.target.value) || 0 })
+                      onDraftChange({
+                        ...draft,
+                        defaultPrice: parseNumberInputValue(e.target.value),
+                      })
                     }
                     placeholder="0.000"
                     required
@@ -1341,9 +1356,12 @@ function DetailsStepForm({
                       type="number"
                       step="0.001"
                       min="0"
-                      value={draft.defaultMrp || ""}
+                      value={formatNumberInputValue(draft.defaultMrp)}
                       onChange={(e) =>
-                        onDraftChange({ ...draft, defaultMrp: parseFloat(e.target.value) || 0 })
+                        onDraftChange({
+                          ...draft,
+                          defaultMrp: parseNumberInputValue(e.target.value),
+                        })
                       }
                       placeholder="Optional"
                     />
@@ -1355,9 +1373,12 @@ function DetailsStepForm({
                     type="number"
                     step="0.001"
                     min="0"
-                    value={draft.purchasePrice || ""}
+                    value={formatNumberInputValue(draft.purchasePrice)}
                     onChange={(e) =>
-                      onDraftChange({ ...draft, purchasePrice: parseFloat(e.target.value) || 0 })
+                      onDraftChange({
+                        ...draft,
+                        purchasePrice: parseNumberInputValue(e.target.value),
+                      })
                     }
                     placeholder="0.000"
                   />
@@ -1368,9 +1389,12 @@ function DetailsStepForm({
                     type="number"
                     step="0.01"
                     min="0"
-                    value={draft.taxRatePercent || ""}
+                    value={formatNumberInputValue(draft.taxRatePercent)}
                     onChange={(e) =>
-                      onDraftChange({ ...draft, taxRatePercent: parseFloat(e.target.value) || 0 })
+                      onDraftChange({
+                        ...draft,
+                        taxRatePercent: parseNumberInputValue(e.target.value),
+                      })
                     }
                     placeholder="e.g. 18"
                   />
@@ -1381,9 +1405,12 @@ function DetailsStepForm({
                     type="number"
                     step="0.01"
                     min="0"
-                    value={draft.markupPercent || ""}
+                    value={formatNumberInputValue(draft.markupPercent)}
                     onChange={(e) =>
-                      onDraftChange({ ...draft, markupPercent: parseFloat(e.target.value) || 0 })
+                      onDraftChange({
+                        ...draft,
+                        markupPercent: parseNumberInputValue(e.target.value),
+                      })
                     }
                     placeholder="Optional"
                   />

@@ -1,4 +1,16 @@
 import type { NextConfig } from "next";
+import withSerwistInit from "@serwist/next";
+import { randomUUID } from "node:crypto";
+
+const offlineShellRevision = randomUUID();
+
+const withSerwist = withSerwistInit({
+  swSrc: "src/sw.ts",
+  swDest: "public/sw.js",
+  additionalPrecacheEntries: [{ url: "/~offline", revision: offlineShellRevision }],
+  disable: process.env.NODE_ENV === "development",
+  register: false,
+});
 
 const nextConfig: NextConfig = {
   async redirects() {
@@ -14,4 +26,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

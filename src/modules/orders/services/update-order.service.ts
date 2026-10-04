@@ -3,7 +3,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { Database } from "@/lib/integrations/supabase/types";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
-import { buildOrderItemSnapshot } from "@/modules/orders/services/order-item-pricing.service";
+import { buildOrderItemSnapshots } from "@/modules/orders/services/order-item-pricing.service";
 import {
   commitOrderInventory,
   creditCustomerWallet,
@@ -77,16 +77,21 @@ export async function updateOrderWithItems(
     listPrice: number;
   }[] = [];
 
+  const pricingSnapshots = await buildOrderItemSnapshots(
+    input.items.map((item) => ({
+      variantId: item.variantId,
+      quantity: Math.max(1, Math.floor(item.quantity)),
+      unitPriceOverride: roundMoney(Math.max(0, item.unitPrice)),
+    })),
+  );
+
   for (const item of input.items) {
     const qty = Math.max(1, Math.floor(item.quantity));
     const listPrice = roundMoney(Math.max(0, item.listPrice));
     const finalPrice = roundMoney(Math.max(0, item.unitPrice));
 
-    const snapshot = await buildOrderItemSnapshot({
-      variantId: item.variantId,
-      quantity: qty,
-      unitPriceOverride: finalPrice,
-    });
+    const snapshot = pricingSnapshots.get(item.variantId);
+    if (!snapshot) throw new Error("Variant or product not found.");
 
     lineSnapshots.push({
       productId: snapshot.product_id,

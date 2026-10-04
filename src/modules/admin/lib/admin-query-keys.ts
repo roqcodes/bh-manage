@@ -62,4 +62,11 @@ export const adminQueryKeys = {
     ["admin", "analytics", queryString] as const,
   accountsPicker: (storeId?: string | null) =>
     ["admin", "accounts", "picker", storeId ?? "active"] as const,
+  erpProductLiveSearch: (
+    catalog: "purchase" | "sales",
+    storeId: string | undefined,
+    query: string,
+  ) => ["admin", "erp-product-search", catalog, storeId ?? "", query] as const,
+  entityLiveSearch: (scope: string, query: string) =>
+    ["admin", "entity-search", scope, query] as const,
 };

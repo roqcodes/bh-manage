@@ -10,6 +10,10 @@ import {
   type UserProfile,
 } from "@/common/auth/types";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import {
+  isSupabaseConnectivityError,
+  SupabaseConnectivityError,
+} from "@/lib/integrations/supabase/connectivity-error";
 import { recordAuthAudit } from "@/modules/auth/services/auth-audit.service";
 import {
   formatPortalAuthError,
@@ -64,24 +68,47 @@ export async function getUserProfileById(userId: string): Promise<UserProfile | 
 }
 
 export const getCurrentSessionProfile = cache(async () => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  if (!user) {
+    if (authError && isSupabaseConnectivityError(authError)) {
+      throw new SupabaseConnectivityError(authError);
+    }
+
+    if (!user) {
+      return {
+        user: null,
+        profile: null,
+      };
+    }
+
+    let profile: UserProfile | null;
+    try {
+      profile = await getUserProfileById(user.id);
+    } catch (profileError) {
+      if (isSupabaseConnectivityError(profileError)) {
+        throw new SupabaseConnectivityError(profileError);
+      }
+      throw profileError;
+    }
+
     return {
-      user: null,
-      profile: null,
+      user,
+      profile,
     };
+  } catch (error) {
+    if (error instanceof SupabaseConnectivityError) {
+      throw error;
+    }
+    if (isSupabaseConnectivityError(error)) {
+      throw new SupabaseConnectivityError(error);
+    }
+    throw error;
   }
-
-  const profile = await getUserProfileById(user.id);
-
-  return {
-    user,
-    profile,
-  };
 });
 
 export async function signInWithPassword(input: {
@@ -230,6 +257,7 @@ export async function requestAccess(input: {
   });
 
   if (profileError) {
+    await supabase.auth.signOut();
     await recordAuthAudit({
       action: "request_access",
       email: input.email,

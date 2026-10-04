@@ -1,5 +1,5 @@
-import { StockDetailsListView } from "@/modules/admin/views/inventory/stock-details-list-view";
+import { redirect } from "next/navigation";
 
-export default function Page() {
-  return <StockDetailsListView />;
+export default function StockDetailsRedirectPage() {
+  redirect("/admin/erp/store-inventory");
 }

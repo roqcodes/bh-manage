@@ -62,6 +62,8 @@ import {
   shortOrderRef,
   customerInitials,
 } from "@/modules/orders/components/orders-ui";
+import { SalesOrderOutboxTableRows } from "@/modules/orders/components/sales-order-outbox-table-rows";
+import type { OutboxOperationRecord } from "@/lib/sync/outbox-types";
 
 function CompactPopoverShell({
   label,
@@ -410,12 +412,14 @@ export function OrdersDataTable({
   onSelectedIdsChange,
   variant = "online",
   detailBasePath = "/admin/orders",
+  outboxOperations,
 }: {
   orders: Order[];
   selectedIds: Set<string>;
   onSelectedIdsChange: (ids: Set<string>) => void;
   variant?: "online" | "erp";
   detailBasePath?: string;
+  outboxOperations?: OutboxOperationRecord[];
 }) {
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     orders,
@@ -473,7 +477,9 @@ export function OrdersDataTable({
     );
   }
 
-  if (sorted.length === 0) {
+  const queued = variant === "erp" ? outboxOperations ?? [] : [];
+
+  if (sorted.length === 0 && queued.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
         <Package className="size-10 text-muted-foreground/40" aria-hidden />
@@ -575,6 +581,12 @@ export function OrdersDataTable({
         </TableRow>
       </TableHeader>
       <TableBody>
+        {queued.length > 0 ? (
+          <SalesOrderOutboxTableRows
+            operations={queued}
+            detailBasePath={detailBasePath}
+          />
+        ) : null}
         {sorted.map((order) => {
           const isSelected = selectedIds.has(order.id);
           const total = Number(order.total_amount ?? 0);

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import type { Vendor } from "@/common/admin/types";
+import { invalidateAdminVendorCatalogQueries } from "@/modules/erp/lib/entity-live-search.client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -34,6 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { CatalogVendorTableGlance } from "@/modules/admin/ui";
 import { useSortableData } from "@/lib/hooks/use-sortable-data";
 import {
   bulkDeleteVendorsAction,
@@ -99,7 +101,7 @@ export function VendorsBulkActionBar({
           onClick={() => {
             runAction(async () => {
               await bulkSetVendorsActiveAction(ids, true);
-              void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
+              void invalidateAdminVendorCatalogQueries(queryClient);
               onClearSelection();
             });
           }}
@@ -113,7 +115,7 @@ export function VendorsBulkActionBar({
           onClick={() => {
             runAction(async () => {
               await bulkSetVendorsActiveAction(ids, false);
-              void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
+              void invalidateAdminVendorCatalogQueries(queryClient);
               onClearSelection();
             });
           }}
@@ -127,7 +129,7 @@ export function VendorsBulkActionBar({
           onClick={() => {
             runAction(async () => {
               await bulkDeleteVendorsAction(ids);
-              void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
+              void invalidateAdminVendorCatalogQueries(queryClient);
               onClearSelection();
             }, { errorTitle: "Couldn't delete vendors" });
           }}
@@ -197,14 +199,14 @@ export function VendorsDataTable({
   function runToggle(vendorId: string, isActive: boolean) {
     runAction(async () => {
       await toggleVendorAction(vendorId, isActive);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
+      void invalidateAdminVendorCatalogQueries(queryClient);
     });
   }
 
   function runDelete(vendorId: string) {
     runAction(async () => {
       await deleteVendorAction(vendorId);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "vendors"] });
+      void invalidateAdminVendorCatalogQueries(queryClient);
     }, { errorTitle: "Couldn't delete vendor" });
   }
 
@@ -281,12 +283,7 @@ export function VendorsDataTable({
               </TableCell>
               <TableCell>
                 <div className="min-w-0">
-                  <Link
-                    href={`/admin/vendors/${vendor.id}`}
-                    className="text-[13px] font-medium leading-snug text-foreground hover:text-primary hover:underline"
-                  >
-                    {vendor.name ?? "Unnamed vendor"}
-                  </Link>
+                  <CatalogVendorTableGlance vendor={vendor} />
                   <p className="truncate text-[11px] text-muted-foreground">
                     {formatVendorId(vendor)}
                   </p>

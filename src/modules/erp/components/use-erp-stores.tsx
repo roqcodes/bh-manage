@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
@@ -21,6 +21,7 @@ export function useErpContextQuery() {
     queryKey: adminQueryKeys.erpContext(),
     queryFn: () => adminGet<ErpContextQueryData>("erp/context"),
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -22,8 +22,10 @@ import {
   AdminTableBody,
   AdminTableCell,
   AdminTableHeader,
-  AdminTableLink,
   AdminTableRow,
+  ErpDocumentTableGlance,
+  ErpStoreTableGlance,
+  ErpVendorTableGlance,
   ErpListRowActions,
   SortableTableHead,
   useErpFormModal,
@@ -69,7 +71,7 @@ export function VendorCreditsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, dateFrom, dateTo, reloadToken, listParams, activeStoreId]);
+  }, [page, debouncedSearch, dateFrom, dateTo, reloadToken, listParams]);
 
   const filteredRows = useMemo(() => {
     if (!debouncedSearch.trim()) return sorted;
@@ -174,30 +176,30 @@ export function VendorCreditsListView() {
             {filteredRows.map((r) => (
               <AdminTableRow key={r.id}>
                 <AdminTableCell>
-                  <AdminTableLink
-                    href={`/admin/erp/vendor-credits/${r.id}`}
-                    title={r.credit_number}
-                  >
-                    {formatErpDocRef("VC", r.id)}
-                  </AdminTableLink>
+                  <ErpDocumentTableGlance
+                    triggerLabel={formatErpDocRef("VC", r.id)}
+                    shellLabel="Vendor credit"
+                    title={r.credit_number?.trim() || formatErpDocRef("VC", r.id)}
+                    subtitle={r.vendor_name ?? undefined}
+                    viewHref={`/admin/erp/vendor-credits/${r.id}`}
+                    viewLabel="View vendor credit →"
+                    stats={[
+                      { label: "Total", value: formatCurrencyAmount(r.total_amount) },
+                      { label: "Remaining", value: formatCurrencyAmount(r.balance_remaining) },
+                    ]}
+                  />
                 </AdminTableCell>
                 <AdminTableCell>
-                  {r.vendor_id && r.vendor_name ? (
-                    <AdminTableLink href={`/admin/vendors/${r.vendor_id}/erp`}>
-                      {r.vendor_name}
-                    </AdminTableLink>
-                  ) : (
-                    (r.vendor_name ?? "—")
-                  )}
+                  <ErpVendorTableGlance
+                    vendorId={r.vendor_id}
+                    name={r.vendor_name}
+                    stats={[
+                      { label: "Remaining", value: formatCurrencyAmount(r.balance_remaining) },
+                    ]}
+                  />
                 </AdminTableCell>
                 <AdminTableCell>
-                  {r.store_id && r.store_name ? (
-                    <AdminTableLink href={`/admin/erp/stores/${r.store_id}/edit`}>
-                      {r.store_name}
-                    </AdminTableLink>
-                  ) : (
-                    (r.store_name ?? "—")
-                  )}
+                  <ErpStoreTableGlance storeId={r.store_id} name={r.store_name} />
                 </AdminTableCell>
                 <AdminTableCell>
                   <StatusBadge status={r.status} />

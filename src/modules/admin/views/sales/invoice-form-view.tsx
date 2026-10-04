@@ -1,13 +1,25 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import type { SalesLineFormRow } from "@/common/erp/sales-types";
 import { calcSalesLine, roundSalesMoney } from "@/common/erp/sales-types";
 import { toDateInputValue } from "@/lib/format-date";
-import { adminGet, adminPatch, adminPost } from "@/modules/admin/lib/admin-api-client";
+import { createSupabaseBrowserClient } from "@/lib/integrations/supabase/client";
+import { ERP_CLIENT_OPERATION_TYPES } from "@/lib/erp/client-operations/operation-types";
+import { dispatchOutboxChanged } from "@/lib/sync/outbox-browser-events";
+import { broadcastSyncWake } from "@/lib/sync/sync-network";
+import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
+import { createOutboxStore } from "@/lib/sync/outbox-store";
+import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
+import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
+import type { SalesInvoiceCreatePayload } from "@/modules/erp/types/sales-invoice-payload";
+import type { SalesInvoiceUpdatePayload } from "@/modules/erp/types/sales-invoice-payload";
+import { salesInvoiceResourceScope } from "@/modules/erp/types/sales-invoice-payload";
+import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import {
   AdminFormField,
   AdminFormGrid,
@@ -21,10 +33,11 @@ import {
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import {
   SalesLinesEditor,
-  emptySalesLine,
   salesLinesToApiInput,
 } from "@/modules/erp/components/sales-lines-editor";
-import { validateSalesLinesStoreStock } from "@/modules/erp/lib/sales-line-stock-validation";
+import { getSalesLinesStockFeedback } from "@/modules/erp/lib/sales-line-stock-validation";
+import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import type { CurrencySettings } from "@/lib/format-currency";
 import type { LineProductContextMap } from "@/common/erp/line-product-context";
 import {
   ActiveStoreFormField,
@@ -33,6 +46,8 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import { Label } from "@/components/ui/label";
 
 export type InvoiceFormViewProps = ErpFormViewBaseProps & {
@@ -55,7 +70,17 @@ export function InvoiceFormView({
     useActiveStoreFormField({ mode });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [stockWarning, setStockWarning] = useState<string | null>(null);
+  const [localSaveNotice, setLocalSaveNotice] = useState<string | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(mode === "edit");
+
+  const { data: appSettings } = useQuery({
+    queryKey: adminQueryKeys.appSettings(),
+    queryFn: () =>
+      adminGet<{ settings: CurrencySettings }>("settings").then((r) => r.settings),
+    staleTime: 60_000,
+  });
+  const allowNegativeStoreStock = appSettings?.allow_negative_store_stock ?? false;
   const isModal = variant === "modal";
 
   const [customerId, setCustomerId] = useState("");
@@ -65,7 +90,7 @@ export function InvoiceFormView({
   const [discount, setDiscount] = useState(0);
   const [taxInclusive, setTaxInclusive] = useState(true);
   const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<SalesLineFormRow[]>([emptySalesLine()]);
+  const [lines, setLines] = useState<SalesLineFormRow[]>([]);
 
   useEffect(() => {
     const preselected = searchParams.get("customerId");
@@ -135,7 +160,7 @@ export function InvoiceFormView({
       tax += taxAmount;
     }
     const gross = roundSalesMoney(subtotal + tax);
-    const net = roundSalesMoney(Math.max(0, gross - discount));
+    const net = roundSalesMoney(Math.max(0, gross - coalesceNumber(discount)));
     return { subtotal: roundSalesMoney(subtotal), tax: roundSalesMoney(tax), total: net };
   }, [lines, taxInclusive, discount]);
 
@@ -147,7 +172,27 @@ export function InvoiceFormView({
     }
   }
 
+  function resetCreateForm() {
+    setCustomerId("");
+    setCustomerLabel("");
+    const today = new Date().toISOString().slice(0, 10);
+    setInvoiceDate(today);
+    setDueDate(today);
+    setDiscount(0);
+    setTaxInclusive(true);
+    setNotes("");
+    setLines([]);
+    setStockWarning(null);
+    setError(null);
+  }
+
   function handleSuccessNavigate(id?: string) {
+    if (mode === "create") {
+      resetCreateForm();
+      onSuccess?.(id);
+      if (!isModal) return;
+      return;
+    }
     if (isModal) {
       onOpenChange?.(false);
       onSuccess?.(id);
@@ -158,6 +203,8 @@ export function InvoiceFormView({
 
   function handleSubmit(finalize: boolean) {
     setError(null);
+    setLocalSaveNotice(null);
+    setStockWarning(null);
     if (!customerId) {
       setError("Customer is required");
       return;
@@ -186,10 +233,17 @@ export function InvoiceFormView({
             const stockCtx = await adminGet<{ data: LineProductContextMap }>(
               `erp/line-product-context?storeId=${encodeURIComponent(effectiveStoreId)}&productIds=${productIds.join(",")}`,
             );
-            const stockError = validateSalesLinesStoreStock(lines, stockCtx.data ?? {});
-            if (stockError) {
-              setError(stockError);
+            const feedback = getSalesLinesStockFeedback(
+              lines,
+              stockCtx.data ?? {},
+              allowNegativeStoreStock,
+            );
+            if (feedback.blocking) {
+              setError(feedback.blocking);
               return;
+            }
+            if (feedback.warning) {
+              setStockWarning(feedback.warning);
             }
           } else if (apiLines.some((line) => !line.productId)) {
             setError("Each line must be linked to a product (use product search) before issuing.");
@@ -197,33 +251,83 @@ export function InvoiceFormView({
           }
         }
 
-        if (invoiceId) {
-          await adminPatch(`erp/invoices/${invoiceId}`, {
-            invoiceDate,
-            dueDate: dueDate || invoiceDate,
-            lines: apiLines,
-            discount,
-            taxInclusive,
-            notes: notes || undefined,
-          });
-          handleSuccessNavigate(invoiceId);
+        const supabase = createSupabaseBrowserClient();
+        const staffUserId = await resolveOutboxUserId(supabase);
+        if (!staffUserId) {
+          setError("You must be signed in to save an invoice.");
           return;
         }
 
-        const res = await adminPost<{ id: string }>("erp/invoices", {
-          userId: customerId,
-          storeId: effectiveStoreId,
-          invoiceDate,
-          dueDate: dueDate || invoiceDate,
-          lines: apiLines,
-          discount,
-          taxInclusive,
-          notes: notes || undefined,
-          finalize,
-        });
-        handleSuccessNavigate(res.id);
+        const store = createOutboxStore();
+        try {
+          if (invoiceId) {
+            const updatePayload: SalesInvoiceUpdatePayload = {
+              invoiceId,
+              invoiceDate,
+              dueDate: dueDate || invoiceDate,
+              lines: apiLines,
+              discount: coalesceNumber(discount),
+              taxInclusive,
+              notes: notes || undefined,
+            };
+            await store.enqueue({
+              operationType: ERP_CLIENT_OPERATION_TYPES.salesInvoice.update,
+              schemaVersion: 1,
+              payload: updatePayload,
+              userId: staffUserId,
+              storeId: effectiveStoreId,
+              terminalId: getOrCreateErpTerminalId(),
+              resourceScope: salesInvoiceResourceScope(invoiceId),
+            });
+          } else {
+            const createPayload: SalesInvoiceCreatePayload = {
+              userId: customerId,
+              invoiceDate,
+              dueDate: dueDate || invoiceDate,
+              lines: apiLines,
+              discount: coalesceNumber(discount),
+              taxInclusive,
+              notes: notes || undefined,
+              finalize,
+            };
+            await store.enqueue({
+              operationType: ERP_CLIENT_OPERATION_TYPES.salesInvoice.create,
+              schemaVersion: 1,
+              payload: createPayload,
+              userId: staffUserId,
+              storeId: effectiveStoreId,
+              terminalId: getOrCreateErpTerminalId(),
+            });
+          }
+        } catch (enqueueErr) {
+          if (enqueueErr instanceof OutboxEnqueueError) {
+            setError(enqueueErr.message);
+          } else {
+            setError(
+              enqueueErr instanceof Error
+                ? enqueueErr.message
+                : "Could not queue invoice locally.",
+            );
+          }
+          return;
+        } finally {
+          await store.close();
+        }
+
+        dispatchOutboxChanged();
+        broadcastSyncWake();
+        setLocalSaveNotice(
+          finalize
+            ? "Queued — will post when synchronized"
+            : "Saved locally — pending sync",
+        );
+        if (mode === "create") {
+          handleSuccessNavigate();
+        } else {
+          handleSuccessNavigate(invoiceId);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to create invoice");
+        setError(err instanceof Error ? err.message : "Failed to queue invoice");
       }
     });
   }
@@ -249,12 +353,11 @@ export function InvoiceFormView({
         </div>
         <div className="space-y-1">
           <Label>Discount</Label>
-          <Input
-            type="number"
+          <NumericInput
             min={0}
             step="0.01"
-            value={discount || ""}
-            onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+            value={discount}
+            onValueChange={setDiscount}
           />
         </div>
         <div className="flex justify-between border-t pt-3 text-base font-semibold">
@@ -276,7 +379,7 @@ export function InvoiceFormView({
         </Button>
       ) : null}
       <Button disabled={pending} onClick={() => handleSubmit(true)}>
-        {pending ? "Savingâ€¦" : mode === "edit" ? "Update invoice" : "Save invoice"}
+        {pending ? "Saving…" : mode === "edit" ? "Update invoice" : "Save & next"}
       </Button>
     </>
   ) : undefined;
@@ -300,7 +403,12 @@ export function InvoiceFormView({
       loading={loadingInvoice}
       loadingFallback={<AdminPageSkeleton />}
     >
-      <form id={formId} className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+      <form
+        id={formId}
+        className="space-y-4"
+        autoComplete="off"
+        onSubmit={(e) => e.preventDefault()}
+      >
         <AdminFormModalLayout sidebar={totalsSidebar}>
           <AdminFormSection title="Invoice details">
             <AdminFormGrid cols={3}>
@@ -368,6 +476,12 @@ export function InvoiceFormView({
             />
           </AdminFormSection>
 
+          {stockWarning ? (
+            <p className="text-sm text-amber-700 dark:text-amber-400">{stockWarning}</p>
+          ) : null}
+          {localSaveNotice ? (
+            <p className="text-sm text-muted-foreground">{localSaveNotice}</p>
+          ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           {!isModal ? (
@@ -381,7 +495,7 @@ export function InvoiceFormView({
                 </Button>
               ) : null}
               <Button disabled={pending} onClick={() => handleSubmit(true)}>
-                {pending ? "Savingâ€¦" : mode === "edit" ? "Update invoice" : "Save invoice"}
+                {pending ? "Saving…" : mode === "edit" ? "Update invoice" : "Save & next"}
               </Button>
             </div>
           ) : null}

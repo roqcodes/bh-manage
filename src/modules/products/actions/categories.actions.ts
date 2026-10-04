@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { revalidatePublicCatalog } from "@/lib/cache/public-catalog-cache";
+
 import {
   createCategory,
   deleteCategory,
@@ -15,6 +17,7 @@ export async function createCategoryAction(
   const id = await createCategory(input);
   revalidatePath("/admin/categories");
   revalidatePath("/admin/products");
+  revalidatePublicCatalog();
   return id;
 }
 
@@ -25,10 +28,12 @@ export async function updateCategoryAction(
   await updateCategory(id, input);
   revalidatePath("/admin/categories");
   revalidatePath("/admin/products");
+  revalidatePublicCatalog();
 }
 
 export async function deleteCategoryAction(id: string): Promise<void> {
   await deleteCategory(id);
   revalidatePath("/admin/categories");
   revalidatePath("/admin/products");
+  revalidatePublicCatalog();
 }

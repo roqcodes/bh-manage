@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 import { resolveErpStoreId } from "@/modules/erp/services/store-context.service";
 import type { Database } from "@/lib/integrations/supabase/types";
 import type {
@@ -58,16 +59,26 @@ async function customerOrderCounts(
   if (userIds.length === 0) return {};
 
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("orders")
-    .select("user_id")
-    .in("user_id", userIds);
+  const { data, error } = await invokeRpc(supabase, "get_user_order_counts", {
+    p_user_ids: userIds,
+  });
 
   const counts: Record<string, number> = {};
-  for (const row of data ?? []) {
-    const uid = row.user_id as string | null;
-    if (!uid) continue;
-    counts[uid] = (counts[uid] ?? 0) + 1;
+  if (error) {
+    const { data: fallback } = await supabase
+      .from("orders")
+      .select("user_id")
+      .in("user_id", userIds);
+    for (const row of fallback ?? []) {
+      const uid = row.user_id as string | null;
+      if (!uid) continue;
+      counts[uid] = (counts[uid] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  for (const row of (data ?? []) as { user_id: string; order_count: number }[]) {
+    counts[row.user_id] = Number(row.order_count ?? 0);
   }
   return counts;
 }
@@ -360,7 +371,7 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id,created_at,status,payment_status,total_amount,subtotal,tax,discount,merchant_note,customer_edited_at,address_id,source,fulfillment_status,inventory_reserved,inventory_committed,preferred_delivery_date,shipment_date,sales_order_number,reference_number,delivery_method,invoice_id,tax_inclusive,users:users!orders_user_fkey(id,name,email,phone),stores(name),order_items(id,order_id,product_id,variant_id,quantity,price,product_name,vendor_id,base_price,final_price,margin_amount,customer_edit_flag,tax_rate_percent,created_at)",
+      "id,created_at,status,payment_status,total_amount,subtotal,tax,discount,merchant_note,customer_edited_at,address_id,store_id,source,fulfillment_status,inventory_reserved,inventory_committed,preferred_delivery_date,shipment_date,sales_order_number,reference_number,delivery_method,invoice_id,tax_inclusive,users:users!orders_user_fkey(id,name,email,phone),stores(name),order_items(id,order_id,product_id,variant_id,quantity,price,product_name,vendor_id,base_price,final_price,margin_amount,customer_edit_flag,tax_rate_percent,created_at)",
     )
     .eq("id", id)
     .maybeSingle();

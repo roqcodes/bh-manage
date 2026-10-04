@@ -20,6 +20,7 @@ import {
   withAccountStoreScope,
 } from "@/modules/erp/services/store-context.service";
 import type { Json } from "@/lib/integrations/supabase/types";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 
 const CUSTOMER_BULK_REF_PREFIX = "CBPB:";
 
@@ -158,16 +159,33 @@ export async function listErpPayments(filters: PaymentListFilters = {}): Promise
     });
   }
 
-  let summaryQuery = applyPaymentListFilters(
-    supabase.from("erp_customer_payments").select("payment_mode, total_amount"),
-    scopedFilters,
-  );
-  const { data: summaryRows, error: summaryError } = await summaryQuery;
-  if (summaryError) throw new Error(summaryError.message);
-
   const summary = emptyPaymentSummary();
-  for (const row of summaryRows ?? []) {
-    addToSummary(summary, row.payment_mode, Number(row.total_amount ?? 0));
+  const { data: summaryRows, error: summaryError } = await invokeRpc(
+    supabase,
+    "summarize_erp_customer_payments",
+    {
+      p_store_id: activeStoreId ?? undefined,
+      p_date_from: filters.dateFrom ?? undefined,
+      p_date_to: filters.dateTo ?? undefined,
+    },
+  );
+  if (summaryError) {
+    let summaryQuery = applyPaymentListFilters(
+      supabase.from("erp_customer_payments").select("payment_mode, total_amount"),
+      scopedFilters,
+    );
+    const { data: fallbackRows, error: fallbackErr } = await summaryQuery;
+    if (fallbackErr) throw new Error(fallbackErr.message);
+    for (const row of fallbackRows ?? []) {
+      addToSummary(summary, row.payment_mode, Number(row.total_amount ?? 0));
+    }
+  } else {
+    for (const row of (summaryRows ?? []) as {
+      payment_mode: string;
+      total_amount: number;
+    }[]) {
+      addToSummary(summary, row.payment_mode, Number(row.total_amount ?? 0));
+    }
   }
 
   return {

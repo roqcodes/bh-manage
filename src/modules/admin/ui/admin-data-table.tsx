@@ -43,12 +43,17 @@ export function AdminTableBody({ children }: { children: ReactNode }) {
 export function AdminTableRow({
   children,
   className,
+  onClick,
 }: {
   children: ReactNode;
   className?: string;
+  onClick?: () => void;
 }) {
   return (
-    <TableRow className={cn("hover:bg-muted/30", className)}>
+    <TableRow
+      className={cn(onClick && "cursor-pointer", "hover:bg-muted/30", className)}
+      onClick={onClick}
+    >
       {children}
     </TableRow>
   );

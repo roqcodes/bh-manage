@@ -18,6 +18,7 @@ import {
   AdminTableHeader,
   AdminTableLink,
   AdminTableRow,
+  ErpStoreTableGlance,
   SortableTableHead,
   useSortableData,
 } from "@/modules/admin/ui";
@@ -164,22 +165,10 @@ export function TransferApprovalsListView() {
                   </AdminTableLink>
                 </AdminTableCell>
                 <AdminTableCell>
-                  {r.from_store_id && r.from_store_name ? (
-                    <AdminTableLink href={`/admin/erp/stores/${r.from_store_id}/edit`}>
-                      {r.from_store_name}
-                    </AdminTableLink>
-                  ) : (
-                    (r.from_store_name ?? "—")
-                  )}
+                  <ErpStoreTableGlance storeId={r.from_store_id} name={r.from_store_name} />
                 </AdminTableCell>
                 <AdminTableCell>
-                  {r.to_store_id && r.to_store_name ? (
-                    <AdminTableLink href={`/admin/erp/stores/${r.to_store_id}/edit`}>
-                      {r.to_store_name}
-                    </AdminTableLink>
-                  ) : (
-                    (r.to_store_name ?? "—")
-                  )}
+                  <ErpStoreTableGlance storeId={r.to_store_id} name={r.to_store_name} />
                 </AdminTableCell>
                 <AdminTableCell>{r.request_date}</AdminTableCell>
                 <AdminTableCell>

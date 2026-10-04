@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 
 import { isAdminInvoicePrintPath } from "@/modules/admin/lib/admin-invoice-route";
+import { AUTH_ROUTES } from "@/modules/auth/services/auth-route.service";
 
 import type { UserProfile } from "@/common/auth/types";
 import { AdminHeader } from "@/modules/admin/components/admin-header";
@@ -49,7 +50,7 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isError) {
-      router.replace("/");
+      router.replace(AUTH_ROUTES.signIn);
     }
   }, [isError, router]);
 

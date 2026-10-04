@@ -64,7 +64,7 @@ export function PaySlipsListView() {
     adminGet<{ data: ErpEmployeeOption[] }>(`erp/employees${q}`).then((res) =>
       setEmployees(res.data ?? []),
     );
-  }, [storeId, activeStoreId]);
+  }, [storeId]);
 
   useEffect(() => {
     setLoading(true);
@@ -81,7 +81,7 @@ export function PaySlipsListView() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
-  }, [page, storeId, period, employeeId, debouncedSearch, activeStoreId]);
+  }, [page, storeId, period, employeeId, debouncedSearch]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
