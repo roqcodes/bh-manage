@@ -79,7 +79,7 @@ function DialogContent({
               <Button
                 type="button"
                 variant="ghost"
-                className="absolute top-2 right-2 z-20"
+                className="absolute top-2 right-2 z-20 pointer-events-auto"
                 size="icon-sm"
               />
             }

@@ -20,6 +20,8 @@ import {
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 
@@ -325,35 +327,27 @@ export function StoreTransferFormView({
                     <td className="px-3 py-2">{line.productName}</td>
                     <td className="px-3 py-2 tabular-nums">{line.available}</td>
                     <td className="px-3 py-2">
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         step="any"
                         value={line.quantity}
-                        onChange={(e) =>
+                        onValueChange={(quantity) =>
                           setLines(
-                            lines.map((l) =>
-                              l.key === line.key
-                                ? { ...l, quantity: parseFloat(e.target.value) || 0 }
-                                : l,
-                            ),
+                            lines.map((l) => (l.key === line.key ? { ...l, quantity } : l)),
                           )
                         }
                         className="w-20"
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         step="0.01"
                         value={line.transferPrice}
-                        onChange={(e) =>
+                        onValueChange={(transferPrice) =>
                           setLines(
                             lines.map((l) =>
-                              l.key === line.key
-                                ? { ...l, transferPrice: parseFloat(e.target.value) || 0 }
-                                : l,
+                              l.key === line.key ? { ...l, transferPrice } : l,
                             ),
                           )
                         }
@@ -361,7 +355,9 @@ export function StoreTransferFormView({
                       />
                     </td>
                     <td className="px-3 py-2 tabular-nums">
-                      {formatCurrencyAmount(line.quantity * line.transferPrice)}
+                      {formatCurrencyAmount(
+                        coalesceNumber(line.quantity) * coalesceNumber(line.transferPrice),
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <Button

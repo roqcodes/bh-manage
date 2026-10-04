@@ -8,13 +8,16 @@ import { ChevronRight } from "lucide-react";
 
 import type { AdminNavBadge } from "@/common/admin/types";
 import { cn } from "@/lib/utils";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import {
   ADMIN_DASHBOARD_ITEM,
   ADMIN_NAV_SECTIONS,
   type AdminNavItem,
   type AdminNavSection,
 } from "@/modules/admin/lib/admin-nav-items";
+import {
+  adminNavBadgesQueryOptions,
+  fetchAdminNavBadges,
+} from "@/modules/admin/lib/admin-nav-badges-query";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { prefetchAdminRoute } from "@/modules/admin/lib/admin-prefetch-nav";
 import { isAdminRouteHidden } from "@/modules/admin/lib/hidden-admin-routes";
@@ -390,12 +393,23 @@ export function AdminSidebar({
     }
   }, [activeSectionLabel]);
 
+  /** Load badge counts after first paint so they do not compete with page data. */
+  const [navBadgesEnabled, setNavBadgesEnabled] = useState(false);
+  useEffect(() => {
+    const enable = () => setNavBadgesEnabled(true);
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(enable, { timeout: 3_000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(enable, 2_000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const { data: navBadgesData } = useQuery({
     queryKey: adminQueryKeys.navBadges(),
-    queryFn: () => adminGet<{ badges: Record<string, AdminNavBadge> }>("nav-badges"),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
+    queryFn: fetchAdminNavBadges,
+    enabled: navBadgesEnabled,
+    ...adminNavBadgesQueryOptions,
   });
 
   const navAlerts = navBadgesData?.badges ?? {};

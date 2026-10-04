@@ -7,12 +7,26 @@ import { formatAuditLogUserDetail } from "@/modules/erp/lib/audit-log-display";
 import type { AuditLogEntry } from "@/common/erp/types";
 import type { ErpPurchaseOrderDetail } from "@/common/erp/purchasing-types";
 import { matchPoLineToBillLine } from "@/common/erp/match-po-bill-line";
-import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
+import { createSupabaseBrowserClient } from "@/lib/integrations/supabase/client";
+import { ERP_CLIENT_OPERATION_TYPES } from "@/lib/erp/client-operations/operation-types";
+import { dispatchOutboxChanged } from "@/lib/sync/outbox-browser-events";
+import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
+import { createOutboxStore } from "@/lib/sync/outbox-store";
+import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
+import { broadcastSyncWake } from "@/lib/sync/sync-network";
+import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
+import {
+  purchaseOrderResourceScope,
+  type PurchaseOrderDeliverFinalizePayload,
+} from "@/modules/erp/types/purchase-payload";
+import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { cancelAdminPurchaseOrderAction } from "@/modules/purchase-orders/actions/admin-purchase-orders.actions";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { formatErpDocRef } from "@/lib/erp-document-ref";
 import { PoStatusPill } from "@/modules/purchase-orders/components/purchase-orders-ui";
@@ -150,7 +164,7 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
     return po.purchase_order_items.map((line) => {
       const billLine = po.linked_bill?.lines.find((bl) => matchPoLineToBillLine(line, bl));
       const originalBillQty = billLine?.original_quantity ?? line.quantity;
-      const delivered = deliveredQty[line.id] ?? 0;
+      const delivered = coalesceNumber(deliveredQty[line.id]);
       return {
         poLineId: line.id,
         productName: lineProductName(line),
@@ -212,13 +226,56 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
     startTransition(async () => {
       try {
         setError(null);
-        await adminPost(`erp/purchase-orders/${poId}/deliver-finalize`, {
+        const storeId = po.store_id;
+        if (!storeId) {
+          setError("Purchase order has no store.");
+          return;
+        }
+
+        const supabase = createSupabaseBrowserClient();
+        const staffUserId = await resolveOutboxUserId(supabase);
+        if (!staffUserId) {
+          setError("You must be signed in to submit delivery.");
+          return;
+        }
+
+        const deliverPayload: PurchaseOrderDeliverFinalizePayload = {
+          poId,
           receiveDate,
           lines: po.purchase_order_items.map((line) => ({
-            poLineId: line.id,
-            deliveredQty: deliveredQty[line.id] ?? 0,
+            poLineId: line.id as string,
+            deliveredQty: coalesceNumber(deliveredQty[line.id]),
           })),
-        });
+        };
+
+        const store = createOutboxStore();
+        try {
+          await store.enqueue({
+            operationType: ERP_CLIENT_OPERATION_TYPES.purchaseOrder.deliverFinalize,
+            schemaVersion: 1,
+            payload: deliverPayload,
+            userId: staffUserId,
+            storeId,
+            terminalId: getOrCreateErpTerminalId(),
+            resourceScope: purchaseOrderResourceScope(poId),
+          });
+        } catch (enqueueErr) {
+          if (enqueueErr instanceof OutboxEnqueueError) {
+            setError(enqueueErr.message);
+          } else {
+            setError(
+              enqueueErr instanceof Error
+                ? enqueueErr.message
+                : "Could not queue delivery locally.",
+            );
+          }
+          return;
+        } finally {
+          await store.close();
+        }
+
+        dispatchOutboxChanged();
+        broadcastSyncWake();
         await reload();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Submit failed");
@@ -402,16 +459,15 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
                       <td className="py-2 pr-4">{lineProductName(line)}</td>
                       <td className="py-2 pr-4 tabular-nums">{line.quantity}</td>
                       <td className="py-2">
-                        <Input
-                          type="number"
+                        <NumericInput
                           min={0}
                           step="any"
                           className="max-w-[120px]"
-                          value={deliveredQty[line.id] ?? 0}
-                          onChange={(e) =>
+                          value={deliveredQty[line.id] ?? Number.NaN}
+                          onValueChange={(qty) =>
                             setDeliveredQty((prev) => ({
                               ...prev,
-                              [line.id]: Number(e.target.value),
+                              [line.id]: qty,
                             }))
                           }
                         />

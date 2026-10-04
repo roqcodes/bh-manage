@@ -19,6 +19,7 @@ import {
 } from "@/modules/admin/ui";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
 
 type RequestLine = {
@@ -231,33 +232,25 @@ export function TransferRequestFormView({
                     <td className="px-3 py-2">{line.productName}</td>
                     <td className="px-3 py-2">{line.sourceAvailable}</td>
                     <td className="px-3 py-2">
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         value={line.quantity}
-                        onChange={(e) =>
+                        onValueChange={(quantity) =>
                           setLines(
-                            lines.map((l) =>
-                              l.key === line.key
-                                ? { ...l, quantity: parseFloat(e.target.value) || 0 }
-                                : l,
-                            ),
+                            lines.map((l) => (l.key === line.key ? { ...l, quantity } : l)),
                           )
                         }
                         className="w-20"
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         value={line.transferPrice}
-                        onChange={(e) =>
+                        onValueChange={(transferPrice) =>
                           setLines(
                             lines.map((l) =>
-                              l.key === line.key
-                                ? { ...l, transferPrice: parseFloat(e.target.value) || 0 }
-                                : l,
+                              l.key === line.key ? { ...l, transferPrice } : l,
                             ),
                           )
                         }
@@ -265,16 +258,13 @@ export function TransferRequestFormView({
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         value={line.salesPrice}
-                        onChange={(e) =>
+                        onValueChange={(salesPrice) =>
                           setLines(
                             lines.map((l) =>
-                              l.key === line.key
-                                ? { ...l, salesPrice: parseFloat(e.target.value) || 0 }
-                                : l,
+                              l.key === line.key ? { ...l, salesPrice } : l,
                             ),
                           )
                         }

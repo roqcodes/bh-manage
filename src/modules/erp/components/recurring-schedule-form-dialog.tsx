@@ -203,7 +203,7 @@ export function RecurringScheduleFormDialog({
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           <AdminFormSection title="Schedule">
             <AdminFormGrid cols={2}>
               <AdminFormField label="Schedule name" required className="sm:col-span-2">

@@ -16,6 +16,7 @@ import { OrdersPanel } from "@/modules/orders/components/orders-panel";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { AdminPageHeader, AdminPageLayout, useErpFormModal } from "@/modules/admin/ui";
+import { SalesOrderOutboxBanner } from "@/modules/admin/components/sales-order-outbox-banner";
 import { SalesOrderFormView } from "@/modules/admin/views/sales/sales-order-form-view";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
@@ -81,6 +82,7 @@ export function SalesOrdersListView() {
         title=""
         breadcrumb={[{ label: "Sales orders", href: "/admin/erp/sales-orders" }]}
       />
+      <SalesOrderOutboxBanner />
       <OrdersPanel
         orders={data.data}
         total={data.total}

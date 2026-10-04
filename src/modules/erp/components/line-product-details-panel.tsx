@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 
 import type { LineProductContext } from "@/common/erp/line-product-context";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { ERP_PRODUCT_SEARCH_STALE_MS } from "@/modules/erp/lib/erp-product-live-search.client";
 import { Button } from "@/components/ui/button";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { cn } from "@/lib/utils";
@@ -110,7 +111,7 @@ export function LineProductDetailsPanel({
       return res.data[productId] ?? null;
     },
     enabled: enabled && Boolean(storeId && productId && counterpartyId),
-    staleTime: 30_000,
+    staleTime: ERP_PRODUCT_SEARCH_STALE_MS,
   });
 
   if (!storeId || !productId || !counterpartyId) {

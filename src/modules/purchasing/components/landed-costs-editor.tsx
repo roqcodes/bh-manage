@@ -7,6 +7,8 @@ import type { ErpLandedCostItem, LandedCostFormRow } from "@/common/erp/purchasi
 import { calcPurchaseLine, roundMoney } from "@/common/erp/purchasing-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import {
   Table,
   TableBody,
@@ -100,7 +102,11 @@ export function LandedCostsEditor({
             </TableHeader>
             <TableBody>
               {rows.map((row, index) => {
-                const { lineTotal } = calcPurchaseLine(row.quantity, row.rate, row.taxRatePercent);
+                const { lineTotal } = calcPurchaseLine(
+                  coalesceNumber(row.quantity),
+                  coalesceNumber(row.rate),
+                  coalesceNumber(row.taxRatePercent),
+                );
                 return (
                   <TableRow key={row.key}>
                     <TableCell>
@@ -110,30 +116,25 @@ export function LandedCostsEditor({
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
+                      <NumericInput
                         className="w-20"
                         value={row.quantity}
-                        onChange={(e) =>
-                          updateRow(index, { quantity: parseFloat(e.target.value) || 0 })
-                        }
+                        onValueChange={(quantity) => updateRow(index, { quantity })}
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
+                      <NumericInput
                         className="w-24"
                         value={row.rate}
-                        onChange={(e) => updateRow(index, { rate: parseFloat(e.target.value) || 0 })}
+                        onValueChange={(rate) => updateRow(index, { rate })}
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
+                      <NumericInput
                         className="w-20"
                         value={row.taxRatePercent}
-                        onChange={(e) =>
-                          updateRow(index, { taxRatePercent: parseFloat(e.target.value) || 0 })
+                        onValueChange={(taxRatePercent) =>
+                          updateRow(index, { taxRatePercent })
                         }
                       />
                     </TableCell>

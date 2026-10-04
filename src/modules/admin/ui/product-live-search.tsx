@@ -19,8 +19,7 @@ import { cn } from "@/lib/utils";
 import { useSearchListKeyboard } from "@/modules/admin/ui/use-search-list-keyboard";
 import {
   ERP_PRODUCT_SEARCH_GC_MS,
-  ERP_PURCHASE_SEARCH_STALE_MS,
-  ERP_SALES_SEARCH_STALE_MS,
+  ERP_PRODUCT_SEARCH_STALE_MS,
   erpProductLiveSearchQueryKey,
   fetchErpProductLiveSearch,
 } from "@/modules/erp/lib/erp-product-live-search.client";
@@ -66,8 +65,7 @@ export function ProductLiveSearch({
   const trimmedQuery = query.trim();
   const searchEnabled = open && !disabled && trimmedQuery.length >= minChars;
 
-  const staleTime =
-    catalog === "purchase" ? ERP_PURCHASE_SEARCH_STALE_MS : ERP_SALES_SEARCH_STALE_MS;
+  const staleTime = ERP_PRODUCT_SEARCH_STALE_MS;
 
   const {
     data: results = [],
@@ -180,10 +178,12 @@ export function ProductLiveSearch({
       <div className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
+          type="search"
           value={query}
           disabled={disabled}
+          autoComplete="off"
           placeholder={placeholder}
-          className="h-10 pr-9 pl-9"
+          className="h-10 pr-9 pl-9 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
           role="combobox"
           aria-expanded={showDropdown}
           aria-controls={listboxId}

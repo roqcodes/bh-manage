@@ -18,6 +18,10 @@ import {
   type EntitySearchOption,
 } from "@/modules/erp/lib/entity-live-search.client";
 import type { ErpSalesProductSearchRow } from "@/common/erp/sales-types";
+import {
+  ERP_PRODUCT_SEARCH_GC_MS,
+  ERP_PRODUCT_SEARCH_STALE_MS,
+} from "@/modules/erp/lib/erp-product-live-search.client";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +43,7 @@ type EntitySearchSelectProps = {
   /** TanStack Query cache scope (e.g. `vendor`, `customer`, `invoice`). */
   cacheScope: string;
   staleTime?: number;
+  gcTime?: number;
   /** Resolve authoritative option on select (search rows are suggestions only). */
   resolveSelectedOption?: (id: string) => Promise<EntitySearchOption>;
   selectedLabel?: string;
@@ -57,6 +62,7 @@ export function EntitySearchSelect({
   fetchOptions,
   cacheScope,
   staleTime = ENTITY_PARTY_SEARCH_STALE_MS,
+  gcTime = ENTITY_SEARCH_GC_MS,
   resolveSelectedOption,
   selectedLabel,
   minChars = 1,
@@ -98,7 +104,7 @@ export function EntitySearchSelect({
     queryFn: () => fetchOptionsRef.current(searchQuery),
     enabled: queryEnabled,
     staleTime,
-    gcTime: ENTITY_SEARCH_GC_MS,
+    gcTime,
     placeholderData: keepPreviousData,
   });
 
@@ -278,10 +284,18 @@ export function EntitySearchSelect({
       <div ref={anchorRef} className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
+          type="search"
           value={displayValue}
           disabled={disabled}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          data-1p-ignore
+          data-lpignore="true"
+          data-form-type="other"
           placeholder={value && !open ? placeholder : searchPlaceholder}
-          className="h-10 pr-9 pl-9"
+          className="h-10 pr-9 pl-9 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
           role="combobox"
           aria-expanded={open}
           aria-controls={listboxId}
@@ -426,7 +440,8 @@ export function ProductSearchSelect({
       className={className}
       disabled={disabled}
       cacheScope={`product-select:${storeId ?? "none"}`}
-      staleTime={ENTITY_PARTY_SEARCH_STALE_MS}
+      staleTime={ERP_PRODUCT_SEARCH_STALE_MS}
+      gcTime={ERP_PRODUCT_SEARCH_GC_MS}
       placeholder="Search product or barcode"
       searchPlaceholder="Name, SKU, barcode…"
       emptyText="No products found"

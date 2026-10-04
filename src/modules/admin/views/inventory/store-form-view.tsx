@@ -19,6 +19,8 @@ import {
 } from "@/modules/admin/ui";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import { AttachmentField } from "@/modules/erp/components/attachment-field";
 
 export type StoreFormViewProps = ErpFormViewBaseProps & {
@@ -110,7 +112,7 @@ export function StoreFormView({
       city: city || null,
       country: country || null,
       currency: currency || null,
-      markupPercent,
+      markupPercent: coalesceNumber(markupPercent),
       trn: trn || null,
       taxTemplate: taxTemplate || null,
       description: description || null,
@@ -217,12 +219,11 @@ export function StoreFormView({
                 <Input value={currency} onChange={(e) => setCurrency(e.target.value)} />
               </AdminFormField>
               <AdminFormField label="Markup %">
-                <Input
-                  type="number"
+                <NumericInput
                   min={0}
                   step="0.01"
                   value={markupPercent}
-                  onChange={(e) => setMarkupPercent(parseFloat(e.target.value) || 0)}
+                  onValueChange={setMarkupPercent}
                 />
               </AdminFormField>
               <AdminFormField label="Tax registration (TRN)">

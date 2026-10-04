@@ -19,6 +19,8 @@ import {
 } from "@/modules/admin/ui";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import {
   ActiveStoreFormField,
   useActiveStoreFormField,
@@ -228,18 +230,13 @@ export function StockAdjustmentFormView({
                     <td className="px-3 py-2">{line.productName}</td>
                     <td className="px-3 py-2 capitalize">{line.direction}</td>
                     <td className="px-3 py-2">
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         step="any"
                         value={line.quantity}
-                        onChange={(e) =>
+                        onValueChange={(quantity) =>
                           setLines(
-                            lines.map((l) =>
-                              l.key === line.key
-                                ? { ...l, quantity: parseFloat(e.target.value) || 0 }
-                                : l,
-                            ),
+                            lines.map((l) => (l.key === line.key ? { ...l, quantity } : l)),
                           )
                         }
                         className="w-20"
@@ -247,17 +244,14 @@ export function StockAdjustmentFormView({
                     </td>
                     <td className="px-3 py-2">
                       {line.direction === "add" ? (
-                        <Input
-                          type="number"
+                        <NumericInput
                           min={0}
                           step="0.01"
                           value={line.purchaseCost}
-                          onChange={(e) =>
+                          onValueChange={(purchaseCost) =>
                             setLines(
                               lines.map((l) =>
-                                l.key === line.key
-                                  ? { ...l, purchaseCost: parseFloat(e.target.value) || 0 }
-                                  : l,
+                                l.key === line.key ? { ...l, purchaseCost } : l,
                               ),
                             )
                           }
@@ -270,7 +264,9 @@ export function StockAdjustmentFormView({
                     </td>
                     <td className="px-3 py-2 tabular-nums">
                       {line.direction === "add"
-                        ? formatCurrencyAmount(line.quantity * line.purchaseCost)
+                        ? formatCurrencyAmount(
+                            coalesceNumber(line.quantity) * coalesceNumber(line.purchaseCost),
+                          )
                         : "â€”"}
                     </td>
                     <td className="px-3 py-2">

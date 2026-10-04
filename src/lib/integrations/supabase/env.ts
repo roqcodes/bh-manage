@@ -1,12 +1,4 @@
-function requireEnv(name: string) {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-
-  return value;
-}
+/** Next.js only inlines `process.env.NEXT_PUBLIC_*` for static property access (not `process.env[name]`). */
 
 /** Client-safe read; returns null instead of throwing (typeahead can fall back to API routes). */
 export function getSupabaseEnvOptional() {

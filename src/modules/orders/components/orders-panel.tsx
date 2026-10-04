@@ -7,6 +7,7 @@ import { format, isAfter, isBefore, startOfDay, endOfDay, subDays } from "date-f
 import { Ban, ChevronDown, Columns3, Search } from "lucide-react";
 
 import type { Order, OrderCatalogStats } from "@/common/admin/types";
+import type { OutboxOperationRecord } from "@/lib/sync/outbox-types";
 import type { OrderFilterUserRow } from "@/modules/orders/services/orders.service";
 import { Pagination } from "@/modules/admin/components/pagination";
 import {
@@ -70,6 +71,7 @@ export function OrdersPanel({
   stats,
   channel = "online",
   basePath = "/admin/orders",
+  outboxOperations,
 }: {
   orders: Order[];
   total: number;
@@ -80,6 +82,7 @@ export function OrdersPanel({
   stats: OrderCatalogStats;
   channel?: "online" | "erp";
   basePath?: string;
+  outboxOperations?: OutboxOperationRecord[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -225,7 +228,8 @@ export function OrdersPanel({
             />
           </div>
 
-          {filtered.length === 0 ? (
+          {filtered.length === 0 &&
+          !(channel === "erp" && outboxOperations && outboxOperations.length > 0) ? (
             <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
               <Ban className="size-12 text-muted-foreground/30" aria-hidden />
               <p className="text-sm text-muted-foreground">
@@ -257,6 +261,7 @@ export function OrdersPanel({
               onSelectedIdsChange={setSelectedIds}
               variant={channel}
               detailBasePath={basePath}
+              outboxOperations={channel === "erp" ? outboxOperations : undefined}
             />
           )}
 

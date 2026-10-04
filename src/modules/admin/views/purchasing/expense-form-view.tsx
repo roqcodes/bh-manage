@@ -336,7 +336,7 @@ export function ExpenseFormView({
       formId={formId}
       footer={footer}
     >
-      <form id={formId} onSubmit={handleSubmit} className="space-y-4">
+      <form id={formId} onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
         {sections}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {!isModal ? (
