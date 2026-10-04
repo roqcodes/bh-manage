@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "prebuild": "node -e \"try{require('node:fs').rmSync('.next/dev',{recursive:true,force:true,maxRetries:3,retryDelay:200})}catch(e){if(e&&e.code!=='EPERM'&&e.code!=='EBUSY')throw e}\"",
+    "prebuild": "node scripts/prebuild-clean-next-dev.mjs",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
