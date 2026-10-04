@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { Database } from "@/lib/integrations/supabase/types";
@@ -8,7 +10,7 @@ import type { Brand } from "@/common/admin/types";
 const BRAND_COLUMNS =
   "id,name,logo_url,image_url,sort_order,is_active,slug,description,created_at,updated_at";
 
-export async function getBrands(opts?: {
+export const getBrands = cache(async function getBrands(opts?: {
   activeOnly?: boolean;
 }): Promise<Brand[]> {
   await requireAdminOrManagerProfile();
@@ -26,7 +28,7 @@ export async function getBrands(opts?: {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []) as Brand[];
-}
+});
 
 export async function getBrandById(id: string): Promise<Brand | null> {
   await requireAdminOrManagerProfile();

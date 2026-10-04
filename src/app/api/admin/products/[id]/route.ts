@@ -25,18 +25,19 @@ export async function GET(
 
   const { id } = await params;
 
-  const [product, categories, brands, pricingRule] = await Promise.all([
+  const [product, pricingRule, categories, brands, variantsInitial] = await Promise.all([
     getProductById(id),
+    getProductPricingRule(id),
     getCategories(),
     getBrands(),
-    getProductPricingRule(id),
+    getProductVariants(id),
   ]);
 
   if (!product) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  let variants = await getProductVariants(id);
+  let variants = variantsInitial;
   if (variants.length === 0 && Number(product.price) > 0) {
     try {
       await ensureDefaultProductVariant(id);
@@ -46,18 +47,20 @@ export async function GET(
     }
   }
 
-  const [variant_groups, product_images, product_videos] = await Promise.all([
-    listVariantGroupsForProduct(id).catch(() => [] as Awaited<ReturnType<typeof listVariantGroupsForProduct>>),
+  const [variant_groups, product_images, product_videos, glance] = await Promise.all([
+    listVariantGroupsForProduct(id).catch(
+      () => [] as Awaited<ReturnType<typeof listVariantGroupsForProduct>>,
+    ),
     listProductImages(id).catch(() => [] as Awaited<ReturnType<typeof listProductImages>>),
     listProductVideos(id).catch(() => [] as Awaited<ReturnType<typeof listProductVideos>>),
+    getProductAtGlanceMetrics(
+      id,
+      variants.map((v) => v.id),
+      product.use_smart_pricing === true,
+      { price: product.price, mrp: product.mrp },
+      pricingRule,
+    ),
   ]);
-
-  const glance = await getProductAtGlanceMetrics(
-    id,
-    variants.map((v) => v.id),
-    product.use_smart_pricing === true,
-    { price: product.price, mrp: product.mrp },
-  );
 
   return NextResponse.json({
     product,

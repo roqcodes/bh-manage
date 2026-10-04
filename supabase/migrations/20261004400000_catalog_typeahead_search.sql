@@ -7,7 +7,7 @@ CREATE INDEX IF NOT EXISTS idx_products_active_goods_name_prefix
 
 CREATE INDEX IF NOT EXISTS idx_products_active_goods_barcode
   ON public.products (barcode)
-  WHERE is_active = true AND item_type = 'goods' AND barcode IS NOT NULL;
+  WHERE is_active = true AND item_type = 'goods' AND   barcode IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_products_name_trgm
   ON public.products USING gin (name extensions.gin_trgm_ops)

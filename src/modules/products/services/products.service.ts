@@ -287,12 +287,11 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
     }
   }
 
-  let outOfStock = 0;
-  const { data: allProductIds } = await supabase.from("products").select("id");
-  for (const row of allProductIds ?? []) {
-    const stock = stockByProduct.get(row.id) ?? 0;
-    if (stock <= 0) outOfStock += 1;
+  let productsWithPositiveStock = 0;
+  for (const stock of stockByProduct.values()) {
+    if (stock > 0) productsWithPositiveStock += 1;
   }
+  const outOfStock = Math.max(0, total - productsWithPositiveStock);
 
   return {
     total,

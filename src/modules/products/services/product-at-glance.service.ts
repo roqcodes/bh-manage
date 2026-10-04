@@ -3,7 +3,10 @@ import "server-only";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ProductAtGlanceMetrics } from "@/common/admin/types";
-import { getActivePricingRuleForProduct } from "@/modules/pricing/services/pricing.service";
+import {
+  getActivePricingRuleForProduct,
+  type PricingRuleRow,
+} from "@/modules/pricing/services/pricing.service";
 import {
   resolveListPrice,
   resolveSuggestedPrice,
@@ -20,6 +23,7 @@ export async function getProductAtGlanceMetrics(
   variantIds: string[],
   useSmartPricing: boolean,
   productLevel?: { price?: number | null; mrp?: number | null },
+  pricingRule?: PricingRuleRow | null,
 ): Promise<ProductAtGlanceMetrics> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
@@ -45,8 +49,14 @@ export async function getProductAtGlanceMetrics(
     };
   }
 
+  const rulePromise = !useSmartPricing
+    ? Promise.resolve(null)
+    : pricingRule !== undefined
+      ? Promise.resolve(pricingRule?.is_active ? pricingRule : null)
+      : getActivePricingRuleForProduct(productId);
+
   const [rule, invRes, variantRes, offersRes] = await Promise.all([
-    useSmartPricing ? getActivePricingRuleForProduct(productId) : Promise.resolve(null),
+    rulePromise,
     supabase.from("inventory").select("variant_id,stock").in("variant_id", variantIds),
     supabase.from("product_variants").select("id,price").in("id", variantIds),
     supabase

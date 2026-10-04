@@ -56,7 +56,7 @@ export function SalesOrdersListView() {
       }>(`erp/sales-orders${qs ? `?${qs}` : ""}`);
     },
     placeholderData: keepPreviousData,
-    enabled: !erpContextLoading,
+    enabled: !erpContextLoading && Boolean(activeStoreId),
   });
 
   if (isPending && !data) return <AdminPageSkeleton />;

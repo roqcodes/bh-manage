@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import type { ErpContextQueryData } from "@/modules/erp/components/use-erp-stores";
 
 const STALE = 90_000;
 
@@ -67,9 +68,13 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
   }
 
   if (p === "/admin/erp/sales-orders") {
+    const ctx = qc.getQueryData<ErpContextQueryData>(adminQueryKeys.erpContext());
+    const storeId = ctx?.context?.store_id ?? "";
+    if (!storeId) return Promise.resolve();
+    const qs = `?storeId=${encodeURIComponent(storeId)}`;
     return qc.prefetchQuery({
-      queryKey: adminQueryKeys.salesOrders("all", null, 0),
-      queryFn: () => adminGet("erp/sales-orders"),
+      queryKey: adminQueryKeys.salesOrders("all", null, 0, storeId),
+      queryFn: () => adminGet(`erp/sales-orders${qs}`),
       staleTime: STALE,
     });
   }

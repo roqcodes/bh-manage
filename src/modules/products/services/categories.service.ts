@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { Database } from "@/lib/integrations/supabase/types";
@@ -8,7 +10,7 @@ import type { Category } from "@/common/admin/types";
 const CATEGORY_COLUMNS =
   "id,name,parent_id,thumbnail_url,image_url,sort_order,is_active,slug,description,created_at,updated_at";
 
-export async function getCategories(opts?: {
+export const getCategories = cache(async function getCategories(opts?: {
   activeOnly?: boolean;
 }): Promise<Category[]> {
   await requireAdminOrManagerProfile();
@@ -26,7 +28,7 @@ export async function getCategories(opts?: {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []) as Category[];
-}
+});
 
 export async function getCategoryById(id: string): Promise<Category | null> {
   await requireAdminOrManagerProfile();
