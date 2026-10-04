@@ -23,10 +23,24 @@ import {
 } from "@/modules/erp/components/use-active-store-form-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { calcPurchaseLine } from "@/common/erp/purchasing-types";
-import { adminGet, adminPost, adminPut } from "@/modules/admin/lib/admin-api-client";
+import { createSupabaseBrowserClient } from "@/lib/integrations/supabase/client";
+import { ERP_CLIENT_OPERATION_TYPES } from "@/lib/erp/client-operations/operation-types";
+import { dispatchOutboxChanged } from "@/lib/sync/outbox-browser-events";
+import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
+import { createOutboxStore } from "@/lib/sync/outbox-store";
+import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
+import { broadcastSyncWake } from "@/lib/sync/sync-network";
+import {
+  purchaseOrderResourceScope,
+  type PurchaseOrderCreatePayload,
+  type PurchaseOrderUpdatePayload,
+} from "@/modules/erp/types/purchase-payload";
+import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import type { StoreStockShortageRow } from "@/common/erp/stock-shortage-types";
 import {
   AdminFormActions,
@@ -70,11 +84,12 @@ export function PurchaseOrderFormView({
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [discount, setDiscount] = useState(0);
-  const [lines, setLines] = useState<PurchaseLineFormRow[]>([emptyPurchaseLine()]);
+  const [lines, setLines] = useState<PurchaseLineFormRow[]>([]);
   const [landedCosts, setLandedCosts] = useState<LandedCostFormRow[]>([]);
   const [landedMaster, setLandedMaster] = useState<ErpLandedCostItem[]>([]);
   const [poNumber, setPoNumber] = useState<string | null>(null);
   const [shortagesLoading, setShortagesLoading] = useState(false);
+  const [localSaveNotice, setLocalSaveNotice] = useState<string | null>(null);
 
   async function fillLinesFromShortages() {
     if (!effectiveStoreId) {
@@ -145,7 +160,7 @@ export function PurchaseOrderFormView({
                 purchasePrice: item.price,
                 taxRatePercent: item.tax_rate_percent,
               }))
-            : [emptyPurchaseLine()],
+            : [],
         );
         setLandedCosts(
           (po.purchase_order_landed_costs ?? []).map((lc) => ({
@@ -166,18 +181,22 @@ export function PurchaseOrderFormView({
     let tax = 0;
     for (const line of lines) {
       const { taxable, taxAmount } = calcPurchaseLine(
-        line.quantity,
-        line.purchasePrice,
-        line.taxRatePercent,
+        coalesceNumber(line.quantity),
+        coalesceNumber(line.purchasePrice),
+        coalesceNumber(line.taxRatePercent),
       );
       subtotal += taxable;
       tax += taxAmount;
     }
     let landed = 0;
     for (const lc of landedCosts) {
-      landed += calcPurchaseLine(lc.quantity, lc.rate, lc.taxRatePercent).lineTotal;
+      landed += calcPurchaseLine(
+        coalesceNumber(lc.quantity),
+        coalesceNumber(lc.rate),
+        coalesceNumber(lc.taxRatePercent),
+      ).lineTotal;
     }
-    const total = roundMoney(Math.max(0, subtotal + tax - discount) + landed);
+    const total = roundMoney(Math.max(0, subtotal + tax - coalesceNumber(discount)) + landed);
     return {
       subtotal: roundMoney(subtotal),
       tax: roundMoney(tax),
@@ -194,10 +213,30 @@ export function PurchaseOrderFormView({
     }
   }
 
+  function resetCreateForm() {
+    setVendorId("");
+    setVendorLabel("");
+    setPoDate(new Date().toISOString().slice(0, 10));
+    setExpectedDeliveryDate("");
+    setReference("");
+    setNotes("");
+    setDiscount(0);
+    setLines([]);
+    setLandedCosts([]);
+    setPoNumber(null);
+    setError(null);
+  }
+
   function handleSuccessNavigate(id?: string) {
+    if (mode === "create") {
+      resetCreateForm();
+      onSuccess?.(id);
+      return;
+    }
     if (isModal) {
       onOpenChange?.(false);
       onSuccess?.(id);
+      return;
     }
     if (id) router.push(`/admin/purchase-orders/${id}`);
   }
@@ -226,19 +265,64 @@ export function PurchaseOrderFormView({
       reference: reference || null,
       notes: notes || null,
       lines: apiLines,
-      discount,
+      discount: coalesceNumber(discount),
       landedCosts: landedCostsToApiInput(landedCosts),
     };
 
     startTransition(async () => {
       try {
-        if (poId) {
-          await adminPut(`erp/purchase-orders/${poId}`, payload);
-          handleSuccessNavigate(poId);
-        } else {
-          const res = await adminPost<{ id: string }>("erp/purchase-orders", payload);
-          handleSuccessNavigate(res.id);
+        const supabase = createSupabaseBrowserClient();
+        const { data: authData } = await supabase.auth.getUser();
+        const staffUserId = authData.user?.id;
+        if (!staffUserId) {
+          setError("You must be signed in to save a purchase order.");
+          return;
         }
+
+        const store = createOutboxStore();
+        try {
+          if (poId) {
+            const updatePayload: PurchaseOrderUpdatePayload = { ...payload, poId };
+            await store.enqueue({
+              operationType: ERP_CLIENT_OPERATION_TYPES.purchaseOrder.update,
+              schemaVersion: 1,
+              payload: updatePayload,
+              userId: staffUserId,
+              storeId: effectiveStoreId,
+              terminalId: getOrCreateErpTerminalId(),
+              resourceScope: purchaseOrderResourceScope(poId),
+            });
+          } else {
+            await store.enqueue({
+              operationType: ERP_CLIENT_OPERATION_TYPES.purchaseOrder.create,
+              schemaVersion: 1,
+              payload: payload as PurchaseOrderCreatePayload,
+              userId: staffUserId,
+              storeId: effectiveStoreId,
+              terminalId: getOrCreateErpTerminalId(),
+            });
+          }
+        } catch (enqueueErr) {
+          if (enqueueErr instanceof OutboxEnqueueError) {
+            setError(enqueueErr.message);
+          } else {
+            setError(
+              enqueueErr instanceof Error
+                ? enqueueErr.message
+                : "Could not save purchase order locally.",
+            );
+          }
+          return;
+        } finally {
+          await store.close();
+        }
+
+        dispatchOutboxChanged();
+        broadcastSyncWake();
+        setLocalSaveNotice(
+          poId ? "Update saved locally — pending sync" : "Saved locally — pending sync",
+        );
+        handleSuccessNavigate(poId);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Save failed");
       }
@@ -268,12 +352,7 @@ export function PurchaseOrderFormView({
           <span className="tabular-nums">{formatCurrencyAmount(totals.landed)}</span>
         </div>
         <AdminFormField label="Discount">
-          <Input
-            type="number"
-            min={0}
-            value={discount}
-            onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-          />
+          <NumericInput min={0} value={discount} onValueChange={setDiscount} />
         </AdminFormField>
         <div className="flex justify-between border-t pt-2 font-semibold">
           <span>Total</span>
@@ -287,7 +366,7 @@ export function PurchaseOrderFormView({
     <AdminFormActions
       formId={formId}
       onCancel={handleCancel}
-      submitLabel={mode === "edit" ? "Save changes" : "Save PO"}
+      submitLabel={mode === "edit" ? "Save changes" : "Save & next"}
       pending={pending}
     />
   ) : undefined;
@@ -396,6 +475,9 @@ export function PurchaseOrderFormView({
           </AdminFormSection>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {localSaveNotice ? (
+            <p className="text-sm text-muted-foreground">{localSaveNotice}</p>
+          ) : null}
 
           {!isModal ? (
             <div className="flex flex-wrap justify-end gap-2">
@@ -403,7 +485,7 @@ export function PurchaseOrderFormView({
                 Cancel
               </Link>
               <Button disabled={pending} onClick={submit}>
-                {pending ? "Saving…" : mode === "edit" ? "Save changes" : "Save PO"}
+                {pending ? "Saving…" : mode === "edit" ? "Save changes" : "Save & next"}
               </Button>
             </div>
           ) : null}

@@ -20,7 +20,15 @@ import {
 } from "lucide-react";
 
 import { derivePurchaseBillDisplayStatus } from "@/common/erp/purchasing-types";
-import { adminDelete, adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
+import { createSupabaseBrowserClient } from "@/lib/integrations/supabase/client";
+import { ERP_CLIENT_OPERATION_TYPES } from "@/lib/erp/client-operations/operation-types";
+import { dispatchOutboxChanged } from "@/lib/sync/outbox-browser-events";
+import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
+import { createOutboxStore } from "@/lib/sync/outbox-store";
+import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
+import { broadcastSyncWake } from "@/lib/sync/sync-network";
+import { purchaseBillResourceScope } from "@/modules/erp/types/purchase-payload";
+import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { AdminPageHeader, AdminPageLayout } from "@/modules/admin/ui";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { ErpDocumentTabsLayout } from "@/modules/erp/components/erp-document-tabs-layout";
@@ -253,9 +261,46 @@ export function PurchaseBillDetailView({ billId }: { billId: string }) {
 
   function finalize() {
     setError(null);
+    if (!bill?.store_id) {
+      setError("Bill store is missing.");
+      return;
+    }
     startTransition(async () => {
       try {
-        await adminPost(`erp/purchase-bills/${billId}`, {});
+        const supabase = createSupabaseBrowserClient();
+        const { data: authData } = await supabase.auth.getUser();
+        const staffUserId = authData.user?.id;
+        if (!staffUserId) {
+          setError("You must be signed in to finalize.");
+          return;
+        }
+
+        const store = createOutboxStore();
+        try {
+          await store.enqueue({
+            operationType: ERP_CLIENT_OPERATION_TYPES.purchaseBill.finalize,
+            schemaVersion: 1,
+            payload: { billId },
+            userId: staffUserId,
+            storeId: bill.store_id,
+            terminalId: getOrCreateErpTerminalId(),
+            resourceScope: purchaseBillResourceScope(billId),
+          });
+        } catch (enqueueErr) {
+          if (enqueueErr instanceof OutboxEnqueueError) {
+            setError(enqueueErr.message);
+          } else {
+            setError(
+              enqueueErr instanceof Error ? enqueueErr.message : "Could not queue finalize.",
+            );
+          }
+          return;
+        } finally {
+          await store.close();
+        }
+
+        dispatchOutboxChanged();
+        broadcastSyncWake();
         await load();
         router.refresh();
       } catch (e) {
@@ -265,7 +310,42 @@ export function PurchaseBillDetailView({ billId }: { billId: string }) {
   }
 
   async function cancelBill() {
-    await adminDelete(`erp/purchase-bills/${billId}`);
+    if (!bill?.store_id) {
+      setError("Bill store is missing.");
+      return;
+    }
+    const supabase = createSupabaseBrowserClient();
+    const { data: authData } = await supabase.auth.getUser();
+    const staffUserId = authData.user?.id;
+    if (!staffUserId) {
+      setError("You must be signed in to cancel.");
+      return;
+    }
+
+    const store = createOutboxStore();
+    try {
+      await store.enqueue({
+        operationType: ERP_CLIENT_OPERATION_TYPES.purchaseBill.cancel,
+        schemaVersion: 1,
+        payload: { billId },
+        userId: staffUserId,
+        storeId: bill.store_id,
+        terminalId: getOrCreateErpTerminalId(),
+        resourceScope: purchaseBillResourceScope(billId),
+      });
+    } catch (enqueueErr) {
+      if (enqueueErr instanceof OutboxEnqueueError) {
+        setError(enqueueErr.message);
+      } else {
+        setError(enqueueErr instanceof Error ? enqueueErr.message : "Could not queue cancel.");
+      }
+      return;
+    } finally {
+      await store.close();
+    }
+
+    dispatchOutboxChanged();
+    broadcastSyncWake();
     router.push("/admin/erp/purchase-bills");
   }
 

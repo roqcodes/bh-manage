@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import type { ErpSalesProductSearchRow, SalesLineFormRow } from "@/common/erp/sales-types";
@@ -12,6 +12,8 @@ import {
 } from "@/modules/erp/components/line-product-details-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import {
   Table,
   TableBody,
@@ -21,7 +23,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrencyAmount } from "@/lib/format-currency";
-import { resolveSalesLineDefaultsFromSelection } from "@/modules/erp/lib/resolve-product-line-defaults.client";
+import {
+  resolveSalesLineDefaultsFromSelection,
+  salesLineDefaultsFromSearchRow,
+} from "@/modules/erp/lib/resolve-product-line-defaults.client";
 
 function newLineKey() {
   return `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -73,6 +78,10 @@ export function SalesLinesEditor({
   showSerial?: boolean;
 }) {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const linesRef = useRef(lines);
+  useEffect(() => {
+    linesRef.current = lines;
+  }, [lines]);
 
   const colSpan = (showSerial ? 1 : 0) + 6;
 
@@ -106,27 +115,39 @@ export function SalesLinesEditor({
   }
 
   function addFromSearch(row: ErpSalesProductSearchRow) {
-    void (async () => {
-      const { unitPrice, taxRatePercent } = await resolveSalesLineDefaultsFromSelection(row, {
-        storeId,
-        customerId,
-      });
-      onChange([
-        ...lines.filter((l) => l.productName.trim()),
-        {
-          key: newLineKey(),
-          productId: row.id,
-          variantId: null,
-          productName: row.product_name,
-          description: "",
-          barcode: row.barcode ?? "",
-          quantity: 1,
-          unitPrice,
-          taxRatePercent,
-          unitId: null,
-        },
-      ]);
-    })();
+    const key = newLineKey();
+    const { unitPrice, taxRatePercent } = salesLineDefaultsFromSearchRow(row);
+    const newLine: SalesLineFormRow = {
+      key,
+      productId: row.id,
+      variantId: null,
+      productName: row.product_name,
+      description: "",
+      barcode: row.barcode ?? "",
+      quantity: 1,
+      unitPrice,
+      taxRatePercent,
+      unitId: null,
+    };
+    const next = [...lines.filter((l) => l.productName.trim()), newLine];
+    linesRef.current = next;
+    onChange(next);
+
+    if (!storeId) return;
+
+    void resolveSalesLineDefaultsFromSelection(row, { storeId, customerId }).then(
+      (resolved) => {
+        const current = linesRef.current;
+        if (!current.some((l) => l.key === key)) return;
+        const updated = current.map((l) =>
+          l.key === key
+            ? { ...l, unitPrice: resolved.unitPrice, taxRatePercent: resolved.taxRatePercent }
+            : l,
+        );
+        linesRef.current = updated;
+        onChange(updated);
+      },
+    );
   }
 
   function updateLine(key: string, patch: Partial<SalesLineFormRow>) {
@@ -170,9 +191,9 @@ export function SalesLinesEditor({
           <TableBody>
             {lines.map((line, index) => {
               const { taxAmount, total } = calcSalesLine(
-                line.quantity,
-                line.unitPrice,
-                line.taxRatePercent,
+                coalesceNumber(line.quantity),
+                coalesceNumber(line.unitPrice),
+                coalesceNumber(line.taxRatePercent),
                 taxInclusive,
               );
               const detailsOpen = expandedKeys.has(line.key);
@@ -192,37 +213,28 @@ export function SalesLinesEditor({
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         step="any"
                         value={line.quantity}
-                        onChange={(e) =>
-                          updateLine(line.key, { quantity: parseFloat(e.target.value) || 0 })
-                        }
+                        onValueChange={(quantity) => updateLine(line.key, { quantity })}
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         step="0.01"
                         value={line.unitPrice}
-                        onChange={(e) =>
-                          updateLine(line.key, { unitPrice: parseFloat(e.target.value) || 0 })
-                        }
+                        onValueChange={(unitPrice) => updateLine(line.key, { unitPrice })}
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={0}
                         step="0.01"
                         value={line.taxRatePercent}
-                        onChange={(e) =>
-                          updateLine(line.key, {
-                            taxRatePercent: parseFloat(e.target.value) || 0,
-                          })
+                        onValueChange={(taxRatePercent) =>
+                          updateLine(line.key, { taxRatePercent })
                         }
                       />
                     </TableCell>

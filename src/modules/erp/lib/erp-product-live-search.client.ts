@@ -11,13 +11,21 @@ import type { ProductCatalogType } from "@/modules/admin/ui/product-live-search"
 /** Debounce before hitting the network (balance responsiveness vs chatter). */
 export const ERP_PRODUCT_SEARCH_DEBOUNCE_MS = 200;
 
-/** Purchase metadata in search can be briefly stale; refetch in background. */
-export const ERP_PURCHASE_SEARCH_STALE_MS = 60_000;
+/**
+ * React Query stale window for ERP product search (sales + purchase catalogs).
+ * Cached rows are hints only (stock/price in the dropdown). Line rates use
+ * `line-product-context` on pick; sales issue/submit re-fetches context for stock checks.
+ */
+export const ERP_PRODUCT_SEARCH_STALE_MS = 5 * 60_000;
 
-/** Sales: dedupe + show prior hits; do not treat cache as stock authority. */
-export const ERP_SALES_SEARCH_STALE_MS = 5_000;
+/** @deprecated Use {@link ERP_PRODUCT_SEARCH_STALE_MS}. */
+export const ERP_PURCHASE_SEARCH_STALE_MS = ERP_PRODUCT_SEARCH_STALE_MS;
 
-export const ERP_PRODUCT_SEARCH_GC_MS = 5 * 60_000;
+/** @deprecated Use {@link ERP_PRODUCT_SEARCH_STALE_MS}. */
+export const ERP_SALES_SEARCH_STALE_MS = ERP_PRODUCT_SEARCH_STALE_MS;
+
+/** Keep recent search queries in memory during long entry sessions (Save & next). */
+export const ERP_PRODUCT_SEARCH_GC_MS = 30 * 60_000;
 
 export function erpProductLiveSearchQueryKey(
   catalog: ProductCatalogType,

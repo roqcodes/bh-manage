@@ -18,7 +18,6 @@ import {
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import {
   SalesLinesEditor,
-  emptySalesLine,
   salesLinesToApiInput,
 } from "@/modules/erp/components/sales-lines-editor";
 import type { SalesLineFormRow } from "@/common/erp/sales-types";
@@ -108,7 +107,7 @@ export function CreditNoteFormView({
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [restoreStock, setRestoreStock] = useState(true);
-  const [lines, setLines] = useState<SalesLineFormRow[]>([emptySalesLine()]);
+  const [lines, setLines] = useState<SalesLineFormRow[]>([]);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [invoiceLabel, setInvoiceLabel] = useState("");
   const [sourceInvoice, setSourceInvoice] = useState<InvoiceDetail | null>(null);

@@ -30,12 +30,21 @@ import {
 } from "@/modules/orders/actions/orders.actions";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
 import { OrderEditModal } from "@/modules/orders/components/order-edit-modal";
+import { SalesOrderCancelButton } from "@/modules/orders/components/sales-order-cancel-button";
 import { OrderFulfillmentPanel } from "@/modules/orders/components/order-fulfillment-panel";
 import { OrderLineItemsList } from "@/modules/orders/components/order-line-items-list";
 import { AddressMapEmbed } from "@/modules/admin/components/address-map-embed";
 import { textareaCls } from "@/modules/admin/components/modal";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { createSupabaseBrowserClient } from "@/lib/integrations/supabase/client";
+import { ERP_CLIENT_OPERATION_TYPES } from "@/lib/erp/client-operations/operation-types";
+import { dispatchOutboxChanged } from "@/lib/sync/outbox-browser-events";
+import { broadcastSyncWake } from "@/lib/sync/sync-network";
+import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
+import { createOutboxStore } from "@/lib/sync/outbox-store";
+import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
 import { adminPost } from "@/modules/admin/lib/admin-api-client";
+import { salesOrderResourceScope } from "@/modules/orders/types/sales-order-update-payload";
 import {
   customerInitials,
   CustomerEditedPill,
@@ -599,6 +608,12 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
     Boolean(order.users?.id) &&
     order.order_items.length > 0;
   const canCancelOrder = !cancelled && !activeInvoice;
+  const canEditSalesOrder =
+    isSalesOrder &&
+    !cancelled &&
+    !activeInvoice &&
+    order.status !== "shipped" &&
+    order.status !== "delivered";
 
   const timeline = useMemo(
     () => (isSalesOrder ? buildSalesOrderTimeline(order) : buildTimeline(order, total)),
@@ -721,6 +736,48 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                 setActionError(null);
                 startTransition(async () => {
                   try {
+                    if (isSalesOrder) {
+                      if (!order.store_id) {
+                        setActionError("Sales order has no store.");
+                        return;
+                      }
+                      const supabase = createSupabaseBrowserClient();
+                      const { data: authData } = await supabase.auth.getUser();
+                      const staffUserId = authData.user?.id;
+                      if (!staffUserId) {
+                        setActionError("You must be signed in.");
+                        return;
+                      }
+                      const outbox = createOutboxStore();
+                      try {
+                        await outbox.enqueue({
+                          operationType:
+                            ERP_CLIENT_OPERATION_TYPES.salesOrder.convertToInvoice,
+                          schemaVersion: 1,
+                          payload: { orderId: order.id },
+                          userId: staffUserId,
+                          storeId: order.store_id,
+                          terminalId: getOrCreateErpTerminalId(),
+                          resourceScope: salesOrderResourceScope(order.id),
+                        });
+                      } catch (enqueueErr) {
+                        setActionError(
+                          enqueueErr instanceof OutboxEnqueueError
+                            ? enqueueErr.message
+                            : enqueueErr instanceof Error
+                              ? enqueueErr.message
+                              : "Could not queue conversion",
+                        );
+                        return;
+                      } finally {
+                        await outbox.close();
+                      }
+                      dispatchOutboxChanged();
+                      broadcastSyncWake();
+                      await invalidate();
+                      setActionError(null);
+                      return;
+                    }
                     const res = await adminPost<{ invoiceId: string }>(
                       `orders/${order.id}/convert-to-invoice`,
                       {},
@@ -745,7 +802,24 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
               {cancelledInvoice ? "View cancelled invoice" : "View invoice"}
             </Link>
           ) : null}
-          {canCancelOrder ? (
+          {canEditSalesOrder ? (
+            <Link
+              href={`/admin/erp/sales-orders/${order.id}/edit`}
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+            >
+              <Pencil data-icon="inline-start" />
+              Edit
+            </Link>
+          ) : null}
+          {canCancelOrder && isSalesOrder ? (
+            <SalesOrderCancelButton
+              order={order}
+              disabled={isPending}
+              onQueued={() => void invalidate()}
+              onError={(message) => setActionError(message)}
+            />
+          ) : null}
+          {canCancelOrder && !isSalesOrder ? (
             <Button
               variant="outline"
               size="sm"
@@ -753,7 +827,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
               onClick={handleCancelAndRefund}
             >
               <RotateCcw data-icon="inline-start" />
-              {isSalesOrder ? "Cancel order" : paid ? "Cancel & refund" : "Cancel order"}
+              {paid ? "Cancel & refund" : "Cancel order"}
             </Button>
           ) : null}
           {!isSalesOrder ? (

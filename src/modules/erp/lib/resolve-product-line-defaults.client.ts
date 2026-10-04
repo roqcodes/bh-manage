@@ -29,14 +29,31 @@ function firstPositivePrice(...candidates: (number | null | undefined)[]): numbe
   return null;
 }
 
+/** Instant defaults from catalog search (shown in the line table immediately). */
+export function salesLineDefaultsFromSearchRow(row: ErpSalesProductSearchRow) {
+  return {
+    unitPrice: row.sales_price ?? 0,
+    taxRatePercent: row.tax_rate_percent ?? 0,
+  };
+}
+
+/** Instant defaults from purchase catalog search. */
+export function purchaseLineDefaultsFromSearchRow(row: ErpProductSearchRow) {
+  return {
+    purchasePrice: row.purchase_price ?? 0,
+    taxRatePercent: row.tax_rate_percent ?? 0,
+  };
+}
+
 /** Authoritative store/catalog defaults for a sales line (search row is fallback only). */
 export async function resolveSalesLineDefaultsFromSelection(
   row: ErpSalesProductSearchRow,
   options: { storeId?: string; customerId?: string },
 ): Promise<{ unitPrice: number; taxRatePercent: number }> {
-  const searchUnitPrice = row.sales_price ?? 0;
+  const { unitPrice: searchUnitPrice, taxRatePercent: searchTax } =
+    salesLineDefaultsFromSearchRow(row);
   let unitPrice = searchUnitPrice;
-  let taxRatePercent = row.tax_rate_percent ?? 0;
+  let taxRatePercent = searchTax;
 
   if (!options.storeId) {
     return { unitPrice, taxRatePercent };
@@ -73,8 +90,10 @@ export async function resolvePurchaseLineDefaultsFromSelection(
   row: ErpProductSearchRow,
   options: { storeId?: string; vendorId?: string },
 ): Promise<{ purchasePrice: number; taxRatePercent: number }> {
-  let purchasePrice = row.purchase_price ?? 0;
-  let taxRatePercent = row.tax_rate_percent ?? 0;
+  const { purchasePrice: searchPrice, taxRatePercent: searchTax } =
+    purchaseLineDefaultsFromSearchRow(row);
+  let purchasePrice = searchPrice;
+  let taxRatePercent = searchTax;
 
   if (!options.storeId) {
     return { purchasePrice, taxRatePercent };

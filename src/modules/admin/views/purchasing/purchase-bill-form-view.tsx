@@ -11,7 +11,6 @@ import type {
 import { calcPurchaseLine, roundMoney } from "@/common/erp/purchasing-types";
 import type { PurchaseLineFormRow, LandedCostFormRow } from "@/common/erp/purchasing-types";
 import {
-  emptyPurchaseLine,
   linesToApiInput,
   PurchaseLinesEditor,
 } from "@/modules/purchasing/components/purchase-lines-editor";
@@ -19,7 +18,19 @@ import {
   LandedCostsEditor,
   landedCostsToApiInput,
 } from "@/modules/purchasing/components/landed-costs-editor";
-import { adminGet, adminPost, adminPut } from "@/modules/admin/lib/admin-api-client";
+import { createSupabaseBrowserClient } from "@/lib/integrations/supabase/client";
+import { ERP_CLIENT_OPERATION_TYPES } from "@/lib/erp/client-operations/operation-types";
+import { dispatchOutboxChanged } from "@/lib/sync/outbox-browser-events";
+import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
+import { createOutboxStore } from "@/lib/sync/outbox-store";
+import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
+import { broadcastSyncWake } from "@/lib/sync/sync-network";
+import {
+  purchaseBillResourceScope,
+  type PurchaseBillCreatePayload,
+  type PurchaseBillUpdatePayload,
+} from "@/modules/erp/types/purchase-payload";
+import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import {
   AdminFormField,
   AdminFormGrid,
@@ -37,6 +48,8 @@ import {
 } from "@/modules/erp/components/use-active-store-form-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,6 +152,7 @@ export function PurchaseBillFormView({
     useActiveStoreFormField({ mode });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [localSaveNotice, setLocalSaveNotice] = useState<string | null>(null);
   const [landedMaster, setLandedMaster] = useState<ErpLandedCostItem[]>([]);
   const [loading, setLoading] = useState(mode === "edit");
   const isModal = variant === "modal";
@@ -159,10 +173,11 @@ export function PurchaseBillFormView({
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [discount, setDiscount] = useState(0);
-  const [lines, setLines] = useState<PurchaseLineFormRow[]>([emptyPurchaseLine()]);
+  const [lines, setLines] = useState<PurchaseLineFormRow[]>([]);
   const [landedCosts, setLandedCosts] = useState<LandedCostFormRow[]>([]);
   const [billNumber, setBillNumber] = useState<string | null>(null);
   const [physicalReceiptOnBill, setPhysicalReceiptOnBill] = useState(true);
+  const [poPrefillToken, setPoPrefillToken] = useState(0);
 
   useEffect(() => {
     if (mode === "create") {
@@ -209,7 +224,7 @@ export function PurchaseBillFormView({
                 purchasePrice: Number(line.purchase_price),
                 taxRatePercent: Number(line.tax_rate_percent),
               }))
-            : [emptyPurchaseLine()],
+            : [],
         );
         setLandedCosts(
           bill.erp_purchase_bill_landed_costs.map((lc) => ({
@@ -240,25 +255,29 @@ export function PurchaseBillFormView({
       if (po.purchase_order_items.length) setLines(poLinesToForm(po));
       setLandedCosts(poLandedCostsToForm(po));
     });
-  }, [mode, poIdParam]);
+  }, [mode, poIdParam, poPrefillToken, setStoreId]);
 
   const totals = useMemo(() => {
     let subtotal = 0;
     let tax = 0;
     for (const line of lines) {
       const { taxable, taxAmount } = calcPurchaseLine(
-        line.quantity,
-        line.purchasePrice,
-        line.taxRatePercent,
+        coalesceNumber(line.quantity),
+        coalesceNumber(line.purchasePrice),
+        coalesceNumber(line.taxRatePercent),
       );
       subtotal += taxable;
       tax += taxAmount;
     }
     let landed = 0;
     for (const lc of landedCosts) {
-      landed += calcPurchaseLine(lc.quantity, lc.rate, lc.taxRatePercent).lineTotal;
+      landed += calcPurchaseLine(
+        coalesceNumber(lc.quantity),
+        coalesceNumber(lc.rate),
+        coalesceNumber(lc.taxRatePercent),
+      ).lineTotal;
     }
-    const total = roundMoney(Math.max(0, subtotal + tax - discount) + landed);
+    const total = roundMoney(Math.max(0, subtotal + tax - coalesceNumber(discount)) + landed);
     return {
       subtotal: roundMoney(subtotal),
       tax: roundMoney(tax),
@@ -275,7 +294,34 @@ export function PurchaseBillFormView({
     }
   }
 
+  function resetCreateForm() {
+    const today = new Date().toISOString().slice(0, 10);
+    setVendorId("");
+    setVendorLabel("");
+    setPurchaseDate(today);
+    setDueDate(addDays(today, 30));
+    setExpectedDeliveryDate("");
+    setPoId(poIdParam ?? null);
+    setVendorBillNumber("");
+    setGrnReference("");
+    setBatchReference("");
+    setReference("");
+    setNotes("");
+    setDiscount(0);
+    setLines([]);
+    setLandedCosts([]);
+    setBillNumber(null);
+    setPhysicalReceiptOnBill(true);
+    setError(null);
+  }
+
   function handleSuccessNavigate(id?: string) {
+    if (mode === "create") {
+      resetCreateForm();
+      if (poIdParam) setPoPrefillToken((t) => t + 1);
+      onSuccess?.(id);
+      return;
+    }
     if (isModal) {
       onOpenChange?.(false);
       onSuccess?.(id);
@@ -319,20 +365,69 @@ export function PurchaseBillFormView({
       notes: notes || null,
       lines: apiLines,
       landedCosts: landedCostsToApiInput(landedCosts),
-      discount,
+      discount: coalesceNumber(discount),
       finalize: shouldFinalize,
       physicalReceiptOnBill: poId ? false : physicalReceiptOnBill,
     };
 
     startTransition(async () => {
       try {
-        if (billId) {
-          await adminPut(`erp/purchase-bills/${billId}`, payload);
-          handleSuccessNavigate(billId);
-        } else {
-          const res = await adminPost<{ id: string }>("erp/purchase-bills", payload);
-          handleSuccessNavigate(res.id);
+        const supabase = createSupabaseBrowserClient();
+        const { data: authData } = await supabase.auth.getUser();
+        const staffUserId = authData.user?.id;
+        if (!staffUserId) {
+          setError("You must be signed in to save a purchase bill.");
+          return;
         }
+
+        const store = createOutboxStore();
+        try {
+          if (billId) {
+            const updatePayload: PurchaseBillUpdatePayload = { ...payload, billId };
+            await store.enqueue({
+              operationType: ERP_CLIENT_OPERATION_TYPES.purchaseBill.update,
+              schemaVersion: 1,
+              payload: updatePayload,
+              userId: staffUserId,
+              storeId: effectiveStoreId,
+              terminalId: getOrCreateErpTerminalId(),
+              resourceScope: purchaseBillResourceScope(billId),
+            });
+          } else {
+            await store.enqueue({
+              operationType: ERP_CLIENT_OPERATION_TYPES.purchaseBill.create,
+              schemaVersion: 1,
+              payload: payload as PurchaseBillCreatePayload,
+              userId: staffUserId,
+              storeId: effectiveStoreId,
+              terminalId: getOrCreateErpTerminalId(),
+            });
+          }
+        } catch (enqueueErr) {
+          if (enqueueErr instanceof OutboxEnqueueError) {
+            setError(enqueueErr.message);
+          } else {
+            setError(
+              enqueueErr instanceof Error
+                ? enqueueErr.message
+                : "Could not save purchase bill locally.",
+            );
+          }
+          return;
+        } finally {
+          await store.close();
+        }
+
+        dispatchOutboxChanged();
+        broadcastSyncWake();
+        setLocalSaveNotice(
+          shouldFinalize
+            ? "Queued — will post when synchronized"
+            : billId
+              ? "Update saved locally — pending sync"
+              : "Saved locally — pending sync",
+        );
+        handleSuccessNavigate(billId);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Save failed");
       }
@@ -364,11 +459,10 @@ export function PurchaseBillFormView({
         </div>
         <div className="space-y-1 border-t pt-3">
           <AdminFormField label="Discount">
-            <Input
-              type="number"
+            <NumericInput
               min={0}
               value={discount}
-              onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+              onValueChange={setDiscount}
             />
           </AdminFormField>
         </div>
@@ -392,13 +486,13 @@ export function PurchaseBillFormView({
           </Button>
           {!poId ? (
             <Button disabled={pending} onClick={() => submit(true)}>
-              Save & finalize
+              Save & next
             </Button>
           ) : null}
         </>
       ) : (
         <Button disabled={pending} onClick={() => submit(false)}>
-          Save
+          Save changes
         </Button>
       )}
     </>
@@ -520,6 +614,9 @@ export function PurchaseBillFormView({
           </AdminFormSection>
 
           {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+          {localSaveNotice ? (
+            <p className="text-sm text-muted-foreground">{localSaveNotice}</p>
+          ) : null}
 
           {!isModal ? (
             <div className="flex flex-wrap justify-end gap-2">
@@ -532,7 +629,7 @@ export function PurchaseBillFormView({
                     Save draft
                   </Button>
                   <Button disabled={pending} onClick={() => submit(true)}>
-                    Save & finalize
+                    Save & next
                   </Button>
                 </>
               ) : (

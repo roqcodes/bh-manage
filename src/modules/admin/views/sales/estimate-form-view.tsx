@@ -20,7 +20,6 @@ import {
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import {
   SalesLinesEditor,
-  emptySalesLine,
   salesLinesToApiInput,
 } from "@/modules/erp/components/sales-lines-editor";
 import {
@@ -30,6 +29,8 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 import { Label } from "@/components/ui/label";
 
 export type EstimateFormViewProps = ErpFormViewBaseProps & {
@@ -63,7 +64,7 @@ export function EstimateFormView({
   const [taxInclusive, setTaxInclusive] = useState(true);
   const [notes, setNotes] = useState("");
   const [reference, setReference] = useState("");
-  const [lines, setLines] = useState<SalesLineFormRow[]>([emptySalesLine()]);
+  const [lines, setLines] = useState<SalesLineFormRow[]>([]);
 
   useEffect(() => {
     const preselected = searchParams.get("customerId");
@@ -140,7 +141,7 @@ export function EstimateFormView({
       tax += taxAmount;
     }
     const gross = roundSalesMoney(subtotal + tax);
-    const net = roundSalesMoney(Math.max(0, gross - discount));
+    const net = roundSalesMoney(Math.max(0, gross - coalesceNumber(discount)));
     return { subtotal: roundSalesMoney(subtotal), tax: roundSalesMoney(tax), total: net };
   }, [lines, taxInclusive, discount]);
 
@@ -186,7 +187,7 @@ export function EstimateFormView({
       estimateDate,
       validUntil: validUntil || estimateDate,
       lines: apiLines,
-      discount,
+      discount: coalesceNumber(discount),
       taxInclusive,
       notes: notes || undefined,
       reference: reference || undefined,
@@ -237,12 +238,11 @@ export function EstimateFormView({
         </div>
         <div className="space-y-1">
           <Label>Discount after tax</Label>
-          <Input
-            type="number"
+          <NumericInput
             min={0}
             step="0.01"
-            value={discount || ""}
-            onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+            value={discount}
+            onValueChange={setDiscount}
           />
         </div>
         <div className="flex justify-between border-t pt-3 text-base font-semibold">

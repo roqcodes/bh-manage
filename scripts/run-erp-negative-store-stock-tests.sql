@@ -2,9 +2,9 @@
 -- order_funnel_reach.user_id → auth.users; use walk-in customer (same as POS tests).
 -- Ends with ROLLBACK — no persistent changes.
 -- Pass: one row test_result = TEST_PASS: … | Fail: ERROR (TEST_FAIL / TEST_SKIP).
-
+ 
 BEGIN;
-
+  
 DO $$
 DECLARE
   v_store uuid;

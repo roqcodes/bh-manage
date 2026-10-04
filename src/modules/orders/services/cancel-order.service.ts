@@ -3,6 +3,7 @@ import "server-only";
 import { notifyOrderStatusChange, notifyWalletEvent } from "@/modules/admin/services/push-notifications.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
+import { cancelSalesOrder } from "@/modules/orders/services/cancel-sales-order.service";
 import {
   creditCustomerWallet,
   restoreOrderInventory,
@@ -15,12 +16,17 @@ export async function cancelOrderAndRefund(orderId: string): Promise<void> {
 
   const { data: order, error } = await supabase
     .from("orders")
-    .select("id, status, payment_status, total_amount, user_id, inventory_committed, source")
+    .select("id, status, payment_status, total_amount, user_id, inventory_committed, source, store_id")
     .eq("id", orderId)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!order) throw new Error("Order not found");
+
+  if (order.source === "sales_order") {
+    await cancelSalesOrder(orderId, order.store_id ?? undefined);
+    return;
+  }
   if (order.status === "cancelled") {
     throw new Error("Order is already cancelled.");
   }

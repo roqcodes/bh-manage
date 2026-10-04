@@ -15,6 +15,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import {
+  coalesceNumber,
+  formatNumberInputValue,
+  parseNumberInputValue,
+} from "@/lib/numeric-input";
 import { Label } from "@/components/ui/label";
 import {
   InputGroup,
@@ -90,20 +96,26 @@ export function BillingPanel() {
 
   const totals = useMemo(() => {
     const subtotal = cart.reduce(
-      (sum, item) => sum + item.price * item.cartQuantity,
+      (sum, item) => sum + item.price * coalesceNumber(item.cartQuantity),
       0,
     );
     const totalDiscount = cart.reduce(
-      (sum, item) => sum + item.discount * item.cartQuantity,
+      (sum, item) =>
+        sum + coalesceNumber(item.discount) * coalesceNumber(item.cartQuantity),
       0,
     );
     const tax = 0;
     const grandTotal = subtotal - totalDiscount + tax;
-    const itemCount = cart.reduce((sum, item) => sum + item.cartQuantity, 0);
+    const itemCount = cart.reduce(
+      (sum, item) => sum + coalesceNumber(item.cartQuantity),
+      0,
+    );
     return { subtotal, totalDiscount, tax, grandTotal, itemCount };
   }, [cart]);
 
-  const hasStockIssue = cart.some((item) => item.cartQuantity > item.stock);
+  const hasStockIssue = cart.some(
+    (item) => coalesceNumber(item.cartQuantity) > item.stock,
+  );
 
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     cart,
@@ -527,32 +539,31 @@ export function BillingPanel() {
                             type="number"
                             min={1}
                             max={item.stock}
-                            value={item.cartQuantity}
-                            onChange={(e) =>
+                            value={formatNumberInputValue(item.cartQuantity)}
+                            onChange={(e) => {
+                              const n = parseNumberInputValue(e.target.value);
                               updateCartItem(item.variantId, {
-                                cartQuantity: Math.max(
-                                  1,
-                                  parseInt(e.target.value, 10) || 1,
-                                ),
-                              })
-                            }
+                                cartQuantity: Number.isNaN(n)
+                                  ? Number.NaN
+                                  : Math.max(1, Math.floor(n)),
+                              });
+                            }}
                           />
                         </TableCell>
                         <TableCell className="tabular-nums">
                           {formatBillingInr(item.price)}
                         </TableCell>
                         <TableCell>
-                          <Input
+                          <NumericInput
                             className="h-8 w-24 tabular-nums"
-                            type="number"
                             min={0}
                             step="0.01"
-                            value={roundMoney2(item.discount).toFixed(2)}
-                            onChange={(e) =>
+                            value={item.discount}
+                            onValueChange={(discount) =>
                               updateCartItem(item.variantId, {
-                                discount: roundMoney2(
-                                  parseFloat(e.target.value) || 0,
-                                ),
+                                discount: Number.isNaN(discount)
+                                  ? discount
+                                  : roundMoney2(discount),
                               })
                             }
                           />

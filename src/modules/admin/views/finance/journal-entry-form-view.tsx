@@ -22,6 +22,8 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { coalesceNumber } from "@/lib/numeric-input";
 
 type LineRow = {
   key: string;
@@ -72,8 +74,8 @@ export function JournalEntryFormView({
     let debit = 0;
     let credit = 0;
     for (const line of lines) {
-      debit += line.debit || 0;
-      credit += line.credit || 0;
+      debit += coalesceNumber(line.debit);
+      credit += coalesceNumber(line.credit);
     }
     return { debit: Math.round(debit * 100) / 100, credit: Math.round(credit * 100) / 100 };
   }, [lines]);
@@ -107,11 +109,15 @@ export function JournalEntryFormView({
       return;
     }
     const apiLines = lines
-      .filter((l) => l.accountId && (l.debit > 0 || l.credit > 0))
+      .filter(
+        (l) =>
+          l.accountId &&
+          (coalesceNumber(l.debit) > 0 || coalesceNumber(l.credit) > 0),
+      )
       .map((l) => ({
         accountId: l.accountId,
-        debit: l.debit || undefined,
-        credit: l.credit || undefined,
+        debit: coalesceNumber(l.debit) > 0 ? coalesceNumber(l.debit) : undefined,
+        credit: coalesceNumber(l.credit) > 0 ? coalesceNumber(l.credit) : undefined,
         description: l.description || undefined,
       }));
     if (apiLines.length < 2) {
@@ -224,34 +230,28 @@ export function JournalEntryFormView({
                     </option>
                   ))}
                 </select>
-                <Input
-                  type="number"
+                <NumericInput
                   min={0}
                   step="0.01"
                   placeholder="Debit"
-                  value={line.debit || ""}
-                  onChange={(e) =>
+                  value={line.debit}
+                  onValueChange={(debit) =>
                     setLines((prev) =>
                       prev.map((l) =>
-                        l.key === line.key
-                          ? { ...l, debit: parseFloat(e.target.value) || 0, credit: 0 }
-                          : l,
+                        l.key === line.key ? { ...l, debit, credit: 0 } : l,
                       ),
                     )
                   }
                 />
-                <Input
-                  type="number"
+                <NumericInput
                   min={0}
                   step="0.01"
                   placeholder="Credit"
-                  value={line.credit || ""}
-                  onChange={(e) =>
+                  value={line.credit}
+                  onValueChange={(credit) =>
                     setLines((prev) =>
                       prev.map((l) =>
-                        l.key === line.key
-                          ? { ...l, credit: parseFloat(e.target.value) || 0, debit: 0 }
-                          : l,
+                        l.key === line.key ? { ...l, credit, debit: 0 } : l,
                       ),
                     )
                   }

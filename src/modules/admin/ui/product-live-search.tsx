@@ -22,8 +22,7 @@ import { useSearchListKeyboard } from "@/modules/admin/ui/use-search-list-keyboa
 import {
   ERP_PRODUCT_SEARCH_DEBOUNCE_MS,
   ERP_PRODUCT_SEARCH_GC_MS,
-  ERP_PURCHASE_SEARCH_STALE_MS,
-  ERP_SALES_SEARCH_STALE_MS,
+  ERP_PRODUCT_SEARCH_STALE_MS,
   erpProductLiveSearchQueryKey,
   fetchErpProductLiveSearch,
 } from "@/modules/erp/lib/erp-product-live-search.client";
@@ -72,8 +71,7 @@ export function ProductLiveSearch({
   const searchEnabled =
     open && !disabled && trimmedDebounced.length >= minChars;
 
-  const staleTime =
-    catalog === "purchase" ? ERP_PURCHASE_SEARCH_STALE_MS : ERP_SALES_SEARCH_STALE_MS;
+  const staleTime = ERP_PRODUCT_SEARCH_STALE_MS;
 
   const {
     data: results = [],

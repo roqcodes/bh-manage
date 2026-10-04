@@ -385,14 +385,19 @@ export async function buildProductOrderItemSnapshots(
     }
 
     const listPrice = resolveListPrice(productRow.price);
-    if (listPrice <= 0) {
-      throw new Error("This product has no valid selling price.");
-    }
-
-    const finalPrice =
+    const overridePrice =
       line.unitPriceOverride != null && Number.isFinite(line.unitPriceOverride)
         ? resolveListPrice(line.unitPriceOverride)
-        : listPrice;
+        : 0;
+
+    let finalPrice: number;
+    if (overridePrice > 0) {
+      finalPrice = overridePrice;
+    } else if (listPrice <= 0) {
+      throw new Error("This product has no valid selling price.");
+    } else {
+      finalPrice = listPrice;
+    }
 
     const storeWac =
       spi?.purchase_price != null ? Number(spi.purchase_price) : null;
