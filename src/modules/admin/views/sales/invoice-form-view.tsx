@@ -403,7 +403,12 @@ export function InvoiceFormView({
       loading={loadingInvoice}
       loadingFallback={<AdminPageSkeleton />}
     >
-      <form id={formId} className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+      <form
+        id={formId}
+        className="space-y-4"
+        autoComplete="off"
+        onSubmit={(e) => e.preventDefault()}
+      >
         <AdminFormModalLayout sidebar={totalsSidebar}>
           <AdminFormSection title="Invoice details">
             <AdminFormGrid cols={3}>

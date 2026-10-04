@@ -283,10 +283,18 @@ export function EntitySearchSelect({
       <div ref={anchorRef} className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
+          type="search"
           value={displayValue}
           disabled={disabled}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          data-1p-ignore
+          data-lpignore="true"
+          data-form-type="other"
           placeholder={value && !open ? placeholder : searchPlaceholder}
-          className="h-10 pr-9 pl-9"
+          className="h-10 pr-9 pl-9 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
           role="combobox"
           aria-expanded={open}
           aria-controls={listboxId}
@@ -355,7 +363,7 @@ export function CustomerSearchSelect({
       disabled={disabled}
       cacheScope="customer"
       placeholder="Select customer"
-      searchPlaceholder="Search name, email, phone…"
+      searchPlaceholder="Search by name or phone…"
       emptyText="No customers found"
       minChars={1}
       loadOnFocus
@@ -454,9 +462,10 @@ export function ProductSearchSelect({
         return (res.data ?? []).map((row) => ({
           id: row.id,
           label: row.name ? `${row.product_name} — ${row.name}` : row.product_name,
-          sublabel: row.barcode ? `Barcode: ${row.barcode}` : undefined,
+          sublabel: row.barcode
+            ? `Barcode: ${row.barcode} · Stock: ${row.available_stock}`
+            : `Stock: ${row.available_stock}`,
           meta: `${row.sales_price ?? 0}|stock:${row.available_stock}`,
-          amount: row.sales_price ?? 0,
         }));
       }}
     />

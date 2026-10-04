@@ -404,6 +404,7 @@ export function SalesOrderFormView({
       <form
         id={formId}
         className="space-y-4"
+        autoComplete="off"
         onSubmit={(e) => {
           e.preventDefault();
           handleSubmit();

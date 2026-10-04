@@ -330,7 +330,7 @@ BEGIN
   IF v_cnt < 2 THEN
     RAISE EXCEPTION 'FAIL: expected two finalized receives on PO';
   END IF;
-
+  
   RAISE NOTICE 'partial multi-shipment certification PASS';
 END;
 $$;

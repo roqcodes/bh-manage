@@ -8,8 +8,8 @@ import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import type { ProductCatalogType } from "@/modules/admin/ui/product-live-search";
 
-/** Debounce before hitting the network (balance responsiveness vs chatter). */
-export const ERP_PRODUCT_SEARCH_DEBOUNCE_MS = 200;
+/** Product picker fires on every keystroke; React Query dedupes in-flight requests. */
+export const ERP_PRODUCT_SEARCH_DEBOUNCE_MS = 0;
 
 /**
  * React Query stale window for ERP product search (sales + purchase catalogs).

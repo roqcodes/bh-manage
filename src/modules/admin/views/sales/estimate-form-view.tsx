@@ -289,7 +289,12 @@ export function EstimateFormView({
       loading={loadingEstimate}
       loadingFallback={<AdminPageSkeleton />}
     >
-      <form id={formId} className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+      <form
+        id={formId}
+        className="space-y-4"
+        autoComplete="off"
+        onSubmit={(e) => e.preventDefault()}
+      >
         <AdminFormModalLayout sidebar={totalsSidebar}>
           <AdminFormSection title="Estimate details">
             <AdminFormGrid cols={3}>

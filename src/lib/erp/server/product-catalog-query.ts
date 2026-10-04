@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/integrations/supabase/types";
-import { buildIlikePattern } from "@/lib/postgrest-search";
+import { buildIlikePattern, buildPrefixIlikePattern } from "@/lib/postgrest-search";
 
 export type ActiveProductSearchRow = {
   id: string;
@@ -48,11 +48,24 @@ export async function searchActiveGoodsProducts(
     }
   }
 
+  const prefix = buildPrefixIlikePattern(trimmed);
+  if (prefix) {
+    const { data: prefixRows, error: prefixError } = await base()
+      .or(`name.ilike.${prefix},barcode.ilike.${prefix}`)
+      .order("name", { ascending: true })
+      .limit(limit);
+    if (prefixError) throw new Error(prefixError.message);
+    if (prefixRows?.length) {
+      return prefixRows as ActiveProductSearchRow[];
+    }
+  }
+
   const pattern = buildIlikePattern(trimmed);
   if (!pattern) return [];
 
   const { data, error } = await base()
     .or(`name.ilike.${pattern},barcode.ilike.${pattern}`)
+    .order("name", { ascending: true })
     .limit(limit);
 
   if (error) throw new Error(error.message);

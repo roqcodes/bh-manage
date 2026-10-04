@@ -13,3 +13,10 @@ export function buildIlikePattern(query: string): string | null {
   if (!sanitized) return null;
   return `%${escapeIlikePattern(sanitized)}%`;
 }
+
+/** Prefix match (`term%`) — btree-friendly and faster than leading-wildcard ILIKE. */
+export function buildPrefixIlikePattern(query: string): string | null {
+  const sanitized = sanitizePostgrestOrTerm(query);
+  if (!sanitized) return null;
+  return `${escapeIlikePattern(sanitized)}%`;
+}
