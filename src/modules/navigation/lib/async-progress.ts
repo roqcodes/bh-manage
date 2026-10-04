@@ -1,3 +1,5 @@
+import { ADMIN_LOAD_DEBUG_TRACE_STORAGE_KEY } from "@/modules/navigation/lib/admin-load-debug-preference";
+
 type Listener = () => void;
 
 export type AsyncProgressKind = "api" | "navigation";
@@ -27,7 +29,43 @@ const activeById = new Map<number, AsyncProgressActivity>();
 const activeOrder: number[] = [];
 let navigationOpId: number | null = null;
 const completedTrace: AsyncProgressActivity[] = [];
-const MAX_COMPLETED_TRACE = 80;
+let traceHydratedFromStorage = false;
+
+function persistCompletedTraceToStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      ADMIN_LOAD_DEBUG_TRACE_STORAGE_KEY,
+      JSON.stringify(completedTrace),
+    );
+  } catch {
+    /* quota or SSR */
+  }
+}
+
+function hydrateCompletedTraceFromStorage() {
+  if (traceHydratedFromStorage || typeof window === "undefined") return;
+  traceHydratedFromStorage = true;
+  try {
+    const raw = window.sessionStorage.getItem(ADMIN_LOAD_DEBUG_TRACE_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as AsyncProgressActivity[];
+    if (!Array.isArray(parsed)) return;
+    completedTrace.length = 0;
+    for (const entry of parsed) {
+      if (entry && typeof entry.id === "number" && entry.label) {
+        completedTrace.push(entry);
+      }
+    }
+    rebuildCaches();
+  } catch {
+    /* ignore corrupt storage */
+  }
+}
+
+function ensureTraceHydrated() {
+  hydrateCompletedTraceFromStorage();
+}
 
 const listeners = new Set<Listener>();
 let cachedMessages: string[] = [];
@@ -72,6 +110,7 @@ function notify() {
 rebuildCaches();
 
 export function subscribeGlobalProgress(listener: Listener) {
+  ensureTraceHydrated();
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
@@ -89,6 +128,7 @@ export function getAsyncProgressActivities(): {
   active: readonly AsyncProgressActivity[];
   completed: readonly AsyncProgressActivity[];
 } {
+  ensureTraceHydrated();
   return cachedActivitiesSnapshot;
 }
 
@@ -110,9 +150,7 @@ function finalizeActivity(activity: AsyncProgressActivity, error?: string) {
   activity.status = error ? "failed" : "completed";
   if (error) activity.error = error;
   completedTrace.push({ ...activity });
-  if (completedTrace.length > MAX_COMPLETED_TRACE) {
-    completedTrace.splice(0, completedTrace.length - MAX_COMPLETED_TRACE);
-  }
+  persistCompletedTraceToStorage();
 }
 
 /** Tracks in-flight admin API / async DB operations. Returns a token for `endAsyncProgress`. */
@@ -223,5 +261,12 @@ export function buildAsyncProgressDebugExport(
 
 export function clearAsyncProgressDebugTrace() {
   completedTrace.length = 0;
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.removeItem(ADMIN_LOAD_DEBUG_TRACE_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
   notify();
 }

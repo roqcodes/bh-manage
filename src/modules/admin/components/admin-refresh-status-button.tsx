@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, RefreshCw } from "lucide-react";
+import { Check, Copy, RefreshCw, Trash2 } from "lucide-react";
 import { useSyncExternalStore } from "react";
 
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAdminLoadDebugPreference } from "@/modules/navigation/context/AdminLoadDebugPreferenceContext";
 import {
   buildAsyncProgressDebugExport,
+  clearAsyncProgressDebugTrace,
   getAsyncProgressActivities,
   getGlobalProgressMessages,
   isGlobalProgressActive,
@@ -102,7 +103,7 @@ export function AdminRefreshStatusButton() {
 
   const busy = globalActive || isPending || adminFetching > 0;
   const hasActiveOps = activities.active.length > 0;
-  const recentCompleted = activities.completed.slice(-12).reverse();
+  const completedNewestFirst = [...activities.completed].reverse();
 
   useEffect(() => {
     if (!loadDebugEnabled || !hasActiveOps) return;
@@ -122,10 +123,15 @@ export function AdminRefreshStatusButton() {
     messages.length > 0 ? messages : busy ? ["Syncing admin data with the database…"] : [];
 
   const showDebugPanel =
-    loadDebugEnabled && hoverOpen && (busy || recentCompleted.length > 0);
+    loadDebugEnabled && hoverOpen && (busy || completedNewestFirst.length > 0);
   const showSimpleActivityCard =
     !loadDebugEnabled && hoverOpen && busy && activityMessages.length > 0;
   const showIdleHint = hoverOpen && !busy && !showDebugPanel;
+
+  const onClearDebug = useCallback(() => {
+    clearAsyncProgressDebugTrace();
+    setCopied(false);
+  }, []);
 
   const onCopyDebug = useCallback(async () => {
     const payload = buildAsyncProgressDebugExport(Date.now());
@@ -194,19 +200,33 @@ export function AdminRefreshStatusButton() {
                   <div>
                     <p className="text-xs font-medium text-slate-900">Load debug trace</p>
                     <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
-                      Timings for admin API and navigation (newest completed first).
+                      Timings for admin API and navigation (newest first). Cleared only with
+                      Clear.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 shrink-0 gap-1 px-2 text-[10px]"
-                    onClick={() => void onCopyDebug()}
-                  >
-                    {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                    {copied ? "Copied" : "Copy JSON"}
-                  </Button>
+                  <div className="flex shrink-0 flex-col gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1 px-2 text-[10px]"
+                      onClick={() => void onCopyDebug()}
+                    >
+                      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                      {copied ? "Copied" : "Copy JSON"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1 px-2 text-[10px] text-slate-600"
+                      onClick={onClearDebug}
+                      disabled={completedNewestFirst.length === 0 && !hasActiveOps}
+                    >
+                      <Trash2 className="size-3" />
+                      Clear
+                    </Button>
+                  </div>
                 </div>
 
                 {hasActiveOps ? (
@@ -222,13 +242,13 @@ export function AdminRefreshStatusButton() {
                   </div>
                 ) : null}
 
-                {recentCompleted.length > 0 ? (
+                {completedNewestFirst.length > 0 ? (
                   <div className="mt-2.5 border-t border-slate-100 pt-2.5">
                     <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                      Completed
+                      Completed ({completedNewestFirst.length})
                     </p>
-                    <ul className="max-h-44 space-y-1 overflow-y-auto">
-                      {recentCompleted.map((op) => (
+                    <ul className="max-h-56 space-y-1 overflow-y-auto">
+                      {completedNewestFirst.map((op) => (
                         <DebugActivityRow key={`${op.id}-${op.endedAt}`} op={op} now={now} live={false} />
                       ))}
                     </ul>

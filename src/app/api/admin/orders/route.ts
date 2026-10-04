@@ -5,7 +5,6 @@ import { requireAdminApiProfile } from "@/lib/api/admin-api-auth";
 import {
   getOrders,
   getOrdersCatalogStats,
-  listUsersForOrderFilter,
   type OrderChannel,
 } from "@/modules/orders/services/orders.service";
 
@@ -38,9 +37,8 @@ export async function GET(request: Request) {
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
   const channel = parseChannel(searchParams.get("channel"));
 
-  const [{ data, total }, filterUsers, stats] = await Promise.all([
+  const [{ data, total }, stats] = await Promise.all([
     getOrders(status, userId, page, channel),
-    listUsersForOrderFilter(),
     getOrdersCatalogStats(channel),
   ]);
 
@@ -50,7 +48,7 @@ export async function GET(request: Request) {
     page,
     status,
     userId,
-    filterUsers,
+    filterUsers: [],
     stats,
   });
 }

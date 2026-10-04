@@ -28,7 +28,7 @@ function parseOrderStatus(raw: string | null): OrderStatusFilter {
 }
 
 export function SalesOrdersListView() {
-  const { activeStoreId } = useErpStores();
+  const { activeStoreId, loading: erpContextLoading } = useErpStores();
   const { isOpen, modalProps } = useErpFormModal("/admin/erp/sales-orders");
   const searchParams = useSearchParams();
   const status = parseOrderStatus(searchParams.get("status"));
@@ -56,6 +56,7 @@ export function SalesOrdersListView() {
       }>(`erp/sales-orders${qs ? `?${qs}` : ""}`);
     },
     placeholderData: keepPreviousData,
+    enabled: !erpContextLoading,
   });
 
   if (isPending && !data) return <AdminPageSkeleton />;

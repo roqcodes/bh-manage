@@ -882,7 +882,7 @@ function InventoryPanel({
 export function AdminDashboardView() {
   const { settings } = useCurrencySettings();
   const queryClient = useQueryClient();
-  const { activeStoreId, storeId } = useActiveStoreScope();
+  const { activeStoreId, storeId, erpContextLoading } = useActiveStoreScope();
   const defaults = defaultDashboardDates();
   const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
   const [dateTo, setDateTo] = useState(defaults.dateTo);
@@ -899,7 +899,8 @@ export function AdminDashboardView() {
       return adminGet<AdminDashboardPayload>(`dashboard?${q.toString()}`);
     },
     placeholderData: keepPreviousData,
-    enabled: Boolean(storeId || activeStoreId) && Boolean(dateFrom && dateTo),
+    enabled:
+      !erpContextLoading && Boolean(storeId || activeStoreId) && Boolean(dateFrom && dateTo),
   });
 
   useEffect(() => {

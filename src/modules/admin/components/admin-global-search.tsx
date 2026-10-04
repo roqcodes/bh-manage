@@ -56,13 +56,14 @@ function isTypingTarget(target: EventTarget | null): boolean {
   );
 }
 
-function useSearchIndex() {
+function useSearchIndex(enabled: boolean) {
   return useQuery({
     queryKey: adminQueryKeys.searchIndex(),
     queryFn: () => adminGet<AdminSearchIndexResponse>("search-index"),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
+    enabled,
   });
 }
 
@@ -71,11 +72,19 @@ export function AdminGlobalSearchProvider({ children }: { children: ReactNode })
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    void queryClient.prefetchQuery({
-      queryKey: adminQueryKeys.searchIndex(),
-      queryFn: () => adminGet<AdminSearchIndexResponse>("search-index"),
-      staleTime: 5 * 60_000,
-    });
+    const prefetch = () => {
+      void queryClient.prefetchQuery({
+        queryKey: adminQueryKeys.searchIndex(),
+        queryFn: () => adminGet<AdminSearchIndexResponse>("search-index"),
+        staleTime: 5 * 60_000,
+      });
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(prefetch, { timeout: 12_000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timeoutId = window.setTimeout(prefetch, 8_000);
+    return () => window.clearTimeout(timeoutId);
   }, [queryClient]);
 
   useEffect(() => {
@@ -154,7 +163,7 @@ function AdminGlobalSearchDialog() {
   const router = useRouter();
   const { open, setOpen } = useAdminGlobalSearch();
   const [query, setQuery] = useState("");
-  const { data: index, isLoading, isError, isFetching } = useSearchIndex();
+  const { data: index, isLoading, isError, isFetching } = useSearchIndex(open);
 
   const groups = useMemo(
     () => filterSearchIndex(index?.items ?? [], query),

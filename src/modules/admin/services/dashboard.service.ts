@@ -107,15 +107,10 @@ export async function getAdminDashboardPayload(
   granularity: DashboardChartGranularity = "month",
 ): Promise<AdminDashboardPayload> {
   const supabase = await createSupabaseServerClient();
-  const activeStoreId = await requireErpStoreId(storeId);
-  const currencySettings = await getAppSettings();
-
-  const { data: storeRow } = await supabase
-    .from("stores")
-    .select("name")
-    .eq("id", activeStoreId)
-    .maybeSingle();
-  const storeName = storeRow?.name ?? "Store";
+  const [activeStoreId, currencySettings] = await Promise.all([
+    requireErpStoreId(storeId),
+    getAppSettings(),
+  ]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -128,7 +123,47 @@ export async function getAdminDashboardPayload(
   snapshotSince.setDate(snapshotSince.getDate() - 45);
   const snapshotSinceIso = snapshotSince.toISOString();
 
+  const erpExtendedPromise = Promise.all([
+    getStoreFinancialDashboard(activeStoreId, periodFrom, periodTo),
+    listAuditLogs({ storeId: activeStoreId, limit: 15 }),
+    supabase
+      .from("invoices")
+      .select("id, invoice_number, user_id, total_amount, created_at, status")
+      .eq("store_id", activeStoreId)
+      .order("created_at", { ascending: false })
+      .limit(8),
+    supabase
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("store_id", activeStoreId)
+      .gte("created_at", startOfDay)
+      .in("status", ["issued", "partial", "paid"]),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("store_id", activeStoreId)
+      .eq("fulfillment_status", "pending_assignment")
+      .not("status", "eq", "cancelled"),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("store_id", activeStoreId)
+      .in("fulfillment_status", [
+        "reserved",
+        "multi_shipment",
+        "partially_shipped",
+      ])
+      .not("status", "eq", "cancelled"),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("store_id", activeStoreId)
+      .eq("status", "shipped"),
+    buildStorePlSeries(activeStoreId, periodFrom, periodTo, granularity),
+  ]).catch(() => null);
+
   const [
+    storeRowResult,
     revenueResult,
     unfulfilledResult,
     delayedResult,
@@ -144,7 +179,9 @@ export async function getAdminDashboardPayload(
     recentResult,
     productsCountResult,
     inventoryWithProductRows,
+    erpExtendedResult,
   ] = await Promise.all([
+    supabase.from("stores").select("name").eq("id", activeStoreId).maybeSingle(),
     supabase
       .from("orders")
       .select("id,total_amount")
@@ -214,7 +251,10 @@ export async function getAdminDashboardPayload(
       .from("inventory")
       .select("product_variants(product_id)")
       .gt("stock", 0),
+    erpExtendedPromise,
   ]);
+
+  const storeName = storeRowResult.data?.name ?? "Store";
 
   const todayOrders = revenueResult.data ?? [];
   const todayIds = todayOrders.map((o) => o.id as string).filter(Boolean);
@@ -493,7 +533,7 @@ export async function getAdminDashboardPayload(
     delivered: deliveredPipe.count ?? 0,
   };
 
-  try {
+  if (erpExtendedResult) {
     const [
       financial,
       activityResult,
@@ -503,44 +543,7 @@ export async function getAdminDashboardPayload(
       fulfillReady,
       fulfillShipped,
       erpMonthlySeriesData,
-    ] = await Promise.all([
-      getStoreFinancialDashboard(activeStoreId, periodFrom, periodTo),
-      listAuditLogs({ storeId: activeStoreId, limit: 15 }),
-      supabase
-        .from("invoices")
-        .select("id, invoice_number, user_id, total_amount, created_at, status")
-        .eq("store_id", activeStoreId)
-        .order("created_at", { ascending: false })
-        .limit(8),
-      supabase
-        .from("invoices")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", activeStoreId)
-        .gte("created_at", startOfDay)
-        .in("status", ["issued", "partial", "paid"]),
-      supabase
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", activeStoreId)
-        .eq("fulfillment_status", "pending_assignment")
-        .not("status", "eq", "cancelled"),
-      supabase
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", activeStoreId)
-        .in("fulfillment_status", [
-          "reserved",
-          "multi_shipment",
-          "partially_shipped",
-        ])
-        .not("status", "eq", "cancelled"),
-      supabase
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", activeStoreId)
-        .eq("status", "shipped"),
-      buildStorePlSeries(activeStoreId, periodFrom, periodTo, granularity),
-    ]);
+    ] = erpExtendedResult;
 
     erpFinancial = financial;
     erpActivity = activityResult.data;
@@ -566,9 +569,6 @@ export async function getAdminDashboardPayload(
       customer_name: customerNames.get(row.user_id) ?? null,
       status: row.status,
     }));
-  } catch {
-    erpFinancial = null;
-    erpActivity = [];
   }
 
   return {

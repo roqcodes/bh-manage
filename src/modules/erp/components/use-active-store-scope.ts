@@ -9,7 +9,7 @@ import { useErpStores } from "@/modules/erp/components/use-erp-stores";
  * Defaults to the active store and re-syncs when it changes.
  */
 export function useActiveStoreScope(options?: { allowAll?: boolean }) {
-  const { activeStoreId } = useErpStores();
+  const { activeStoreId, loading: erpContextLoading } = useErpStores();
   const allowAll = options?.allowAll ?? false;
   const [storeId, setStoreId] = useState(activeStoreId);
 
@@ -32,5 +32,6 @@ export function useActiveStoreScope(options?: { allowAll?: boolean }) {
     storeId: effectiveStoreId,
     setStoreId,
     listParams,
+    erpContextLoading,
   };
 }

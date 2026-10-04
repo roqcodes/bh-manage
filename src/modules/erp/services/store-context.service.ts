@@ -1,28 +1,32 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { ErpContext, Store } from "@/common/erp/types";
 import { getErpContext } from "@/modules/erp/services/audit-log.service";
 
-export async function getAdminErpContext(): Promise<ErpContext | null> {
+export const getAdminErpContext = cache(async (): Promise<ErpContext | null> => {
   await requireAdminOrManagerProfile();
   return getErpContext();
-}
+});
 
-export async function resolveErpStoreId(explicit?: string | null): Promise<string | null> {
-  if (explicit) return explicit;
-  const ctx = await getAdminErpContext();
-  if (ctx?.store_id) return ctx.store_id;
+export const resolveErpStoreId = cache(
+  async (explicit?: string | null): Promise<string | null> => {
+    if (explicit) return explicit;
+    const ctx = await getAdminErpContext();
+    if (ctx?.store_id) return ctx.store_id;
 
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("get_default_store_id");
-  if (error) {
-    console.error("get_default_store_id failed:", error);
-    return null;
-  }
-  return data ?? null;
-}
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.rpc("get_default_store_id");
+    if (error) {
+      console.error("get_default_store_id failed:", error);
+      return null;
+    }
+    return data ?? null;
+  },
+);
 
 export async function requireErpStoreId(explicit?: string | null): Promise<string> {
   const storeId = await resolveErpStoreId(explicit);

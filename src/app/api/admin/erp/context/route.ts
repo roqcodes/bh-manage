@@ -12,8 +12,10 @@ export async function GET() {
   if (!auth.ok) return auth.response;
 
   try {
-    const context = await getAdminErpContext();
-    const stores = await listActiveStores();
+    const [context, stores] = await Promise.all([
+      getAdminErpContext(),
+      listActiveStores(),
+    ]);
     return NextResponse.json({ context, stores });
   } catch (error) {
     console.error("[GET /api/admin/erp/context]", error);

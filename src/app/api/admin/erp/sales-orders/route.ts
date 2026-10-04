@@ -14,11 +14,7 @@ import {
   idempotentSalesOrderCreateBodySchema,
   salesOrderPayloadSchema,
 } from "@/modules/orders/schemas/sales-order-api-schemas";
-import {
-  getOrders,
-  getOrdersCatalogStats,
-  listUsersForOrderFilter,
-} from "@/modules/orders/services/orders.service";
+import { getOrders, getOrdersCatalogStats } from "@/modules/orders/services/orders.service";
 
 const STATUSES: OrderStatusFilter[] = [
   "all",
@@ -45,9 +41,8 @@ export async function GET(request: Request) {
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
   const storeId = searchParams.get("storeId") ?? undefined;
 
-  const [{ data, total }, filterUsers, stats] = await Promise.all([
+  const [{ data, total }, stats] = await Promise.all([
     getOrders(status, userId, page, "erp", storeId),
-    listUsersForOrderFilter(),
     getOrdersCatalogStats("erp", storeId),
   ]);
 
@@ -57,7 +52,7 @@ export async function GET(request: Request) {
     page,
     status,
     userId,
-    filterUsers,
+    filterUsers: [],
     stats,
   });
 }

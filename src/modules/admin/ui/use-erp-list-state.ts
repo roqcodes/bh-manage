@@ -12,7 +12,7 @@ export function useErpListState(options?: {
   allowAllStores?: boolean;
 }) {
   const searchParams = useSearchParams();
-  const { activeStoreId } = useErpStores();
+  const { activeStoreId, loading: erpContextLoading } = useErpStores();
   const allowAllStores = options?.allowAllStores ?? false;
 
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
@@ -79,5 +79,6 @@ export function useErpListState(options?: {
     clearFilters,
     activeStoreId,
     allowAllStores,
+    erpContextLoading,
   };
 }

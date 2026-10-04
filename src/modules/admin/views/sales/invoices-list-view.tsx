@@ -69,6 +69,7 @@ export function InvoicesListView() {
     isFiltering,
     clearFilters,
     activeStoreId,
+    erpContextLoading,
   } = useErpListState();
   const [rows, setRows] = useState<ErpInvoiceListRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -91,9 +92,10 @@ export function InvoicesListView() {
   }
 
   useEffect(() => {
+    if (erpContextLoading) return;
     setLoading(true);
     reload().finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken]);
+  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken, erpContextLoading]);
 
   function cancelInvoice(invoiceId: string) {
     startCancel(async () => {

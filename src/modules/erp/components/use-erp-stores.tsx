@@ -25,12 +25,29 @@ export function useErpContextQuery() {
   });
 }
 
+const ADMIN_QUERY_KEYS_PRESERVED_ON_STORE_SWITCH = new Set([
+  "session",
+  "erp-context",
+  "search-index",
+  "app-settings",
+]);
+
 export async function refreshAdminAfterStoreChange(
   queryClient: ReturnType<typeof useQueryClient>,
   router: ReturnType<typeof useRouter>,
   storeId?: string | null,
 ) {
-  await queryClient.invalidateQueries({ queryKey: ["admin"] });
+  await queryClient.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey;
+      if (!Array.isArray(key) || key[0] !== "admin") return false;
+      const segment = key[1];
+      if (typeof segment === "string" && ADMIN_QUERY_KEYS_PRESERVED_ON_STORE_SWITCH.has(segment)) {
+        return false;
+      }
+      return true;
+    },
+  });
   router.refresh();
   if (typeof window !== "undefined") {
     window.dispatchEvent(

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
 import type { Json } from "@/lib/integrations/supabase/types";
 import type { AuditLogEntry, ErpContext, LogAuditEventInput } from "@/common/erp/types";
@@ -52,7 +54,8 @@ function mapAuditLogRow(row: AuditLogDbRow): AuditLogEntry {
   };
 }
 
-export async function getErpContext(userId?: string): Promise<ErpContext | null> {
+/** Request-scoped: one get_erp_context RPC per server render / API handler. */
+export const getErpContext = cache(async (userId?: string): Promise<ErpContext | null> => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc(
     "get_erp_context",
@@ -65,7 +68,7 @@ export async function getErpContext(userId?: string): Promise<ErpContext | null>
   }
 
   return data as unknown as ErpContext;
-}
+});
 
 export async function logAuditEvent(input: LogAuditEventInput): Promise<string | null> {
   const supabase = await createSupabaseServerClient();

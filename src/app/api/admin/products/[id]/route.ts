@@ -46,20 +46,11 @@ export async function GET(
     }
   }
 
-  let variant_groups: Awaited<ReturnType<typeof listVariantGroupsForProduct>> = [];
-  let product_images: Awaited<ReturnType<typeof listProductImages>> = [];
-  let product_videos: Awaited<ReturnType<typeof listProductVideos>> = [];
-  try {
-    variant_groups = await listVariantGroupsForProduct(id);
-  } catch {
-    /* migration may be pending */
-  }
-  try {
-    product_images = await listProductImages(id);
-    product_videos = await listProductVideos(id);
-  } catch {
-    /* migration may be pending */
-  }
+  const [variant_groups, product_images, product_videos] = await Promise.all([
+    listVariantGroupsForProduct(id).catch(() => [] as Awaited<ReturnType<typeof listVariantGroupsForProduct>>),
+    listProductImages(id).catch(() => [] as Awaited<ReturnType<typeof listProductImages>>),
+    listProductVideos(id).catch(() => [] as Awaited<ReturnType<typeof listProductVideos>>),
+  ]);
 
   const glance = await getProductAtGlanceMetrics(
     id,
