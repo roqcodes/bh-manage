@@ -14,6 +14,7 @@ import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
 import { createOutboxStore } from "@/lib/sync/outbox-store";
 import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
 import { broadcastSyncWake } from "@/lib/sync/sync-network";
+import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
 import {
   purchaseOrderResourceScope,
   type PurchaseOrderDeliverFinalizePayload,
@@ -232,8 +233,7 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
         }
 
         const supabase = createSupabaseBrowserClient();
-        const { data: authData } = await supabase.auth.getUser();
-        const staffUserId = authData.user?.id;
+        const staffUserId = await resolveOutboxUserId(supabase);
         if (!staffUserId) {
           setError("You must be signed in to submit delivery.");
           return;

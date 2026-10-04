@@ -39,6 +39,7 @@ import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { createSupabaseBrowserClient } from "@/lib/integrations/supabase/client";
 import { ERP_CLIENT_OPERATION_TYPES } from "@/lib/erp/client-operations/operation-types";
 import { dispatchOutboxChanged } from "@/lib/sync/outbox-browser-events";
+import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
 import { broadcastSyncWake } from "@/lib/sync/sync-network";
 import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
 import { createOutboxStore } from "@/lib/sync/outbox-store";
@@ -742,8 +743,7 @@ export function OrderDetailPanel({ order }: { order: OrderWithItems }) {
                         return;
                       }
                       const supabase = createSupabaseBrowserClient();
-                      const { data: authData } = await supabase.auth.getUser();
-                      const staffUserId = authData.user?.id;
+                      const staffUserId = await resolveOutboxUserId(supabase);
                       if (!staffUserId) {
                         setActionError("You must be signed in.");
                         return;

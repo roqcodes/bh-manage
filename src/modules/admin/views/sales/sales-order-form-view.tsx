@@ -14,6 +14,7 @@ import { broadcastSyncWake } from "@/lib/sync/sync-network";
 import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
 import { createOutboxStore } from "@/lib/sync/outbox-store";
 import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
+import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
 import type { SalesOrderCreatePayload } from "@/modules/orders/types/sales-order-create-payload";
 import type { SalesOrderUpdatePayload } from "@/modules/orders/types/sales-order-update-payload";
 import { salesOrderResourceScope } from "@/modules/orders/types/sales-order-update-payload";
@@ -248,8 +249,7 @@ export function SalesOrderFormView({
         }
 
         const supabase = createSupabaseBrowserClient();
-        const { data: authData } = await supabase.auth.getUser();
-        const staffUserId = authData.user?.id;
+        const staffUserId = await resolveOutboxUserId(supabase);
         if (!staffUserId) {
           setError("You must be signed in to save a sales order.");
           return;

@@ -12,6 +12,7 @@ import { broadcastSyncWake } from "@/lib/sync/sync-network";
 import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
 import { createOutboxStore } from "@/lib/sync/outbox-store";
 import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
+import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
 import { usePendingSalesOrderCreates } from "@/lib/sync/hooks/use-pending-sales-order-creates";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 import { salesOrderResourceScope } from "@/modules/orders/types/sales-order-update-payload";
@@ -74,8 +75,7 @@ export function SalesOrderCancelButton({
     startTransition(async () => {
       try {
         const supabase = createSupabaseBrowserClient();
-        const { data: authData } = await supabase.auth.getUser();
-        const staffUserId = authData.user?.id;
+        const staffUserId = await resolveOutboxUserId(supabase);
         if (!staffUserId) {
           onError?.("You must be signed in to cancel this sales order.");
           return;

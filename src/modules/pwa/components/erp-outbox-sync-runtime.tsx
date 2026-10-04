@@ -11,6 +11,7 @@ import type { SalesOrderUpdatePayload } from "@/modules/orders/types/sales-order
 import { OperationHandlerRegistry } from "@/lib/sync/operation-handler";
 import { OutboxSyncRuntime } from "@/lib/sync/outbox-sync-runtime";
 import { registerErpSyncHandlers } from "@/lib/sync/handlers/register-erp-sync-handlers";
+import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
 function createErpHandlerRegistry(): OperationHandlerRegistry {
   const registry = new OperationHandlerRegistry();
   registerErpSyncHandlers(registry);
@@ -22,8 +23,7 @@ export function ErpOutboxSyncRuntime() {
 
   const getCurrentUserId = useCallback(async () => {
     const supabase = createSupabaseBrowserClient();
-    const { data } = await supabase.auth.getUser();
-    return data.user?.id ?? null;
+    return resolveOutboxUserId(supabase);
   }, []);
 
   const handlers = useMemo(() => createErpHandlerRegistry(), []);

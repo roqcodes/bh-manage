@@ -27,6 +27,7 @@ import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
 import { createOutboxStore } from "@/lib/sync/outbox-store";
 import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
 import { broadcastSyncWake } from "@/lib/sync/sync-network";
+import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
 import { purchaseBillResourceScope } from "@/modules/erp/types/purchase-payload";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { AdminPageHeader, AdminPageLayout } from "@/modules/admin/ui";
@@ -268,8 +269,7 @@ export function PurchaseBillDetailView({ billId }: { billId: string }) {
     startTransition(async () => {
       try {
         const supabase = createSupabaseBrowserClient();
-        const { data: authData } = await supabase.auth.getUser();
-        const staffUserId = authData.user?.id;
+        const staffUserId = await resolveOutboxUserId(supabase);
         if (!staffUserId) {
           setError("You must be signed in to finalize.");
           return;
@@ -315,8 +315,7 @@ export function PurchaseBillDetailView({ billId }: { billId: string }) {
       return;
     }
     const supabase = createSupabaseBrowserClient();
-    const { data: authData } = await supabase.auth.getUser();
-    const staffUserId = authData.user?.id;
+    const staffUserId = await resolveOutboxUserId(supabase);
     if (!staffUserId) {
       setError("You must be signed in to cancel.");
       return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type ErpFormModalMode = "new" | "edit";
@@ -13,7 +13,19 @@ export function useErpFormModal(listPath?: string) {
   const basePath = listPath ?? pathname;
   const formMode = searchParams.get("form") as ErpFormModalMode | null;
   const editId = searchParams.get("id");
-  const isOpen = formMode === "new" || (formMode === "edit" && Boolean(editId));
+  const isOpenFromUrl =
+    formMode === "new" || (formMode === "edit" && Boolean(editId));
+
+  /** Immediate dismiss while URL catches up (fixes close button / overlay on slow router). */
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    if (isOpenFromUrl) {
+      setDismissed(false);
+    }
+  }, [isOpenFromUrl]);
+
+  const open = isOpenFromUrl && !dismissed;
 
   const extraParams = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -42,6 +54,7 @@ export function useErpFormModal(listPath?: string) {
 
   const openNew = useCallback(
     (extra?: Record<string, string>) => {
+      setDismissed(false);
       router.push(buildUrl("new", null, extra));
     },
     [router, buildUrl],
@@ -49,17 +62,19 @@ export function useErpFormModal(listPath?: string) {
 
   const openEdit = useCallback(
     (id: string, extra?: Record<string, string>) => {
+      setDismissed(false);
       router.push(buildUrl("edit", id, extra));
     },
     [router, buildUrl],
   );
 
   const close = useCallback(() => {
+    setDismissed(true);
     router.push(buildUrl(null));
   }, [router, buildUrl]);
 
   return {
-    isOpen,
+    isOpen: open,
     formMode,
     editId,
     mode: formMode === "edit" ? ("edit" as const) : ("create" as const),
@@ -67,9 +82,9 @@ export function useErpFormModal(listPath?: string) {
     openEdit,
     close,
     modalProps: {
-      open: isOpen,
-      onOpenChange: (open: boolean) => {
-        if (!open) close();
+      open,
+      onOpenChange: (next: boolean) => {
+        if (!next) close();
       },
     },
   };

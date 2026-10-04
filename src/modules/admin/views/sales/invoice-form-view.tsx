@@ -15,6 +15,7 @@ import { broadcastSyncWake } from "@/lib/sync/sync-network";
 import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
 import { createOutboxStore } from "@/lib/sync/outbox-store";
 import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
+import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
 import type { SalesInvoiceCreatePayload } from "@/modules/erp/types/sales-invoice-payload";
 import type { SalesInvoiceUpdatePayload } from "@/modules/erp/types/sales-invoice-payload";
 import { salesInvoiceResourceScope } from "@/modules/erp/types/sales-invoice-payload";
@@ -251,8 +252,7 @@ export function InvoiceFormView({
         }
 
         const supabase = createSupabaseBrowserClient();
-        const { data: authData } = await supabase.auth.getUser();
-        const staffUserId = authData.user?.id;
+        const staffUserId = await resolveOutboxUserId(supabase);
         if (!staffUserId) {
           setError("You must be signed in to save an invoice.");
           return;
