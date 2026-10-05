@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import type { ErpStoreListRow } from "@/common/erp/inventory-types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { Button } from "@/components/ui/button";
@@ -28,22 +28,18 @@ import { StoreFormView } from "@/modules/admin/views/inventory/store-form-view";
 
 export function StoresListView() {
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/stores");
-  const [reloadToken, setReloadToken] = useState(0);
-  const [rows, setRows] = useState<ErpStoreListRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 350);
+  const listPath = adminListPath("erp/stores", {
+    search: debouncedSearch.trim() || undefined,
+  });
+  const { data, isPending, refetch } = useAdminGetQuery<{ data: ErpStoreListRow[] }>({
+    path: listPath,
+  });
+  const rows = data?.data ?? [];
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(rows, "name", "asc");
 
-  useEffect(() => {
-    setLoading(true);
-    const q = debouncedSearch.trim() ? `?search=${encodeURIComponent(debouncedSearch.trim())}` : "";
-    adminGet<{ data: ErpStoreListRow[] }>(`erp/stores${q}`)
-      .then((res) => setRows(res.data ?? []))
-      .finally(() => setLoading(false));
-  }, [debouncedSearch, reloadToken]);
-
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>
@@ -147,7 +143,7 @@ export function StoresListView() {
           storeId={mode === "edit" ? (editId ?? undefined) : undefined}
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

@@ -19,7 +19,7 @@ import {
   fetchAdminNavBadges,
 } from "@/modules/admin/lib/admin-nav-badges-query";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
-import { prefetchAdminRoute } from "@/modules/admin/lib/admin-prefetch-nav";
+import { cancelScheduledAdminPrefetch, schedulePrefetchAdminRoute } from "@/modules/admin/lib/admin-prefetch-nav";
 import { isAdminRouteHidden } from "@/modules/admin/lib/hidden-admin-routes";
 import { useAdminBootstrap } from "@/modules/admin/providers/admin-bootstrap-provider";
 import { BuyHubLogo } from "@/modules/brand/components/buyhub-logo";
@@ -407,9 +407,17 @@ export function AdminSidebar({
 
   const prefetch = useMemo(
     () => (href: string) =>
-      void prefetchAdminRoute(queryClient, href, { enabled: secondaryQueriesEnabled }),
-    [queryClient, secondaryQueriesEnabled],
+      schedulePrefetchAdminRoute(queryClient, href, {
+        enabled: secondaryQueriesEnabled,
+        currentPath: pathname,
+      }),
+    [queryClient, secondaryQueriesEnabled, pathname],
   );
+
+  function handleNavigate() {
+    cancelScheduledAdminPrefetch();
+    onNavigate?.();
+  }
 
   return (
     <aside
@@ -452,7 +460,7 @@ export function AdminSidebar({
           active={dashboardActive}
           collapsed={collapsed}
           alert={navAlerts[DASHBOARD_ITEM.href]}
-          onNavigate={onNavigate}
+          onNavigate={handleNavigate}
           onPrefetch={() => prefetch(DASHBOARD_ITEM.href)}
         />
 
@@ -463,7 +471,7 @@ export function AdminSidebar({
             pathname={pathname}
             collapsed={collapsed}
             navAlerts={navAlerts}
-            onNavigate={onNavigate}
+            onNavigate={handleNavigate}
             onPrefetch={prefetch}
             open={openSection === section.label}
             onToggle={() =>

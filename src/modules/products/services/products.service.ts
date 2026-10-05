@@ -18,6 +18,7 @@ import type {
   VariantImage,
 } from "@/common/admin/types";
 import { PAGE_SIZE } from "@/common/admin/types";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
 
 export async function getProducts(
   page = 0,
@@ -232,13 +233,34 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
   await requireAdminOrManagerProfile();
   const supabase = await createSupabaseServerClient();
 
+  const rpc = await invokeRpc(supabase, "get_admin_product_catalog_stats");
+  if (!rpc.error && rpc.data && typeof rpc.data === "object") {
+    const row = rpc.data as {
+      total?: number;
+      active?: number;
+      inactive?: number;
+      categories_count?: number;
+      uncategorized?: number;
+      out_of_stock?: number;
+      inventory_value?: number;
+    };
+    return {
+      total: Number(row.total ?? 0),
+      active: Number(row.active ?? 0),
+      inactive: Number(row.inactive ?? 0),
+      categoriesCount: Number(row.categories_count ?? 0),
+      uncategorized: Number(row.uncategorized ?? 0),
+      categoryCounts: {},
+      outOfStock: Number(row.out_of_stock ?? 0),
+      inventoryValue: Number(row.inventory_value ?? 0),
+    };
+  }
+
   const [
     totalResult,
     activeResult,
     categoriesCountResult,
-    categoryRowsResult,
-    variantRowsResult,
-    inventoryRowsResult,
+    uncategorizedResult,
   ] = await Promise.all([
     supabase.from("products").select("id", { count: "exact", head: true }),
     supabase
@@ -246,62 +268,24 @@ export async function getProductCatalogStats(): Promise<ProductCatalogStats> {
       .select("id", { count: "exact", head: true })
       .eq("is_active", true),
     supabase.from("categories").select("id", { count: "exact", head: true }),
-    supabase.from("products").select("category_id"),
-    supabase.from("product_variants").select("id,product_id,price"),
-    supabase.from("inventory").select("variant_id,stock"),
+    supabase
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .is("category_id", null),
   ]);
 
   const total = totalResult.count ?? 0;
   const active = activeResult.count ?? 0;
-
-  const categoryCounts: Record<string, number> = {};
-  let uncategorized = 0;
-  for (const row of (categoryRowsResult.data ?? []) as {
-    category_id: string | null;
-  }[]) {
-    if (row.category_id == null) {
-      uncategorized += 1;
-    } else {
-      categoryCounts[row.category_id] =
-        (categoryCounts[row.category_id] ?? 0) + 1;
-    }
-  }
-
-  const stockByVariant = new Map<string, number>();
-  for (const row of inventoryRowsResult.data ?? []) {
-    stockByVariant.set(row.variant_id, Number(row.stock ?? 0));
-  }
-
-  const stockByProduct = new Map<string, number>();
-  let inventoryValue = 0;
-
-  for (const variant of variantRowsResult.data ?? []) {
-    const productId = variant.product_id as string | null;
-    if (!productId) continue;
-
-    const stock = stockByVariant.get(variant.id) ?? 0;
-    const price = Number(variant.price ?? 0);
-    stockByProduct.set(productId, (stockByProduct.get(productId) ?? 0) + stock);
-    if (Number.isFinite(price) && stock > 0) {
-      inventoryValue += price * stock;
-    }
-  }
-
-  let productsWithPositiveStock = 0;
-  for (const stock of stockByProduct.values()) {
-    if (stock > 0) productsWithPositiveStock += 1;
-  }
-  const outOfStock = Math.max(0, total - productsWithPositiveStock);
 
   return {
     total,
     active,
     inactive: Math.max(0, total - active),
     categoriesCount: categoriesCountResult.count ?? 0,
-    uncategorized,
-    categoryCounts,
-    outOfStock,
-    inventoryValue,
+    uncategorized: uncategorizedResult.count ?? 0,
+    categoryCounts: {},
+    outOfStock: 0,
+    inventoryValue: 0,
   };
 }
 

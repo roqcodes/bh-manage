@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { adminListPath } from "@/modules/admin/lib/use-admin-get-query";
+import { getAdminPrimaryGetInFlight } from "@/modules/admin/lib/admin-primary-get";
 import type { ErpContextQueryData } from "@/modules/erp/components/use-erp-stores";
 
 const STALE = 90_000;
@@ -89,6 +90,8 @@ function erpListPrefetchPath(hrefPath: string, storeId: string | undefined): str
       return adminListPath("erp/transfer-statement", { fromStoreId: storeId });
     case "/admin/erp/transfer-bulk-payments":
       return adminListPath("erp/transfer-payments", {});
+    case "/admin/erp/stores":
+      return adminListPath("erp/stores", {});
     default:
       return null;
   }
@@ -98,10 +101,15 @@ function erpListPrefetchPath(hrefPath: string, storeId: string | undefined): str
 export function prefetchAdminRoute(
   qc: QueryClient,
   href: string,
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; currentPath?: string },
 ) {
   if (options?.enabled === false) return Promise.resolve();
   const p = href.split("?")[0];
+  const current = (options?.currentPath ?? "").split("?")[0];
+  if (current && (current === p || current === p.replace(/\/$/, ""))) {
+    return Promise.resolve();
+  }
+  if (getAdminPrimaryGetInFlight() > 0) return Promise.resolve();
   const storeId = activeStoreIdFromCache(qc);
 
   if (p === "/admin" || p === "") {
@@ -210,4 +218,27 @@ export function prefetchAdminRoute(
   if (erpPath) return prefetchErpGet(qc, erpPath);
 
   return Promise.resolve();
+}
+
+const PREFETCH_HOVER_MS = 200;
+let hoverPrefetchTimer: number | null = null;
+
+/** Debounce hover so sweeping the sidebar does not start every list GET. */
+export function schedulePrefetchAdminRoute(
+  qc: QueryClient,
+  href: string,
+  options?: { enabled?: boolean; currentPath?: string },
+) {
+  if (options?.enabled === false) return;
+  if (hoverPrefetchTimer != null) window.clearTimeout(hoverPrefetchTimer);
+  hoverPrefetchTimer = window.setTimeout(() => {
+    hoverPrefetchTimer = null;
+    void prefetchAdminRoute(qc, href, options);
+  }, PREFETCH_HOVER_MS);
+}
+
+export function cancelScheduledAdminPrefetch() {
+  if (hoverPrefetchTimer == null) return;
+  window.clearTimeout(hoverPrefetchTimer);
+  hoverPrefetchTimer = null;
 }

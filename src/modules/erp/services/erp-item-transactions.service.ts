@@ -25,22 +25,43 @@ export async function listItemTransactions(
   const from = page * limit;
   const storeId = await resolveErpStoreId(filters.storeId);
 
-  let query = supabase
+  let dataQuery = supabase
     .from("stock_movements")
     .select(
       "id, created_at, store_id, transfer_store_id, type, variant_id, quantity, transaction_price, balance_after, reference_id, reference_type, reason",
-      { count: "exact" },
     )
     .order("created_at", { ascending: false })
     .range(from, from + limit - 1);
 
-  if (storeId) query = query.eq("store_id", storeId);
-  if (filters.type && filters.type !== "all") query = query.eq("type", filters.type);
-  if (filters.dateFrom) query = query.gte("created_at", `${filters.dateFrom}T00:00:00`);
-  if (filters.dateTo) query = query.lte("created_at", `${filters.dateTo}T23:59:59`);
+  let countQuery = supabase
+    .from("stock_movements")
+    .select("id", { count: "exact", head: true });
 
-  const { data, error, count } = await query;
-  if (error) throw new Error(error.message);
+  if (storeId) {
+    dataQuery = dataQuery.eq("store_id", storeId);
+    countQuery = countQuery.eq("store_id", storeId);
+  }
+  if (filters.type && filters.type !== "all") {
+    dataQuery = dataQuery.eq("type", filters.type);
+    countQuery = countQuery.eq("type", filters.type);
+  }
+  if (filters.dateFrom) {
+    const fromTs = `${filters.dateFrom}T00:00:00`;
+    dataQuery = dataQuery.gte("created_at", fromTs);
+    countQuery = countQuery.gte("created_at", fromTs);
+  }
+  if (filters.dateTo) {
+    const toTs = `${filters.dateTo}T23:59:59`;
+    dataQuery = dataQuery.lte("created_at", toTs);
+    countQuery = countQuery.lte("created_at", toTs);
+  }
+
+  const [dataResult, countResult] = await Promise.all([dataQuery, countQuery]);
+  if (dataResult.error) throw new Error(dataResult.error.message);
+  if (countResult.error) throw new Error(countResult.error.message);
+
+  const data = dataResult.data;
+  const count = countResult.count;
 
   const variantIds = [...new Set((data ?? []).map((r) => r.variant_id))];
   const storeIds = new Set<string>();
@@ -50,38 +71,38 @@ export async function listItemTransactions(
   }
 
   const variantMap = new Map<string, { product_name: string; variant_name: string | null; barcode: string | null }>();
-  if (variantIds.length > 0) {
-    const { data: variants } = await supabase
-      .from("product_variants")
-      .select("id, name, barcode, products(name)")
-      .in("id", variantIds);
-    for (const v of variants ?? []) {
-      const product = v.products as { name: string } | null;
-      variantMap.set(v.id, {
-        product_name: product?.name ?? "—",
-        variant_name: v.name,
-        barcode: v.barcode,
-      });
-    }
-  }
-
   const storeMap = new Map<string, string>();
-  if (storeIds.size > 0) {
-    const { data: stores } = await supabase.from("stores").select("id, name").in("id", [...storeIds]);
-    for (const s of stores ?? []) storeMap.set(s.id, s.name);
-  }
+  const invoiceMap = new Map<string, string>();
 
   const invoiceIds = (data ?? [])
     .filter((r) => r.reference_type === "invoice" && r.reference_id)
     .map((r) => r.reference_id as string);
-  const invoiceMap = new Map<string, string>();
-  if (invoiceIds.length > 0) {
-    const { data: invoices } = await supabase
-      .from("invoices")
-      .select("id, invoice_number")
-      .in("id", invoiceIds);
-    for (const inv of invoices ?? []) invoiceMap.set(inv.id, inv.invoice_number);
+
+  const [variantsRes, storesRes, invoicesRes] = await Promise.all([
+    variantIds.length > 0
+      ? supabase
+          .from("product_variants")
+          .select("id, name, barcode, products(name)")
+          .in("id", variantIds)
+      : Promise.resolve({ data: [] as { id: string; name: string | null; barcode: string | null; products: { name: string } | null }[] }),
+    storeIds.size > 0
+      ? supabase.from("stores").select("id, name").in("id", [...storeIds])
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    invoiceIds.length > 0
+      ? supabase.from("invoices").select("id, invoice_number").in("id", invoiceIds)
+      : Promise.resolve({ data: [] as { id: string; invoice_number: string }[] }),
+  ]);
+
+  for (const v of variantsRes.data ?? []) {
+    const product = v.products as { name: string } | null;
+    variantMap.set(v.id, {
+      product_name: product?.name ?? "—",
+      variant_name: v.name,
+      barcode: v.barcode,
+    });
   }
+  for (const s of storesRes.data ?? []) storeMap.set(s.id, s.name);
+  for (const inv of invoicesRes.data ?? []) invoiceMap.set(inv.id, inv.invoice_number);
 
   let rows: ItemTransactionRow[] = (data ?? []).map((row) => {
     const variant = variantMap.get(row.variant_id);

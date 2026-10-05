@@ -193,6 +193,7 @@ export function AdminItemUnitsView() {
   const { data, isPending, isError, error } = useQuery({
     queryKey: adminQueryKeys.itemUnits(),
     queryFn: () => adminGet<{ data: ItemUnit[] }>("item-units"),
+    staleTime: 5 * 60_000,
   });
 
   const units = data?.data ?? [];

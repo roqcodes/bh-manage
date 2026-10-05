@@ -2,7 +2,8 @@ import "server-only";
 
 import { requireAdminOrManagerProfile } from "@/modules/admin/services/rbac.service";
 import { createSupabaseServerClient } from "@/lib/integrations/supabase/server";
-import { PAGE_SIZE, type Order, type AdminUser, type Paginated } from "@/common/admin/types";
+import { invokeRpc } from "@/lib/integrations/supabase/rpc";
+import { PAGE_SIZE, type AdminUser, type Order, type Paginated } from "@/common/admin/types";
 import { CUSTOMER_ROLE_OR_FILTER } from "@/modules/customers/lib/customer-query";
 import { searchCustomersTypeahead } from "@/modules/customers/lib/customer-typeahead-query";
 
@@ -143,7 +144,7 @@ export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & 
   const supabase = await createSupabaseServerClient();
   const from = page * PAGE_SIZE;
 
-  const [usersResult, countResult, retailCountResult, activeCountResult] = await Promise.all([
+  const [usersResult, countResult, activeCountResult] = await Promise.all([
     supabase
       .from("users")
       .select(
@@ -159,35 +160,38 @@ export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & 
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
-      .or(CUSTOMER_ROLE_OR_FILTER),
-    supabase
-      .from("users")
-      .select("id", { count: "exact", head: true })
       .or(CUSTOMER_ROLE_OR_FILTER)
       .eq("is_verified", true),
   ]);
 
   const users = (usersResult.data ?? []) as AdminUser[];
   const total = countResult.count ?? 0;
-  const retail = retailCountResult.count ?? 0;
   const active = activeCountResult.count ?? 0;
-  const staff = total - retail;
-
-  const stats: CustomerStats = { total, retail, staff, active };
+  const stats: CustomerStats = { total, retail: total, staff: 0, active };
 
   if (users.length === 0) {
     return { data: [], total, stats };
   }
 
-  const { data: orderRows } = await supabase
-    .from("orders")
-    .select("user_id")
-    .in(
-      "user_id",
-      users.map((u) => u.id),
-    );
-
   const userIds = users.map((u) => u.id);
+
+  const orderCountRpc = await invokeRpc(supabase, "get_user_order_counts", {
+    p_user_ids: userIds,
+  });
+  const orderCountMap: Record<string, number> = {};
+  if (orderCountRpc.error) {
+    const { data: orderRows } = await supabase
+      .from("orders")
+      .select("user_id")
+      .in("user_id", userIds);
+    for (const o of orderRows ?? []) {
+      if (o.user_id) orderCountMap[o.user_id] = (orderCountMap[o.user_id] ?? 0) + 1;
+    }
+  } else {
+    for (const row of (orderCountRpc.data ?? []) as { user_id: string; order_count: number }[]) {
+      orderCountMap[row.user_id] = Number(row.order_count ?? 0);
+    }
+  }
 
   const [{ data: invoiceRows }, { data: creditLimitRows }] = await Promise.all([
     supabase
@@ -200,14 +204,6 @@ export async function getAllCustomers(page = 0): Promise<Paginated<AdminUser> & 
       .select("user_id, credit_limit")
       .in("user_id", userIds),
   ]);
-
-  const orderCountMap = (orderRows ?? []).reduce<Record<string, number>>(
-    (acc, o) => {
-      if (o.user_id) acc[o.user_id] = (acc[o.user_id] ?? 0) + 1;
-      return acc;
-    },
-    {},
-  );
 
   const receivablesMap = (invoiceRows ?? []).reduce<Record<string, number>>(
     (acc, inv) => {
