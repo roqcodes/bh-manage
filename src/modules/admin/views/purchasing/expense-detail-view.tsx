@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 
 import type { ErpExpenseDetail } from "@/common/erp/purchasing-types";
+import { AdminDetailSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { AdminPageHeader, AdminPageLayout } from "@/modules/admin/ui";
@@ -43,7 +44,7 @@ export function ExpenseDetailView({ expenseId }: { expenseId: string }) {
   if (loading) {
     return (
       <AdminPageLayout>
-        <p className="text-sm text-muted-foreground">Loading expense…</p>
+        <AdminDetailSkeleton />
       </AdminPageLayout>
     );
   }

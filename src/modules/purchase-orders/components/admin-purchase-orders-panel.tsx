@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Ban, ChevronDown, Columns3, Search } from "lucide-react";
 
@@ -9,9 +9,10 @@ import type {
   PurchaseOrderCatalogStats,
   PurchaseOrderDeliveryFilter,
   PurchaseOrderStatusFilter,
-  Vendor,
 } from "@/common/admin/types";
 import { Pagination } from "@/modules/admin/components/pagination";
+import { VendorSearchSelect } from "@/modules/admin/ui";
+import { resolveVendorPickerOption } from "@/modules/erp/lib/entity-live-search.client";
 import {
   exportPurchaseOrdersCsv,
   PurchaseOrdersBulkActionBar,
@@ -89,7 +90,6 @@ export function AdminPurchaseOrdersPanel({
   page,
   statusFilter,
   deliveryFilter,
-  filterVendors: _filterVendors,
   selectedVendorId,
   stats,
 }: {
@@ -98,7 +98,6 @@ export function AdminPurchaseOrdersPanel({
   page: number;
   statusFilter: PurchaseOrderStatusFilter;
   deliveryFilter: PurchaseOrderDeliveryFilter | null;
-  filterVendors: Pick<Vendor, "id" | "name">[];
   selectedVendorId: string | null;
   stats: PurchaseOrderCatalogStats;
 }) {
@@ -106,6 +105,17 @@ export function AdminPurchaseOrdersPanel({
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [vendorFilterLabel, setVendorFilterLabel] = useState("");
+
+  useEffect(() => {
+    if (!selectedVendorId) {
+      setVendorFilterLabel("");
+      return;
+    }
+    void resolveVendorPickerOption(selectedVendorId)
+      .then((option) => setVendorFilterLabel(option.label))
+      .catch(() => setVendorFilterLabel(""));
+  }, [selectedVendorId]);
 
   const listParams: Record<string, string> = {};
   if (statusFilter !== "all") listParams.status = statusFilter;
@@ -136,6 +146,7 @@ export function AdminPurchaseOrdersPanel({
 
   function handleClearFilters() {
     setSearch("");
+    handleVendorFilter(null);
     pushFilters({ status: "all", delivery: null });
   }
 
@@ -168,7 +179,8 @@ export function AdminPurchaseOrdersPanel({
   }, [orders, search]);
 
   const isClientFiltering = search.trim().length > 0;
-  const isViewFiltered = statusFilter !== "all" || deliveryFilter !== null;
+  const isViewFiltered =
+    statusFilter !== "all" || deliveryFilter !== null || selectedVendorId !== null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -204,6 +216,21 @@ export function AdminPurchaseOrdersPanel({
                   value={deliveryFilter ?? "all"}
                   options={PURCHASE_ORDER_DELIVERY_FILTER_OPTIONS}
                   onChange={handleDeliveryFilter}
+                />
+              </InputGroupAddon>
+              <InputGroupAddon align="inline-start" className="px-0">
+                <div className="h-4 w-px bg-border" aria-hidden />
+              </InputGroupAddon>
+              <InputGroupAddon align="inline-start" className="min-w-[11rem] max-w-[14rem] py-0.5 pr-1">
+                <VendorSearchSelect
+                  value={selectedVendorId}
+                  selectedLabel={vendorFilterLabel || undefined}
+                  placeholder="All vendors"
+                  className="[&_input]:h-8 [&_input]:border-0 [&_input]:bg-transparent [&_input]:shadow-none"
+                  onChange={(id, option) => {
+                    setVendorFilterLabel(option?.label ?? "");
+                    handleVendorFilter(id);
+                  }}
                 />
               </InputGroupAddon>
               <InputGroupAddon align="inline-start" className="px-0">

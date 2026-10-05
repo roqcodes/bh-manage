@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { AlertTriangle, Package } from "lucide-react";
 
 import type { FulfillmentQueueRow } from "@/common/admin/types";
+import { AdminTableBodySkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
@@ -107,7 +108,7 @@ export function FulfillmentQueueView() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading queue…</p>
+        <AdminTableBodySkeleton rows={8} />
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center">
           <Package className="size-10 text-muted-foreground/40" />

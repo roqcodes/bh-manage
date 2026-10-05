@@ -11,6 +11,7 @@ import type {
   VendorStatementLine,
 } from "@/common/erp/purchasing-types";
 import type { AuditLogEntry } from "@/common/erp/types";
+import { AdminDetailSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { formatAuditLogUserDetail } from "@/modules/erp/lib/audit-log-display";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -48,7 +49,13 @@ export function VendorErpDetailView() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <p className="p-4 text-sm">Loading vendor…</p>;
+  if (loading) {
+    return (
+      <AdminPageLayout>
+        <AdminDetailSkeleton />
+      </AdminPageLayout>
+    );
+  }
   if (!profile || !summary) return <p className="p-4 text-sm">Vendor not found.</p>;
 
   return (

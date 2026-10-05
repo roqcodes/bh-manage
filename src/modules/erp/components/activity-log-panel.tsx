@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import type { AuditLogEntry } from "@/common/erp/types";
+import { AdminPanelSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import {
   formatAuditLogUser,
@@ -37,7 +38,7 @@ export function AuditLogEntryList({
   logs: AuditLogEntry[];
   loading?: boolean;
 }) {
-  if (loading) return <p className="text-sm text-slate-500">Loading activity…</p>;
+  if (loading) return <AdminPanelSkeleton rows={4} />;
   if (logs.length === 0) {
     return <p className="text-sm text-slate-500">No activity recorded yet.</p>;
   }

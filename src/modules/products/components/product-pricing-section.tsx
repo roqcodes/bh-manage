@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { Info } from "lucide-react";
 
+import { AdminTableBodySkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -389,7 +390,7 @@ export function ProductPricingSection({
               </p>
 
               {suggestionsLoading ? (
-                <p className="text-sm text-muted-foreground">Loading suggestions…</p>
+                <AdminTableBodySkeleton rows={4} />
               ) : suggestions.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Add variants first.</p>
               ) : (

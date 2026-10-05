@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, isAfter, isBefore, startOfDay, endOfDay, subDays } from "date-fns";
@@ -10,6 +10,8 @@ import type { Order, OrderCatalogStats } from "@/common/admin/types";
 import type { OutboxOperationRecord } from "@/lib/sync/outbox-types";
 import type { OrderFilterUserRow } from "@/modules/orders/services/orders.service";
 import { Pagination } from "@/modules/admin/components/pagination";
+import { CustomerSearchSelect } from "@/modules/admin/ui";
+import { resolveCustomerPickerOption } from "@/modules/erp/lib/entity-live-search.client";
 import {
   exportOrdersCsv,
   OrdersBulkActionBar,
@@ -94,6 +96,17 @@ export function OrdersPanel({
   );
   const [dateTo, setDateTo] = useState(format(new Date(), "yyyy-MM-dd"));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [customerFilterLabel, setCustomerFilterLabel] = useState("");
+
+  useEffect(() => {
+    if (!selectedUserId) {
+      setCustomerFilterLabel("");
+      return;
+    }
+    void resolveCustomerPickerOption(selectedUserId)
+      .then((option) => setCustomerFilterLabel(option.label))
+      .catch(() => setCustomerFilterLabel(""));
+  }, [selectedUserId]);
 
   const listParams: Record<string, string> = {};
   if (statusFilter !== "all") listParams.status = statusFilter;
@@ -131,7 +144,8 @@ export function OrdersPanel({
     search.trim().length > 0 ||
     dateFrom.length > 0 ||
     dateTo.length > 0 ||
-    viewFilter !== "all";
+    viewFilter !== "all" ||
+    selectedUserId !== null;
 
   const activeFilterLabel =
     ORDERS_VIEW_FILTERS.find((f) => f.id === viewFilter)?.label ?? "All";
@@ -192,6 +206,21 @@ export function OrdersPanel({
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </InputGroupAddon>
+              <InputGroupAddon align="inline-start" className="px-0">
+                <div className="h-4 w-px bg-border" aria-hidden />
+              </InputGroupAddon>
+              <InputGroupAddon align="inline-start" className="min-w-[11rem] max-w-[14rem] py-0.5 pr-1">
+                <CustomerSearchSelect
+                  value={selectedUserId}
+                  selectedLabel={customerFilterLabel || undefined}
+                  placeholder="All customers"
+                  className="[&_input]:h-8 [&_input]:border-0 [&_input]:bg-transparent [&_input]:shadow-none"
+                  onChange={(id, option) => {
+                    setCustomerFilterLabel(option?.label ?? "");
+                    handleUserFilter(id);
+                  }}
+                />
               </InputGroupAddon>
               <InputGroupAddon align="inline-start" className="px-0">
                 <div className="h-4 w-px bg-border" aria-hidden />

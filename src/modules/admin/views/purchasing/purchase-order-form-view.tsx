@@ -36,6 +36,7 @@ import { createOutboxStore } from "@/lib/sync/outbox-store";
 import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
 import { broadcastSyncWake } from "@/lib/sync/sync-network";
 import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
+import { notifyErpLocalFormSaved } from "@/modules/erp/lib/erp-form-save-feedback.client";
 import {
   purchaseOrderResourceScope,
   type PurchaseOrderCreatePayload,
@@ -90,7 +91,6 @@ export function PurchaseOrderFormView({
   const [landedMaster, setLandedMaster] = useState<ErpLandedCostItem[]>([]);
   const [poNumber, setPoNumber] = useState<string | null>(null);
   const [shortagesLoading, setShortagesLoading] = useState(false);
-  const [localSaveNotice, setLocalSaveNotice] = useState<string | null>(null);
 
   async function fillLinesFromShortages() {
     if (!effectiveStoreId) {
@@ -317,11 +317,12 @@ export function PurchaseOrderFormView({
           await store.close();
         }
 
+        notifyErpLocalFormSaved({
+          entityLabel: "Purchase order",
+          mode: poId ? "update" : "create",
+        });
         dispatchOutboxChanged();
         broadcastSyncWake();
-        setLocalSaveNotice(
-          poId ? "Update saved locally — pending sync" : "Saved locally — pending sync",
-        );
         handleSuccessNavigate(poId);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Save failed");
@@ -475,9 +476,6 @@ export function PurchaseOrderFormView({
           </AdminFormSection>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          {localSaveNotice ? (
-            <p className="text-sm text-muted-foreground">{localSaveNotice}</p>
-          ) : null}
 
           {!isModal ? (
             <div className="flex flex-wrap justify-end gap-2">

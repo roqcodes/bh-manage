@@ -30,6 +30,8 @@ function splitName(name: string | null | undefined) {
 export type CustomerFormViewProps = ErpFormViewBaseProps & {
   mode: "create" | "edit";
   customerId?: string;
+  /** When nested inside another ERP modal (invoice, etc.). */
+  modalStacked?: boolean;
 };
 
 export function CustomerFormView({
@@ -39,6 +41,7 @@ export function CustomerFormView({
   open = true,
   onOpenChange,
   onSuccess,
+  modalStacked = false,
 }: CustomerFormViewProps) {
   const router = useRouter();
   const params = useParams();
@@ -132,6 +135,7 @@ export function CustomerFormView({
         onOpenChange={onOpenChange}
         title={mode === "create" ? "Add customer" : "Edit customer"}
         size="xl"
+        stacked={modalStacked}
         loading
         loadingFallback={<AdminPageSkeleton />}
       >
@@ -149,6 +153,7 @@ export function CustomerFormView({
           onOpenChange={onOpenChange}
           title="Edit customer"
           size="xl"
+          stacked={modalStacked}
         >
           <p className="text-sm text-destructive">Customer not found.</p>
         </AdminFormShell>
@@ -278,6 +283,7 @@ export function CustomerFormView({
         { label: title },
       ]}
       size="xl"
+      stacked={modalStacked}
       formId={formId}
       footer={footer}
     >

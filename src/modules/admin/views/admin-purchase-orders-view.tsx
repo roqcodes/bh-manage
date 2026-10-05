@@ -10,7 +10,6 @@ import type {
   PurchaseOrderCatalogStats,
   PurchaseOrderDeliveryFilter,
   PurchaseOrderStatusFilter,
-  Vendor,
 } from "@/common/admin/types";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { AdminPurchaseOrdersPanel } from "@/modules/purchase-orders/components/admin-purchase-orders-panel";
@@ -53,7 +52,6 @@ export function AdminPurchaseOrdersView() {
         status: PurchaseOrderStatusFilter;
         delivery: PurchaseOrderDeliveryFilter | null;
         vendorId: string | null;
-        filterVendors: Pick<Vendor, "id" | "name">[];
         stats: PurchaseOrderCatalogStats;
       }>(`purchase-orders${qs ? `?${qs}` : ""}`);
     },
@@ -88,7 +86,6 @@ export function AdminPurchaseOrdersView() {
         page={data.page}
         statusFilter={status}
         deliveryFilter={delivery}
-        filterVendors={data.filterVendors}
         selectedVendorId={data.vendorId}
         stats={data.stats}
       />

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Info } from "lucide-react";
 
 import type { StoreProductPurchaseGlance } from "@/common/erp/store-inventory-types";
+import { AdminPanelSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import {
@@ -77,7 +78,7 @@ export function StoreInventoryPurchaseGlancePopover({
       <PopoverContent className="w-80 p-3" align="end">
         <p className="mb-2 text-xs font-semibold text-foreground">Purchase cost glance</p>
         {loading ? (
-          <p className="text-xs text-muted-foreground">Loading…</p>
+          <AdminPanelSkeleton rows={4} />
         ) : error ? (
           <p className="text-xs text-destructive">{error}</p>
         ) : data ? (

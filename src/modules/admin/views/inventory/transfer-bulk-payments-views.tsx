@@ -9,6 +9,7 @@ import type {
   ErpTransferPaymentListRow,
   PendingTransferPaymentRow,
 } from "@/common/erp/inventory-types";
+import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
 import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -46,7 +47,7 @@ export function TransferBulkPaymentsListView() {
   const rows = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (isPending && !data) return <p className="p-4 text-sm">Loading payments…</p>;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>

@@ -10,8 +10,18 @@ export type ErpDocumentDraft = {
 };
 
 /** Stable draft id + formatted ref (e.g. PB-A3F2B) for a new ERP document form session. */
-export function useErpDocumentDraft(kind: ErpDocKind, enabled = true): ErpDocumentDraft | null {
+export function useErpDocumentDraft(
+  kind: ErpDocKind,
+  enabled = true,
+  /** Bump after "save & next" to allocate a new draft number without remounting the form. */
+  resetToken = 0,
+): ErpDocumentDraft | null {
   const draftIdRef = useRef<string | null>(null);
+  const resetTokenRef = useRef(resetToken);
+  if (resetTokenRef.current !== resetToken) {
+    resetTokenRef.current = resetToken;
+    draftIdRef.current = null;
+  }
   if (enabled && !draftIdRef.current) {
     draftIdRef.current = crypto.randomUUID();
   }
@@ -22,7 +32,7 @@ export function useErpDocumentDraft(kind: ErpDocKind, enabled = true): ErpDocume
       draftId: draftIdRef.current,
       documentNumber: formatErpDocRef(kind, draftIdRef.current),
     };
-  }, [enabled, kind]);
+  }, [enabled, kind, resetToken]);
 }
 
 export const ERP_DOC_FIELD_LABELS: Record<ErpDocKind, string> = {

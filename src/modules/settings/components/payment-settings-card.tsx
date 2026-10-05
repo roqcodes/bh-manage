@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreditCard } from "lucide-react";
 
+import { AdminPanelSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -47,8 +48,8 @@ export function PaymentSettingsCard() {
   if (isLoading && !data) {
     return (
       <Card className="border border-border py-0 ring-0">
-        <CardContent className="p-4 text-sm text-muted-foreground">
-          Loading payment settings…
+        <CardContent className="p-4">
+          <AdminPanelSkeleton rows={3} />
         </CardContent>
       </Card>
     );

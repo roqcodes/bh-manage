@@ -25,6 +25,15 @@ type CustomerRpcRow = {
   customer_number: string | null;
 };
 
+type VendorRpcRow = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  contact: string | null;
+  trn: string | null;
+};
+
 function mapCatalogToSalesRow(row: CatalogRpcRow): ErpSalesProductSearchRow {
   return {
     id: row.id,
@@ -124,4 +133,29 @@ export async function rpcSearchCustomers(
   }
 
   return (data ?? []) as CustomerRpcRow[];
+}
+
+export async function rpcSearchVendors(
+  query: string,
+): Promise<VendorRpcRow[] | null> {
+  const supabase = tryCreateSupabaseBrowserClient();
+  if (!supabase) return null;
+  const { data, error } = await (supabase as unknown as {
+    rpc: (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+  }).rpc("erp_search_vendors", {
+    p_query: query.trim(),
+    p_limit: PICKER_LIMIT,
+  });
+
+  if (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[catalog-typeahead] vendor RPC:", error.message);
+    }
+    return null;
+  }
+
+  return (data ?? []) as VendorRpcRow[];
 }

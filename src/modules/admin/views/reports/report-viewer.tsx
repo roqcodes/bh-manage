@@ -8,6 +8,7 @@ import type { ReportChannel, ReportDefinition } from "@/common/erp/report-types"
 import { extractReportRows } from "@/common/erp/report-types";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
+import { AdminTableBodySkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 import { SortableTableHead, useSortableData } from "@/modules/admin/ui";
@@ -279,7 +280,7 @@ export function ReportViewer({ report }: { report: ReportDefinition }) {
       </Card>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {loading ? <p className="text-sm text-muted-foreground">Loading report…</p> : null}
+      {loading ? <AdminTableBodySkeleton rows={10} /> : null}
 
       {!loading && report.slug === "finance-summary" && rawData ? (
         <FinanceSummaryCards data={rawData as Record<string, unknown>} />

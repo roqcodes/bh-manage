@@ -13,7 +13,6 @@ import {
   getPurchaseOrderCatalogStats,
   listAdminPurchaseOrders,
 } from "@/modules/purchase-orders/services/admin-purchase-orders.service";
-import { listVendorsForPurchaseOrderFilter } from "@/modules/vendors/services/vendors.service";
 
 function isPoStatus(s: string | null): s is PurchaseOrderStatusFilter {
   return (
@@ -48,14 +47,13 @@ export async function GET(request: Request) {
   const vendorId = rawVendor && rawVendor.length > 0 ? rawVendor : null;
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
 
-  const [{ data, total }, filterVendors, stats] = await Promise.all([
+  const [{ data, total }, stats] = await Promise.all([
     listAdminPurchaseOrders({
       status,
       delivery,
       page,
       vendorId,
     }),
-    listVendorsForPurchaseOrderFilter(),
     getPurchaseOrderCatalogStats(),
   ]);
 
@@ -66,7 +64,6 @@ export async function GET(request: Request) {
     status,
     delivery,
     vendorId,
-    filterVendors,
     stats,
   });
 }

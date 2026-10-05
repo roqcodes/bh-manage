@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import type { ErpInvoiceListRow } from "@/common/erp/sales-types";
@@ -21,7 +22,7 @@ export function AdminErpInvoicesView() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="p-4 text-sm text-slate-500">Loading invoices…</p>;
+  if (loading) return <AdminPageSkeleton />;
 
   return (
     <div className="space-y-4 p-4">

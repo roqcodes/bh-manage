@@ -9,6 +9,7 @@ export function AdminCustomerFormView({
   open,
   onOpenChange,
   onSuccess,
+  modalStacked,
 }: {
   mode: "create" | "edit";
   customerId?: string;
@@ -16,6 +17,7 @@ export function AdminCustomerFormView({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onSuccess?: (id?: string) => void;
+  modalStacked?: boolean;
 }) {
   return (
     <CustomerFormView
@@ -25,6 +27,7 @@ export function AdminCustomerFormView({
       open={open}
       onOpenChange={onOpenChange}
       onSuccess={onSuccess}
+      modalStacked={modalStacked}
     />
   );
 }

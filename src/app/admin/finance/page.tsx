@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Package, DollarSign, TrendingUp, ClipboardList } from "lucide-react";
+import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { currencyLabel, formatCurrencyAmount } from "@/lib/format-currency";
 
 interface FinanceSummary {
@@ -89,12 +90,7 @@ export default function AdminFinancePage() {
   if (isLoading) {
     return (
       <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-6">
-        <div className="flex h-64 items-center justify-center">
-          <div className="text-center">
-            <Package className="mx-auto h-12 w-12 animate-spin text-slate-400" />
-            <p className="mt-4 text-sm text-slate-500">Loading finance data...</p>
-          </div>
-        </div>
+        <AdminPageSkeleton />
       </div>
     );
   }

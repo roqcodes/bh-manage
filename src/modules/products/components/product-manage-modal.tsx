@@ -15,6 +15,7 @@ import {
 import type { Brand, Category, ProductImage, ProductVariant, ProductVideo, ProductWithCategory, VariantGroup } from "@/common/admin/types";
 import type { ItemUnit } from "@/common/erp/types";
 import { formatCategoryOptionLabel } from "@/modules/products/lib/categories.utils";
+import { AdminFormSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { formatActionError } from "@/modules/admin/lib/format-action-error";
 import {
   formatNumberInputValue,
@@ -1139,9 +1140,8 @@ function EditVariantsStep({
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-slate-400">
-        <Loader2 className="size-6 animate-spin text-[color:var(--brand)]" style={{ ["--brand" as string]: BRAND }} />
-        <p className="text-xs font-medium">Loading variants…</p>
+      <div className="flex flex-1 flex-col p-6">
+        <AdminFormSkeleton />
       </div>
     );
   }
@@ -2006,12 +2006,8 @@ export function ProductManageModal({
             transition={{ duration: 0.22, ease: "easeOut" }}
           >
             {activeTab === "details" && !isCreate && isLoading && !detailHydrated ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-slate-400">
-                <Loader2
-                  className="size-6 animate-spin text-[color:var(--brand)]"
-                  style={{ ["--brand" as string]: BRAND }}
-                />
-                <p className="text-xs font-medium">Loading product…</p>
+              <div className="flex flex-1 flex-col p-6">
+                <AdminFormSkeleton />
               </div>
             ) : null}
 

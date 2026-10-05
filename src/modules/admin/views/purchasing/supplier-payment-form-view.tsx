@@ -4,7 +4,7 @@ import { useEffect, useId, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import type { PayablePurchaseBillRow, PaidThroughAccountOption } from "@/common/erp/purchasing-types";
+import type { PaidThroughAccountOption } from "@/common/erp/purchasing-types";
 import { ERP_SUPPLIER_PAYMENT_MODES } from "@/common/erp/purchasing-types";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -15,14 +15,35 @@ import {
   AdminFormGrid,
   AdminFormSection,
   AdminFormShell,
-  ErpDocumentNumberField,
   PurchaseBillSearchSelect,
   VendorSearchSelect,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
+
+type PendingLine = {
+  purchaseBillId: string;
+  billNumber: string;
+  vendorId: string;
+  vendorName: string | null;
+  balanceDue: number;
+  amount: number;
+};
 
 export type SupplierPaymentFormViewProps = ErpFormViewBaseProps;
 
@@ -35,8 +56,9 @@ export function SupplierPaymentFormView({
   const router = useRouter();
   const formId = useId();
   const searchParams = useSearchParams();
-  const { activeStoreId } = useErpStores();
   const prefillBillId = searchParams.get("billId") ?? "";
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode: "create" });
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isModal = variant === "modal";
@@ -45,10 +67,11 @@ export function SupplierPaymentFormView({
   const [expenseAccounts, setExpenseAccounts] = useState<PaidThroughAccountOption[]>([]);
   const [vendorId, setVendorId] = useState("");
   const [vendorLabel, setVendorLabel] = useState("");
-  const [billId, setBillId] = useState(prefillBillId);
+  const [selectedBillId, setSelectedBillId] = useState("");
   const [billLabel, setBillLabel] = useState("");
-  const [selectedBill, setSelectedBill] = useState<PayablePurchaseBillRow | null>(null);
-  const [amount, setAmount] = useState("");
+  const [selectedBillBalance, setSelectedBillBalance] = useState(0);
+  const [lineAmount, setLineAmount] = useState("");
+  const [lines, setLines] = useState<PendingLine[]>([]);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMode, setPaymentMode] = useState<string>(ERP_SUPPLIER_PAYMENT_MODES[0]);
   const [accountId, setAccountId] = useState("");
@@ -58,44 +81,44 @@ export function SupplierPaymentFormView({
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    const q = activeStoreId ? `&storeId=${encodeURIComponent(activeStoreId)}` : "";
-    adminGet<{ data: PaidThroughAccountOption[] }>(`erp/supplier-payments?view=accounts${q}`).then(
-      (res) => {
-        setAccounts(res.data);
-        setAccountId("");
-      },
-    );
+    if (!effectiveStoreId) return;
     adminGet<{ data: PaidThroughAccountOption[] }>(
-      `erp/supplier-payments?view=expense-accounts${q}`,
-    ).then((res) => {
-      setExpenseAccounts(res.data ?? []);
-      setBankChargesAccountId("");
-    });
-  }, [activeStoreId]);
+      `erp/supplier-payments?view=accounts&storeId=${encodeURIComponent(effectiveStoreId)}`,
+    ).then((res) => setAccounts(res.data ?? []));
+    adminGet<{ data: PaidThroughAccountOption[] }>(
+      `erp/supplier-payments?view=expense-accounts&storeId=${encodeURIComponent(effectiveStoreId)}`,
+    ).then((res) => setExpenseAccounts(res.data ?? []));
+  }, [effectiveStoreId]);
 
   useEffect(() => {
-    if (!prefillBillId) return;
-    adminGet<{ bill: { vendor_id: string; balance_due: number; purchase_bill_number: string } }>(
-      `erp/purchase-bills/${prefillBillId}`,
-    ).then((res) => {
-      setVendorId(res.bill.vendor_id);
-      setBillId(prefillBillId);
-      setBillLabel(res.bill.purchase_bill_number);
-      setAmount(String(res.bill.balance_due ?? 0));
+    if (!prefillBillId || !effectiveStoreId) return;
+    adminGet<{
+      bill: {
+        id: string;
+        vendor_id: string;
+        balance_due: number;
+        purchase_bill_number: string;
+        vendors?: { name: string | null } | null;
+      };
+    }>(`erp/purchase-bills/${prefillBillId}`).then((res) => {
+      const bill = res.bill;
+      const balance = bill.balance_due ?? 0;
+      if (balance <= 0) return;
+      setLines([
+        {
+          purchaseBillId: bill.id,
+          billNumber: bill.purchase_bill_number,
+          vendorId: bill.vendor_id,
+          vendorName: bill.vendors?.name ?? null,
+          balanceDue: balance,
+          amount: balance,
+        },
+      ]);
     });
-  }, [prefillBillId]);
+  }, [prefillBillId, effectiveStoreId]);
 
-  useEffect(() => {
-    if (!billId) {
-      setSelectedBill(null);
-      return;
-    }
-    adminGet<{ bill: PayablePurchaseBillRow }>(`erp/purchase-bills/${billId}`).then((res) => {
-      const bill = res.bill as PayablePurchaseBillRow;
-      setSelectedBill(bill);
-      if (!amount) setAmount(String(bill.balance_due ?? 0));
-    });
-  }, [billId, amount]);
+  const total = lines.reduce((s, l) => s + l.amount, 0);
+  const bankChargesAmount = parseFloat(bankCharges) || 0;
 
   function handleCancel() {
     if (isModal) {
@@ -114,37 +137,75 @@ export function SupplierPaymentFormView({
     router.push(id ? `/admin/erp/supplier-payments/${id}` : "/admin/erp/supplier-payments");
   }
 
+  function addLine() {
+    const amt = parseFloat(lineAmount);
+    if (!vendorId) return setError("Select a vendor.");
+    if (!selectedBillId) return setError("Select a purchase bill.");
+    if (!amt || amt <= 0) return setError("Enter a positive amount.");
+    if (lines.some((l) => l.purchaseBillId === selectedBillId)) {
+      return setError("Bill already added.");
+    }
+    if (amt > selectedBillBalance) return setError("Amount exceeds bill balance.");
+    const firstVendor = lines[0]?.vendorId;
+    if (firstVendor && firstVendor !== vendorId) {
+      return setError("All bills must belong to the same vendor on a single payment.");
+    }
+    setLines((prev) => [
+      ...prev,
+      {
+        purchaseBillId: selectedBillId,
+        billNumber: billLabel,
+        vendorId,
+        vendorName: vendorLabel || null,
+        balanceDue: selectedBillBalance,
+        amount: amt,
+      },
+    ]);
+    setLineAmount("");
+    setSelectedBillId("");
+    setBillLabel("");
+    setSelectedBillBalance(0);
+    setError(null);
+  }
+
+  function removeLine(billId: string) {
+    setLines((prev) => prev.filter((l) => l.purchaseBillId !== billId));
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const amt = parseFloat(amount);
-    const bankChargesAmount = parseFloat(bankCharges) || 0;
-    if (!vendorId) return setError("Vendor is required.");
-    if (!billId) return setError("Bill is required.");
+    if (lines.length === 0) return setError("Add at least one bill payment.");
     if (!accountId) return setError("Paid through account is required.");
-    if (!amt || amt <= 0) return setError("Amount must be positive.");
-    if (bankChargesAmount >= amt) return setError("Bank charges must be less than payment amount.");
+    if (!effectiveStoreId) return setError(storeRequiredMessage ?? "Store is required.");
+    if (bankChargesAmount >= total) return setError("Bank charges must be less than total payment.");
     if (bankChargesAmount > 0 && !bankChargesAccountId) {
       return setError("Expense account is required for bank charges.");
     }
-    if (selectedBill && amt > selectedBill.balance_due) {
-      return setError("Amount exceeds bill balance due.");
+
+    const paymentVendorId = lines[0].vendorId;
+    if (lines.some((l) => l.vendorId !== paymentVendorId)) {
+      return setError("All bills must belong to the same vendor.");
     }
 
     startTransition(async () => {
       try {
         const res = await adminPost<{ id: string }>("erp/supplier-payments", {
-          vendorId,
+          vendorId: paymentVendorId,
+          storeId: effectiveStoreId,
           paymentDate,
           paymentMode,
           accountId,
-          totalAmount: amt,
+          totalAmount: total,
           bankCharges: bankChargesAmount,
           bankChargesAccountId: bankChargesAccountId || undefined,
           reference: reference || undefined,
           notes: notes || undefined,
           isBulk: false,
-          allocations: [{ purchaseBillId: billId, amount: amt }],
+          allocations: lines.map((l) => ({
+            purchaseBillId: l.purchaseBillId,
+            amount: l.amount,
+          })),
         });
         handleSuccessNavigate(res.id);
       } catch (err) {
@@ -165,28 +226,19 @@ export function SupplierPaymentFormView({
     />
   ) : undefined;
 
-  const billSummary = selectedBill ? (
-    <div className="space-y-2 rounded-lg border p-4 text-sm">
-      <p className="font-semibold">Bill summary</p>
-      <p>Bill amount: {formatCurrencyAmount(selectedBill.total_amount)}</p>
-      <p>Paid amount: {formatCurrencyAmount(selectedBill.amount_paid)}</p>
-      <p className="font-semibold">Due amount: {formatCurrencyAmount(selectedBill.balance_due)}</p>
-    </div>
-  ) : null;
-
   return (
     <AdminFormShell
       variant={variant}
       open={open}
       onOpenChange={onOpenChange}
       title={title}
-      description="Payment number is generated automatically on save."
+      description="Record a supplier payment against one or more purchase bills."
       backHref="/admin/erp/supplier-payments"
       breadcrumb={[
         { label: "Payments made", href: "/admin/erp/supplier-payments" },
         { label: "Add payment" },
       ]}
-      size="lg"
+      size="landscape"
       formId={formId}
       footer={footer}
     >
@@ -194,18 +246,14 @@ export function SupplierPaymentFormView({
         <AdminFormColumns cols={2}>
           <AdminFormSection title="Payment details">
             <AdminFormGrid cols={3}>
-              <ErpDocumentNumberField kind="PM" />
-              <AdminFormField label="Vendor" required className="sm:col-span-2">
-                <VendorSearchSelect
-                  value={vendorId || null}
-                  selectedLabel={vendorLabel || undefined}
-                  onChange={(id, option) => {
-                    setVendorId(id ?? "");
-                    setVendorLabel(option?.label ?? "");
-                    setBillId("");
-                    setBillLabel("");
-                    setSelectedBill(null);
-                  }}
+              <AdminFormField label="Store" required>
+                <ActiveStoreFormField
+                  mode="create"
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
                 />
               </AdminFormField>
               <AdminFormField label="Payment date" required>
@@ -213,35 +261,11 @@ export function SupplierPaymentFormView({
                   type="date"
                   value={paymentDate}
                   onChange={(e) => setPaymentDate(e.target.value)}
-                  required
                 />
               </AdminFormField>
-              <AdminFormField label="Purchase bill" required className="sm:col-span-2">
-                <PurchaseBillSearchSelect
-                  value={billId || null}
-                  selectedLabel={billLabel || undefined}
-                  vendorId={vendorId || undefined}
-                  storeId={activeStoreId || undefined}
-                  disabled={!vendorId}
-                  onChange={(id, option) => {
-                    setBillId(id ?? "");
-                    setBillLabel(option?.label ?? "");
-                  }}
-                />
-              </AdminFormField>
-              <AdminFormField label="Amount" required>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                />
-              </AdminFormField>
-              <AdminFormField label="Payment mode" required>
+              <AdminFormField label="Payment mode">
                 <select
-                  className="h-9 w-full rounded-md border border-input px-3 text-sm"
+                  className="h-9 w-full rounded-md border px-3 text-sm"
                   value={paymentMode}
                   onChange={(e) => setPaymentMode(e.target.value)}
                 >
@@ -254,7 +278,7 @@ export function SupplierPaymentFormView({
               </AdminFormField>
               <AdminFormField label="Paid through account" required className="sm:col-span-2">
                 <select
-                  className="h-9 w-full rounded-md border border-input px-3 text-sm"
+                  className="h-9 w-full rounded-md border px-3 text-sm"
                   value={accountId}
                   onChange={(e) => setAccountId(e.target.value)}
                   required
@@ -262,7 +286,7 @@ export function SupplierPaymentFormView({
                   <option value="">Select account</option>
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.name} ({a.account_type_name})
+                      {a.name}
                     </option>
                   ))}
                 </select>
@@ -277,7 +301,7 @@ export function SupplierPaymentFormView({
               </AdminFormField>
               <AdminFormField label="Bank charges account">
                 <select
-                  className="h-9 w-full rounded-md border border-input px-3 text-sm"
+                  className="h-9 w-full rounded-md border px-3 text-sm"
                   value={bankChargesAccountId}
                   onChange={(e) => setBankChargesAccountId(e.target.value)}
                 >
@@ -293,18 +317,121 @@ export function SupplierPaymentFormView({
                 <Input value={reference} onChange={(e) => setReference(e.target.value)} />
               </AdminFormField>
               <AdminFormField label="Notes" className="sm:col-span-2">
-                <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
               </AdminFormField>
             </AdminFormGrid>
           </AdminFormSection>
-          {billSummary ? <div className="lg:pt-8">{billSummary}</div> : null}
+
+          <AdminFormSection title="Add bill payment">
+            <AdminFormGrid cols={1}>
+              <AdminFormField label="Vendor" required>
+                <VendorSearchSelect
+                  value={vendorId || null}
+                  selectedLabel={vendorLabel || undefined}
+                  disabled={!effectiveStoreId}
+                  onChange={(id, option) => {
+                    setVendorId(id ?? "");
+                    setVendorLabel(option?.label ?? "");
+                    setSelectedBillId("");
+                    setBillLabel("");
+                    setSelectedBillBalance(0);
+                    setLineAmount("");
+                  }}
+                />
+              </AdminFormField>
+              <AdminFormField label="Purchase bill" required>
+                <PurchaseBillSearchSelect
+                  value={selectedBillId || null}
+                  selectedLabel={billLabel || undefined}
+                  vendorId={vendorId || undefined}
+                  storeId={effectiveStoreId || undefined}
+                  disabled={!vendorId || !effectiveStoreId}
+                  onChange={(id, option) => {
+                    setSelectedBillId(id ?? "");
+                    setBillLabel(option?.label ?? "");
+                    const balance = option?.amount ?? 0;
+                    setSelectedBillBalance(balance);
+                    if (id && balance > 0) setLineAmount(String(balance));
+                    if (!id) setLineAmount("");
+                  }}
+                />
+              </AdminFormField>
+              {selectedBillId ? (
+                <p className="text-sm text-muted-foreground">
+                  Balance due: {formatCurrencyAmount(selectedBillBalance)}
+                </p>
+              ) : null}
+              <AdminFormField label="Amount">
+                <Input
+                  type="number"
+                  placeholder="Amount"
+                  value={lineAmount}
+                  onChange={(e) => setLineAmount(e.target.value)}
+                />
+              </AdminFormField>
+            </AdminFormGrid>
+            <div className="mt-3">
+              <Button type="button" variant="outline" onClick={addLine}>
+                Add bill
+              </Button>
+            </div>
+          </AdminFormSection>
         </AdminFormColumns>
+
+        {lines.length > 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bill</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead className="text-right">Due</TableHead>
+                    <TableHead className="text-right">Paying</TableHead>
+                    <TableHead className="text-right">Remaining</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lines.map((l) => (
+                    <TableRow key={l.purchaseBillId}>
+                      <TableCell>{l.billNumber}</TableCell>
+                      <TableCell>{l.vendorName ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrencyAmount(l.balanceDue)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrencyAmount(l.amount)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatCurrencyAmount(Math.max(0, l.balanceDue - l.amount))}
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          className="text-xs text-rose-600"
+                          onClick={() => removeLine(l.purchaseBillId)}
+                        >
+                          Remove
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <p className="mt-3 text-sm font-medium">Total: {formatCurrencyAmount(total)}</p>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
         {!isModal ? (
-          <div className="flex flex-wrap justify-end gap-2">
-            <Link href="/admin/erp/supplier-payments" className={buttonVariants({ variant: "outline" })}>
+          <div className="flex gap-2">
+            <Link
+              href="/admin/erp/supplier-payments"
+              className={buttonVariants({ variant: "outline" })}
+            >
               Cancel
             </Link>
             <Button type="submit" disabled={isPending}>

@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
 import type { OnlineStockTransferRow } from "@/modules/inventory/services/online-stock-transfers.service";
+import { AdminTableBodySkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet, adminPatch } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { AllocateOnlineTransferDialog } from "@/modules/inventory/components/allocate-online-transfer-dialog";
@@ -84,7 +85,9 @@ export function OnlineTransfersList({
 
   if (isPending) {
     return (
-      <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading transfers…</p>
+      <div className="px-4 py-6">
+        <AdminTableBodySkeleton rows={8} />
+      </div>
     );
   }
 

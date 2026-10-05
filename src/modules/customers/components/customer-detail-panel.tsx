@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/table";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { AdminTableBodySkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { ActivityLogPanel } from "@/modules/erp/components/activity-log-panel";
 import {
@@ -308,7 +309,7 @@ export function CustomerDetailPanel({
               </CardHeader>
               <CardContent className="p-0">
                 {erpLoading ? (
-                  <p className="p-4 text-sm text-muted-foreground">Loading statement…</p>
+                  <AdminTableBodySkeleton rows={6} />
                 ) : statementRows.length === 0 ? (
                   <p className="p-8 text-center text-sm text-muted-foreground">
                     No statement entries yet.
@@ -367,7 +368,7 @@ export function CustomerDetailPanel({
               </CardHeader>
               <CardContent className="p-0">
                 {erpLoading ? (
-                  <p className="p-4 text-sm text-muted-foreground">Loading sales…</p>
+                  <AdminTableBodySkeleton rows={6} />
                 ) : !erp?.invoices.length ? (
                   <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
                     <FileText className="size-10 text-muted-foreground/40" aria-hidden />

@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { AdminDetailSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminDelete, adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
 import { AdminPageHeader, AdminPageLayout } from "@/modules/admin/ui";
 import { ErpDocumentActions } from "@/modules/erp/components/erp-document-actions";
@@ -66,7 +67,7 @@ export function VendorCreditDetailView({ creditId }: { creditId: string }) {
   if (loading) {
     return (
       <AdminPageLayout>
-        <p className="text-sm text-muted-foreground">Loading vendor credit…</p>
+        <AdminDetailSkeleton />
       </AdminPageLayout>
     );
   }

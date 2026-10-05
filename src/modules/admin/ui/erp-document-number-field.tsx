@@ -12,6 +12,7 @@ export function ErpDocumentNumberField({
   kind,
   value,
   enabled = true,
+  resetToken = 0,
   label,
   className,
 }: {
@@ -19,10 +20,11 @@ export function ErpDocumentNumberField({
   /** Existing number when editing; overrides draft preview. */
   value?: string | null;
   enabled?: boolean;
+  resetToken?: number;
   label?: string;
   className?: string;
 }) {
-  const draft = useErpDocumentDraft(kind, enabled && !value);
+  const draft = useErpDocumentDraft(kind, enabled && !value, resetToken);
   const display = value?.trim() || draft?.documentNumber || "—";
 
   return (

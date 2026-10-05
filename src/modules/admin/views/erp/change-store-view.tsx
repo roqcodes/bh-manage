@@ -3,12 +3,13 @@
 import { useEffect, useState, useTransition } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Building2, Check, Loader2 } from "lucide-react";
+import { Building2, Check } from "lucide-react";
 
 import type { ErpContext, Store } from "@/common/erp/types";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { refreshAdminAfterStoreChange } from "@/modules/erp/components/use-erp-stores";
+import { AdminPanelSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -56,9 +57,8 @@ export function ChangeStoreView() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Loading stores…
+      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+        <AdminPanelSkeleton rows={6} />
       </div>
     );
   }

@@ -15,6 +15,7 @@ import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
 import { createOutboxStore } from "@/lib/sync/outbox-store";
 import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
 import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
+import { notifyErpLocalFormSaved } from "@/modules/erp/lib/erp-form-save-feedback.client";
 import type { SalesOrderCreatePayload } from "@/modules/orders/types/sales-order-create-payload";
 import type { SalesOrderUpdatePayload } from "@/modules/orders/types/sales-order-update-payload";
 import { salesOrderResourceScope } from "@/modules/orders/types/sales-order-update-payload";
@@ -49,6 +50,10 @@ import { Input } from "@/components/ui/input";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { coalesceNumber } from "@/lib/numeric-input";
 import { Label } from "@/components/ui/label";
+import {
+  AdminFormSkeleton,
+  AdminPageSkeleton,
+} from "@/modules/admin/components/admin-page-skeleton";
 
 export type SalesOrderFormViewProps = ErpFormViewBaseProps & {
   mode?: "create" | "edit";
@@ -70,7 +75,6 @@ export function SalesOrderFormView({
     useActiveStoreFormField({ mode: isEdit ? "edit" : "create" });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [localSaveNotice, setLocalSaveNotice] = useState<string | null>(null);
   const [stockWarning, setStockWarning] = useState<string | null>(null);
   const [loadingOrder, setLoadingOrder] = useState(isEdit);
   const isModal = variant === "modal";
@@ -93,6 +97,7 @@ export function SalesOrderFormView({
   const [discount, setDiscount] = useState(0);
   const [taxInclusive, setTaxInclusive] = useState(true);
   const [lines, setLines] = useState<SalesLineFormRow[]>([]);
+  const [createSession, setCreateSession] = useState(0);
 
   useEffect(() => {
     if (!isEdit || !orderId) return;
@@ -160,7 +165,7 @@ export function SalesOrderFormView({
     }
   }
 
-  function resetForm() {
+  function resetCreateForm() {
     setCustomerId("");
     setCustomerLabel("");
     setReferenceNumber("");
@@ -173,24 +178,24 @@ export function SalesOrderFormView({
     setLines([]);
     setStockWarning(null);
     setError(null);
+    setCreateSession((n) => n + 1);
   }
 
-  function handleSuccessAfterSave() {
-    if (isEdit) {
-      if (isModal) {
-        onOpenChange?.(false);
-        onSuccess?.(orderId);
-      } else {
-        router.push(detailHref);
-      }
+  function handleSuccessNavigate() {
+    if (!isEdit) {
+      onSuccess?.();
       return;
     }
-    onSuccess?.();
+    if (isModal) {
+      onOpenChange?.(false);
+      onSuccess?.(orderId);
+    } else {
+      router.push(detailHref);
+    }
   }
 
   function handleSubmit() {
     setError(null);
-    setLocalSaveNotice(null);
     setStockWarning(null);
     if (!customerId) {
       setError("Customer is required");
@@ -293,6 +298,7 @@ export function SalesOrderFormView({
               storeId: effectiveStoreId,
               terminalId: getOrCreateErpTerminalId(),
             });
+            resetCreateForm();
           }
         } catch (enqueueErr) {
           if (enqueueErr instanceof OutboxEnqueueError) {
@@ -309,17 +315,13 @@ export function SalesOrderFormView({
           await store.close();
         }
 
+        notifyErpLocalFormSaved({
+          entityLabel: "Sales order",
+          mode: isEdit ? "update" : "create",
+        });
         dispatchOutboxChanged();
         broadcastSyncWake();
-        if (!isEdit) {
-          resetForm();
-        }
-        setLocalSaveNotice(
-          isEdit
-            ? "Update saved locally — pending sync"
-            : "Saved locally — pending sync",
-        );
-        handleSuccessAfterSave();
+        handleSuccessNavigate();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to queue sales order");
       }
@@ -327,11 +329,6 @@ export function SalesOrderFormView({
   }
 
   if (isModal && !open) return null;
-  if (loadingOrder) {
-    return (
-      <div className="p-6 text-sm text-muted-foreground">Loading sales order…</div>
-    );
-  }
 
   const title = isEdit ? "Edit sales order" : "Add sales order";
 
@@ -399,7 +396,10 @@ export function SalesOrderFormView({
       ]}
       size="landscape"
       formId={formId}
+      pending={pending}
       footer={footer}
+      loading={loadingOrder}
+      loadingFallback={isModal ? <AdminFormSkeleton /> : <AdminPageSkeleton />}
     >
       <form
         id={formId}
@@ -415,6 +415,7 @@ export function SalesOrderFormView({
             <AdminFormGrid cols={3}>
               <AdminFormField label="Customer" required className="sm:col-span-2">
                 <CustomerSearchSelect
+                  key={createSession}
                   value={customerId || null}
                   selectedLabel={customerLabel || undefined}
                   onChange={(id, option) => {
@@ -423,7 +424,7 @@ export function SalesOrderFormView({
                   }}
                 />
               </AdminFormField>
-              <ErpDocumentNumberField kind="SO" />
+              <ErpDocumentNumberField kind="SO" resetToken={createSession} />
               <AdminFormField label="Reference number">
                 <Input
                   value={referenceNumber}
@@ -473,6 +474,7 @@ export function SalesOrderFormView({
 
           <AdminFormSection title="Order items">
             <SalesLinesEditor
+              key={createSession}
               lines={lines}
               onChange={setLines}
               storeId={effectiveStoreId}
@@ -484,9 +486,6 @@ export function SalesOrderFormView({
 
           {stockWarning ? (
             <p className="text-sm text-amber-700 dark:text-amber-400">{stockWarning}</p>
-          ) : null}
-          {localSaveNotice ? (
-            <p className="text-sm text-muted-foreground">{localSaveNotice}</p>
           ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 

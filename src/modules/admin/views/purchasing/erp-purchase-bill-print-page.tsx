@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { AdminPrintSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { InvoicePrintToolbar } from "@/modules/admin/components/invoice-print-toolbar";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -61,7 +62,7 @@ export function ErpPurchaseBillPrintPage() {
   }, [bill]);
 
   if (loading) {
-    return <p className="p-6 text-sm text-muted-foreground">Loading purchase bill…</p>;
+    return <AdminPrintSkeleton />;
   }
 
   if (error || !bill) {

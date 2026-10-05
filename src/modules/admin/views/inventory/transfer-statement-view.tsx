@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import type { TransferStatementSummary } from "@/common/erp/inventory-types";
+import { AdminTableBodySkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { Input } from "@/components/ui/input";
@@ -100,7 +101,7 @@ export function TransferStatementView() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading statement…</p>
+        <AdminTableBodySkeleton rows={10} />
       ) : lines.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-slate-500">
           No transactions for the selected filters.

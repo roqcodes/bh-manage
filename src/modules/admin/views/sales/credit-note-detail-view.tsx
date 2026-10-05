@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { AdminDetailSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminDelete, adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
 import { ErpDocumentTabsLayout } from "@/modules/erp/components/erp-document-tabs-layout";
 import { ErpDocumentActions } from "@/modules/erp/components/erp-document-actions";
@@ -64,7 +65,7 @@ export function CreditNoteDetailView({ creditNoteId }: { creditNoteId: string })
   if (loading) {
     return (
       <AdminPageLayout>
-        <p className="text-sm text-muted-foreground">Loading credit note…</p>
+        <AdminDetailSkeleton />
       </AdminPageLayout>
     );
   }

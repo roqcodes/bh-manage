@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { AdminPanelSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 
 import type { LineProductContext } from "@/common/erp/line-product-context";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
@@ -124,12 +125,7 @@ export function LineProductDetailsPanel({
   }
 
   if (isPending) {
-    return (
-      <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
-        <Loader2 className="size-3.5 animate-spin" />
-        Loading product context…
-      </div>
-    );
+    return <AdminPanelSkeleton rows={3} />;
   }
 
   if (isError || !data) {

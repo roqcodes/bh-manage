@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import type { JournalEntryLineRow } from "@/common/erp/finance-types";
+import { AdminDetailSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { AdminPageHeader, AdminPageLayout } from "@/modules/admin/ui";
 import { ErpDocumentTabsLayout } from "@/modules/erp/components/erp-document-tabs-layout";
@@ -37,7 +38,7 @@ export function JournalEntryDetailView({ journalId }: { journalId: string }) {
   if (loading) {
     return (
       <AdminPageLayout>
-        <p className="p-6 text-sm text-muted-foreground">Loading journal…</p>
+        <AdminDetailSkeleton />
       </AdminPageLayout>
     );
   }

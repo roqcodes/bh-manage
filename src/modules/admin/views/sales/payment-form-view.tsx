@@ -5,25 +5,45 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import type { PaidThroughAccountOption } from "@/common/erp/sales-types";
-import { PAYMENT_MODE_OPTIONS } from "@/common/erp/finance-types";
+import { ERP_CUSTOMER_PAYMENT_MODES, paymentModeLabel } from "@/common/erp/sales-types";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
+import { formatCurrencyAmount } from "@/lib/format-currency";
 import {
   AdminFormActions,
+  AdminFormColumns,
   AdminFormField,
   AdminFormGrid,
-  AdminFormModalLayout,
   AdminFormSection,
   AdminFormShell,
-  CustomerSearchSelect,
-  ErpDocumentNumberField,
   InvoiceSearchSelect,
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
-import { formatCurrencyAmount } from "@/lib/format-currency";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useErpStores } from "@/modules/erp/components/use-erp-stores";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  ActiveStoreFormField,
+  useActiveStoreFormField,
+} from "@/modules/erp/components/use-active-store-form-field";
+
+type PendingLine = {
+  invoiceId: string;
+  invoiceNumber: string;
+  userId: string;
+  customerName: string | null;
+  balanceDue: number;
+  amount: number;
+  receiptRef: string;
+};
 
 type InvoiceDetail = {
   id: string;
@@ -31,8 +51,6 @@ type InvoiceDetail = {
   balance_due: number;
   invoice_number: string;
   store_id: string | null;
-  total_amount: number;
-  amount_paid: number;
   users: { name: string | null; email: string | null } | null;
 };
 
@@ -40,17 +58,6 @@ export type PaymentFormViewProps = ErpFormViewBaseProps;
 
 function invoiceCustomerLabel(detail: InvoiceDetail) {
   return detail.users?.name ?? detail.users?.email ?? "";
-}
-
-function loadInvoiceFromApi(id: string) {
-  return adminGet<InvoiceDetail>(`erp/invoices/${id}`);
-}
-
-function paymentModeDisplay(mode: string) {
-  if (mode === "CreditCard") return "Card";
-  if (mode === "BankRemittance") return "Bank remittance";
-  if (mode === "BankTransfer") return "Bank transfer";
-  return mode;
 }
 
 export function PaymentFormView({
@@ -63,74 +70,60 @@ export function PaymentFormView({
   const formId = useId();
   const searchParams = useSearchParams();
   const preselectedInvoiceId = searchParams.get("invoiceId") ?? "";
-  const preselectedCustomerId = searchParams.get("customerId") ?? "";
-  const { activeStoreId } = useErpStores();
+  const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
+    useActiveStoreFormField({ mode: "create" });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isModal = variant === "modal";
 
   const [depositAccounts, setDepositAccounts] = useState<PaidThroughAccountOption[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<PaidThroughAccountOption[]>([]);
-  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceDetail | null>(null);
-
-  const [customerId, setCustomerId] = useState("");
-  const [customerLabel, setCustomerLabel] = useState("");
-  const [invoiceId, setInvoiceId] = useState("");
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [invoiceLabel, setInvoiceLabel] = useState("");
+  const [selectedInvoiceBalance, setSelectedInvoiceBalance] = useState(0);
+  const [selectedInvoiceCustomer, setSelectedInvoiceCustomer] = useState<string | null>(null);
+  const [lineAmount, setLineAmount] = useState("");
+  const [receiptRef, setReceiptRef] = useState("");
+  const [lines, setLines] = useState<PendingLine[]>([]);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
-  const [paymentMode, setPaymentMode] = useState<string>(PAYMENT_MODE_OPTIONS[0]);
+  const [paymentMode, setPaymentMode] = useState<string>(ERP_CUSTOMER_PAYMENT_MODES[0]);
   const [accountId, setAccountId] = useState("");
-  const [amount, setAmount] = useState("");
   const [bankCharges, setBankCharges] = useState("");
   const [bankChargesAccountId, setBankChargesAccountId] = useState("");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
-  const storeId = activeStoreId ?? "";
-
-  function loadInvoice(id: string) {
-    return loadInvoiceFromApi(id).then((detail) => {
-      setSelectedInvoice(detail);
-      setInvoiceId(detail.id);
-      setInvoiceLabel(detail.invoice_number);
-      setCustomerId(detail.user_id);
-      setCustomerLabel(invoiceCustomerLabel(detail));
-      setAmount(String(detail.balance_due));
-    });
-  }
 
   useEffect(() => {
-    if (!preselectedInvoiceId) return;
-    loadInvoice(preselectedInvoiceId).catch(() => undefined);
-  }, [preselectedInvoiceId]);
-
-  useEffect(() => {
-    if (!preselectedCustomerId || preselectedInvoiceId) return;
-    setCustomerId(preselectedCustomerId);
-  }, [preselectedCustomerId, preselectedInvoiceId]);
-
-  useEffect(() => {
-    if (!invoiceId || preselectedInvoiceId === invoiceId) return;
-    loadInvoice(invoiceId).catch(() => undefined);
-  }, [invoiceId, preselectedInvoiceId]);
-
-  useEffect(() => {
-    if (!storeId) return;
+    if (!effectiveStoreId) return;
     adminGet<{ data: PaidThroughAccountOption[] }>(
-      `erp/payments?view=accounts&storeId=${encodeURIComponent(storeId)}`,
-    ).then((res) => {
-      setDepositAccounts(res.data ?? []);
-      setAccountId("");
-    });
+      `erp/payments?view=accounts&storeId=${encodeURIComponent(effectiveStoreId)}`,
+    ).then((res) => setDepositAccounts(res.data ?? []));
     adminGet<{ data: PaidThroughAccountOption[] }>(
-      `erp/payments?view=expense-accounts&storeId=${encodeURIComponent(storeId)}`,
-    ).then((res) => {
-      setExpenseAccounts(res.data ?? []);
-      setBankChargesAccountId("");
-    });
-  }, [storeId]);
+      `erp/payments?view=expense-accounts&storeId=${encodeURIComponent(effectiveStoreId)}`,
+    ).then((res) => setExpenseAccounts(res.data ?? []));
+  }, [effectiveStoreId]);
 
+  useEffect(() => {
+    if (!preselectedInvoiceId || !effectiveStoreId) return;
+    adminGet<InvoiceDetail>(`erp/invoices/${preselectedInvoiceId}`).then((detail) => {
+      const balance = detail.balance_due ?? 0;
+      if (balance <= 0) return;
+      setLines([
+        {
+          invoiceId: detail.id,
+          invoiceNumber: detail.invoice_number,
+          userId: detail.user_id,
+          customerName: invoiceCustomerLabel(detail),
+          balanceDue: balance,
+          amount: balance,
+          receiptRef: "",
+        },
+      ]);
+    });
+  }, [preselectedInvoiceId, effectiveStoreId]);
+
+  const total = lines.reduce((s, l) => s + l.amount, 0);
   const bankChargesAmount = parseFloat(bankCharges) || 0;
-  const showBankChargesAccount = bankChargesAmount > 0;
 
   function handleCancel() {
     if (isModal) {
@@ -149,53 +142,86 @@ export function PaymentFormView({
     router.push(id ? `/admin/erp/payments/${id}` : "/admin/erp/payments");
   }
 
+  async function addLine() {
+    const amt = parseFloat(lineAmount);
+    if (!selectedInvoiceId) return setError("Select an invoice.");
+    if (!amt || amt <= 0) return setError("Enter a positive amount.");
+    if (lines.some((l) => l.invoiceId === selectedInvoiceId)) {
+      return setError("Invoice already added.");
+    }
+    if (amt > selectedInvoiceBalance) return setError("Amount exceeds invoice balance.");
+
+    let userId: string;
+    try {
+      const detail = await adminGet<InvoiceDetail>(`erp/invoices/${selectedInvoiceId}`);
+      userId = detail.user_id;
+    } catch {
+      return setError("Could not load invoice details.");
+    }
+
+    const firstUser = lines[0]?.userId;
+    if (firstUser && firstUser !== userId) {
+      return setError("All invoices must belong to the same customer on a single payment.");
+    }
+
+    setLines((prev) => [
+      ...prev,
+      {
+        invoiceId: selectedInvoiceId,
+        invoiceNumber: invoiceLabel,
+        userId,
+        customerName: selectedInvoiceCustomer,
+        balanceDue: selectedInvoiceBalance,
+        amount: amt,
+        receiptRef: receiptRef.trim(),
+      },
+    ]);
+    setLineAmount("");
+    setReceiptRef("");
+    setSelectedInvoiceId("");
+    setInvoiceLabel("");
+    setSelectedInvoiceBalance(0);
+    setSelectedInvoiceCustomer(null);
+    setError(null);
+  }
+
+  function removeLine(invoiceId: string) {
+    setLines((prev) => prev.filter((l) => l.invoiceId !== invoiceId));
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!customerId) {
-      setError("Customer is required");
-      return;
-    }
-    if (!invoiceId || !selectedInvoice) {
-      setError("Invoice is required");
-      return;
-    }
-    if (!accountId) {
-      setError("Deposit To account is required");
-      return;
-    }
-    const paidAmount = parseFloat(amount);
-    if (!paidAmount || paidAmount <= 0) {
-      setError("Paid amount must be greater than zero");
-      return;
-    }
-    if (paidAmount > selectedInvoice.balance_due) {
-      setError("Paid amount cannot exceed invoice balance");
-      return;
-    }
-    if (bankChargesAmount >= paidAmount) {
-      setError("Bank charges must be less than payment amount");
-      return;
-    }
+    if (lines.length === 0) return setError("Add at least one invoice payment.");
+    if (!accountId) return setError("Deposit account is required.");
+    if (!effectiveStoreId) return setError(storeRequiredMessage ?? "Store is required.");
+    if (bankChargesAmount >= total) return setError("Bank charges must be less than total payment.");
     if (bankChargesAmount > 0 && !bankChargesAccountId) {
-      setError("Expense account is required for bank charges");
-      return;
+      return setError("Expense account is required for bank charges.");
+    }
+
+    const userId = lines[0].userId;
+    if (lines.some((l) => l.userId !== userId)) {
+      return setError("All invoices must belong to the same customer.");
     }
 
     startTransition(async () => {
       try {
         const res = await adminPost<{ id: string }>("erp/payments", {
-          userId: customerId,
-          storeId: selectedInvoice.store_id ?? storeId ?? undefined,
+          userId,
+          storeId: effectiveStoreId,
           paymentDate,
           paymentMode,
           accountId,
-          totalAmount: paidAmount,
+          totalAmount: total,
           bankCharges: bankChargesAmount,
           bankChargesAccountId: bankChargesAmount > 0 ? bankChargesAccountId : undefined,
           reference: reference.trim() || undefined,
           notes: notes.trim() || undefined,
-          allocations: [{ invoiceId, amount: paidAmount }],
+          allocations: lines.map((l) => ({
+            invoiceId: l.invoiceId,
+            amount: l.amount,
+          })),
         });
         handleSuccessNavigate(res.id);
       } catch (err) {
@@ -205,15 +231,6 @@ export function PaymentFormView({
   }
 
   if (isModal && !open) return null;
-
-  const paidAmount = parseFloat(amount) || 0;
-  const remainingAfterPayment = selectedInvoice
-    ? Math.max(0, selectedInvoice.balance_due - paidAmount)
-    : 0;
-  const netReceived = Math.max(0, paidAmount - bankChargesAmount);
-  const paymentFieldsDisabled = !selectedInvoice;
-  const selectClassName =
-    "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50";
 
   const title = "Payment received";
   const footer = isModal ? (
@@ -225,271 +242,231 @@ export function PaymentFormView({
     />
   ) : undefined;
 
-  const summarySidebar = (
-    <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4 text-sm">
-      <p className="font-semibold tracking-tight">Invoice summary</p>
-      {selectedInvoice ? (
-        <>
-          <div className="space-y-2.5">
-            <div className="flex justify-between gap-3">
-              <span className="text-muted-foreground">Customer</span>
-              <span className="max-w-[58%] truncate text-right font-medium">
-                {customerLabel || "—"}
-              </span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="text-muted-foreground">Invoice</span>
-              <span className="font-medium">{selectedInvoice.invoice_number}</span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="text-muted-foreground">Invoice total</span>
-              <span className="tabular-nums">{formatCurrencyAmount(selectedInvoice.total_amount)}</span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="text-muted-foreground">Already paid</span>
-              <span className="tabular-nums">{formatCurrencyAmount(selectedInvoice.amount_paid)}</span>
-            </div>
-            <div className="flex justify-between gap-3 border-t border-border/80 pt-2.5">
-              <span className="font-medium">Balance due</span>
-              <span className="font-semibold tabular-nums">
-                {formatCurrencyAmount(selectedInvoice.balance_due)}
-              </span>
-            </div>
-          </div>
-          {paidAmount > 0 ? (
-            <div className="space-y-2 rounded-md border border-border/80 bg-background/80 p-3">
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">This payment</span>
-                <span className="font-semibold tabular-nums">{formatCurrencyAmount(paidAmount)}</span>
-              </div>
-              {bankChargesAmount > 0 ? (
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Bank charges</span>
-                  <span className="tabular-nums text-rose-600">
-                    −{formatCurrencyAmount(bankChargesAmount)}
-                  </span>
-                </div>
-              ) : null}
-              <div className="flex justify-between gap-3 border-t border-border/60 pt-2">
-                <span className="font-medium">Net received</span>
-                <span className="font-semibold tabular-nums">{formatCurrencyAmount(netReceived)}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Remaining</span>
-                <span className="font-medium tabular-nums">
-                  {formatCurrencyAmount(remainingAfterPayment)}
-                </span>
-              </div>
-            </div>
-          ) : null}
-        </>
-      ) : (
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Select an open invoice to view balances and enter payment details.
-        </p>
-      )}
-    </div>
-  );
-
-  const formContent = (
-    <AdminFormModalLayout
-      sidebar={summarySidebar}
-      className="lg:grid-cols-[minmax(0,1fr)_minmax(240px,300px)]"
-    >
-      <AdminFormSection title="Invoice & customer">
-        <div className="space-y-3">
-          <AdminFormField label="Invoice" required>
-            <InvoiceSearchSelect
-              value={invoiceId || null}
-              selectedLabel={invoiceLabel || undefined}
-              storeId={storeId || undefined}
-              openOnly
-              disabled={!storeId}
-              onChange={(id, option) => {
-                setInvoiceId(id ?? "");
-                setInvoiceLabel(option?.label ?? "");
-                if (!id) {
-                  setSelectedInvoice(null);
-                  setAmount("");
-                }
-              }}
-            />
-            {!storeId ? (
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                Select an active store to search open invoices.
-              </p>
-            ) : null}
-          </AdminFormField>
-          <AdminFormGrid cols={2}>
-            <AdminFormField label="Customer" required>
-              <CustomerSearchSelect
-                value={customerId || null}
-                selectedLabel={customerLabel || undefined}
-                disabled={Boolean(selectedInvoice)}
-                onChange={(id, option) => {
-                  setCustomerId(id ?? "");
-                  setCustomerLabel(option?.label ?? "");
-                }}
-              />
-            </AdminFormField>
-            <ErpDocumentNumberField kind="PR" />
-          </AdminFormGrid>
-        </div>
-      </AdminFormSection>
-
-      <AdminFormSection title="Payment details">
-        {!selectedInvoice ? (
-          <p className="mb-3 text-xs text-muted-foreground">
-            Choose an invoice above to enable payment fields.
-          </p>
-        ) : null}
-        <AdminFormGrid cols={3}>
-          <AdminFormField label="Payment date" required>
-            <Input
-              type="date"
-              value={paymentDate}
-              disabled={paymentFieldsDisabled}
-              onChange={(e) => setPaymentDate(e.target.value)}
-              required
-            />
-          </AdminFormField>
-          <AdminFormField label="Payment type" required>
-            <select
-              className={selectClassName}
-              value={paymentMode}
-              disabled={paymentFieldsDisabled}
-              onChange={(e) => setPaymentMode(e.target.value)}
-            >
-              {PAYMENT_MODE_OPTIONS.map((mode) => (
-                <option key={mode} value={mode}>
-                  {paymentModeDisplay(mode)}
-                </option>
-              ))}
-            </select>
-          </AdminFormField>
-          <AdminFormField label="Deposit to" required>
-            <select
-              className={selectClassName}
-              value={accountId}
-              disabled={paymentFieldsDisabled}
-              onChange={(e) => setAccountId(e.target.value)}
-              required
-            >
-              <option value="">Select deposit account</option>
-              {depositAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </select>
-          </AdminFormField>
-          <AdminFormField label="Amount received" required className="sm:col-span-2">
-            <div className="flex flex-wrap gap-2">
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={amount}
-                disabled={paymentFieldsDisabled}
-                onChange={(e) => setAmount(e.target.value)}
-                className="min-w-[140px] flex-1"
-                required
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-10 shrink-0"
-                disabled={paymentFieldsDisabled}
-                onClick={() => setAmount(String(selectedInvoice?.balance_due ?? 0))}
-              >
-                Pay full balance
-              </Button>
-            </div>
-          </AdminFormField>
-          <AdminFormField label="Bank charges">
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={bankCharges}
-              disabled={paymentFieldsDisabled}
-              onChange={(e) => setBankCharges(e.target.value)}
-              placeholder="0.00"
-            />
-          </AdminFormField>
-          {showBankChargesAccount ? (
-            <AdminFormField label="Bank charges expense account" required className="sm:col-span-2">
-              <select
-                className={selectClassName}
-                value={bankChargesAccountId}
-                disabled={paymentFieldsDisabled}
-                onChange={(e) => setBankChargesAccountId(e.target.value)}
-              >
-                <option value="">Select expense account</option>
-                {expenseAccounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-            </AdminFormField>
-          ) : null}
-          <AdminFormField label="Reference">
-            <Input
-              value={reference}
-              disabled={paymentFieldsDisabled}
-              onChange={(e) => setReference(e.target.value)}
-              placeholder="Cheque / transaction ref"
-            />
-          </AdminFormField>
-          <AdminFormField label="Notes" className="sm:col-span-2">
-            <Textarea
-              value={notes}
-              disabled={paymentFieldsDisabled}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              placeholder="Internal notes (optional)"
-            />
-          </AdminFormField>
-        </AdminFormGrid>
-      </AdminFormSection>
-    </AdminFormModalLayout>
-  );
-
   return (
     <AdminFormShell
       variant={variant}
       open={open}
       onOpenChange={onOpenChange}
       title={title}
-      description={
-        isModal
-          ? "Select an open invoice, then enter how much was received."
-          : "Record a customer payment against an invoice."
-      }
+      description="Record a customer payment against one or more invoices."
       backHref="/admin/erp/payments"
       breadcrumb={[
         { label: "Payments", href: "/admin/erp/payments" },
         { label: title },
       ]}
-      size={isModal ? "landscape" : "lg"}
+      size="landscape"
       formId={formId}
       footer={footer}
     >
       <form id={formId} onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
-        {formContent}
-        {error ? (
-          <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {error}
-          </p>
+        <AdminFormColumns cols={2}>
+          <AdminFormSection title="Payment details">
+            <AdminFormGrid cols={3}>
+              <AdminFormField label="Store" required>
+                <ActiveStoreFormField
+                  mode="create"
+                  stores={stores}
+                  activeStoreId={activeStoreId}
+                  storeId={storeId}
+                  onStoreIdChange={setStoreId}
+                  label=""
+                />
+              </AdminFormField>
+              <AdminFormField label="Payment date" required>
+                <Input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  required
+                />
+              </AdminFormField>
+              <AdminFormField label="Payment mode">
+                <select
+                  className="h-9 w-full rounded-md border px-3 text-sm"
+                  value={paymentMode}
+                  onChange={(e) => setPaymentMode(e.target.value)}
+                >
+                  {ERP_CUSTOMER_PAYMENT_MODES.map((m) => (
+                    <option key={m} value={m}>
+                      {paymentModeLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </AdminFormField>
+              <AdminFormField label="Deposit to" required className="sm:col-span-2">
+                <select
+                  className="h-9 w-full rounded-md border px-3 text-sm"
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  required
+                >
+                  <option value="">Select account</option>
+                  {depositAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+              </AdminFormField>
+              <AdminFormField label="Bank charges">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={bankCharges}
+                  onChange={(e) => setBankCharges(e.target.value)}
+                  placeholder="0.00"
+                />
+              </AdminFormField>
+              <AdminFormField label="Bank charges account">
+                <select
+                  className="h-9 w-full rounded-md border px-3 text-sm"
+                  value={bankChargesAccountId}
+                  onChange={(e) => setBankChargesAccountId(e.target.value)}
+                >
+                  <option value="">Select expense account</option>
+                  {expenseAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+              </AdminFormField>
+              <AdminFormField label="Reference">
+                <Input
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder="Cheque / transaction ref"
+                />
+              </AdminFormField>
+              <AdminFormField label="Notes" className="sm:col-span-2">
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Internal notes (optional)"
+                />
+              </AdminFormField>
+            </AdminFormGrid>
+          </AdminFormSection>
+
+          <AdminFormSection title="Add invoice payment">
+            <AdminFormGrid cols={1}>
+              <AdminFormField label="Invoice" required>
+                <InvoiceSearchSelect
+                  value={selectedInvoiceId || null}
+                  selectedLabel={invoiceLabel || undefined}
+                  storeId={effectiveStoreId || undefined}
+                  openOnly
+                  disabled={!effectiveStoreId}
+                  onChange={(id, option) => {
+                    setSelectedInvoiceId(id ?? "");
+                    setInvoiceLabel(option?.label ?? "");
+                    setSelectedInvoiceCustomer(option?.sublabel ?? null);
+                    const balance = option?.amount ?? 0;
+                    setSelectedInvoiceBalance(balance);
+                    if (id && balance > 0) setLineAmount(String(balance));
+                    if (!id) setLineAmount("");
+                  }}
+                />
+              </AdminFormField>
+              {selectedInvoiceId ? (
+                <p className="text-sm text-muted-foreground">
+                  Balance due: {formatCurrencyAmount(selectedInvoiceBalance)}
+                  {selectedInvoiceCustomer ? ` · ${selectedInvoiceCustomer}` : ""}
+                </p>
+              ) : null}
+              <AdminFormField label="Receipt #">
+                <Input
+                  placeholder="Receipt #"
+                  value={receiptRef}
+                  onChange={(e) => setReceiptRef(e.target.value)}
+                />
+              </AdminFormField>
+              <AdminFormField label="Amount">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Amount"
+                  value={lineAmount}
+                  onChange={(e) => setLineAmount(e.target.value)}
+                />
+              </AdminFormField>
+            </AdminFormGrid>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => void addLine()}>
+                Add invoice
+              </Button>
+              {selectedInvoiceBalance > 0 ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setLineAmount(String(selectedInvoiceBalance))}
+                >
+                  Pay full balance
+                </Button>
+              ) : null}
+            </div>
+          </AdminFormSection>
+        </AdminFormColumns>
+
+        {lines.length > 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Receipt #</TableHead>
+                    <TableHead className="text-right">Due</TableHead>
+                    <TableHead className="text-right">Paying</TableHead>
+                    <TableHead className="text-right">Remaining</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lines.map((l) => (
+                    <TableRow key={l.invoiceId}>
+                      <TableCell>{l.invoiceNumber}</TableCell>
+                      <TableCell>{l.customerName ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{l.receiptRef || "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrencyAmount(l.balanceDue)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrencyAmount(l.amount)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatCurrencyAmount(Math.max(0, l.balanceDue - l.amount))}
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          className="text-xs text-rose-600"
+                          onClick={() => removeLine(l.invoiceId)}
+                        >
+                          Remove
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <p className="mt-3 text-sm font-medium">Total: {formatCurrencyAmount(total)}</p>
+            </CardContent>
+          </Card>
         ) : null}
+
+        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+
         {!isModal ? (
           <div className="flex flex-wrap justify-end gap-2">
-            <Link href="/admin/erp/payments" className={buttonVariants({ variant: "ghost" })}>
+            <Link href="/admin/erp/payments" className={buttonVariants({ variant: "outline" })}>
               Cancel
             </Link>
-            <Button type="submit" disabled={pending || !selectedInvoice}>
+            <Button type="submit" disabled={pending}>
               {pending ? "Saving…" : "Record payment"}
             </Button>
           </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import type { StoreInventoryProductDetail } from "@/common/erp/store-inventory-types";
+import { AdminPanelSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { Badge } from "@/components/ui/badge";
@@ -101,7 +102,7 @@ export function StoreInventoryProductDetailDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <AdminPanelSkeleton rows={8} />
           ) : error ? (
             <p className="text-sm text-destructive">{error}</p>
           ) : detail ? (

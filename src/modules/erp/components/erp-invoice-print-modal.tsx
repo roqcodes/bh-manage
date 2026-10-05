@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AdminPrintSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { downloadElementAsPdf } from "@/lib/html2pdf-download";
 import { printDocumentElement } from "@/lib/print-document";
@@ -141,7 +142,7 @@ export function ErpInvoicePrintModal({
           className="flex min-h-0 flex-1 justify-center overflow-x-auto overflow-y-auto overscroll-contain bg-slate-100/90 px-4 py-5"
         >
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading invoice…</p>
+            <AdminPrintSkeleton />
           ) : error ? (
             <p className="text-sm text-destructive">{error}</p>
           ) : invoice ? (

@@ -14,6 +14,7 @@ import {
 
 import { paymentModeLabel } from "@/common/erp/sales-types";
 import { adminDelete, adminGet } from "@/modules/admin/lib/admin-api-client";
+import { AdminDetailSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { AdminPageHeader, AdminPageLayout } from "@/modules/admin/ui";
 import { ErpDocumentTabsLayout } from "@/modules/erp/components/erp-document-tabs-layout";
@@ -181,7 +182,7 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
   if (loading) {
     return (
       <AdminPageLayout>
-        <p className="text-sm text-muted-foreground">Loading invoice…</p>
+        <AdminDetailSkeleton />
       </AdminPageLayout>
     );
   }

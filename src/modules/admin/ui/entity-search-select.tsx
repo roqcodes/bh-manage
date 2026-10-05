@@ -14,6 +14,7 @@ import {
   entityLiveSearchQueryKey,
   fetchCustomerSearchOptions,
   fetchVendorSearchOptions,
+  resolveCustomerPickerOption,
   resolveVendorPickerOption,
   type EntitySearchOption,
 } from "@/modules/erp/lib/entity-live-search.client";
@@ -348,12 +349,14 @@ export function CustomerSearchSelect({
   selectedLabel,
   className,
   disabled,
+  placeholder,
 }: {
   value: string | null;
   onChange: (id: string | null, option?: EntitySearchOption) => void;
   selectedLabel?: string;
   className?: string;
   disabled?: boolean;
+  placeholder?: string;
 }) {
   return (
     <EntitySearchSelect
@@ -363,11 +366,12 @@ export function CustomerSearchSelect({
       className={className}
       disabled={disabled}
       cacheScope="customer"
-      placeholder="Select customer"
-      searchPlaceholder="Search by name or phone…"
+      placeholder={placeholder ?? "Select customer"}
+      searchPlaceholder="Search by name, phone, or customer #…"
       emptyText="No customers found"
       minChars={1}
-      loadOnFocus={false}
+      loadOnFocus
+      resolveSelectedOption={resolveCustomerPickerOption}
       fetchOptions={fetchCustomerSearchOptions}
     />
   );
@@ -379,12 +383,14 @@ export function VendorSearchSelect({
   selectedLabel,
   className,
   disabled,
+  placeholder,
 }: {
   value: string | null;
   onChange: (id: string | null, option?: EntitySearchOption) => void;
   selectedLabel?: string;
   className?: string;
   disabled?: boolean;
+  placeholder?: string;
 }) {
   return (
     <EntitySearchSelect
@@ -395,7 +401,7 @@ export function VendorSearchSelect({
       disabled={disabled}
       cacheScope="vendor"
       resolveSelectedOption={resolveVendorPickerOption}
-      placeholder="Select vendor"
+      placeholder={placeholder ?? "Select vendor"}
       searchPlaceholder="Search vendor name, TRN, phone…"
       emptyText="No vendors found"
       minChars={1}
@@ -557,7 +563,7 @@ export function PurchaseBillSearchSelect({
       searchPlaceholder="Bill number or vendor bill #…"
       emptyText="No purchase bills found"
       minChars={1}
-      loadOnFocus={Boolean(vendorId)}
+      loadOnFocus
       fetchOptions={async (q) => {
         const params = new URLSearchParams({ page: "0", limit: "20" });
         if (q.trim()) params.set("search", q.trim());

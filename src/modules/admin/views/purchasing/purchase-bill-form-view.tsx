@@ -26,6 +26,7 @@ import { createOutboxStore } from "@/lib/sync/outbox-store";
 import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
 import { broadcastSyncWake } from "@/lib/sync/sync-network";
 import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
+import { notifyErpLocalFormSaved } from "@/modules/erp/lib/erp-form-save-feedback.client";
 import {
   purchaseBillResourceScope,
   type PurchaseBillCreatePayload,
@@ -153,7 +154,6 @@ export function PurchaseBillFormView({
     useActiveStoreFormField({ mode });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [localSaveNotice, setLocalSaveNotice] = useState<string | null>(null);
   const [landedMaster, setLandedMaster] = useState<ErpLandedCostItem[]>([]);
   const [loading, setLoading] = useState(mode === "edit");
   const isModal = variant === "modal";
@@ -418,15 +418,13 @@ export function PurchaseBillFormView({
           await store.close();
         }
 
+        notifyErpLocalFormSaved({
+          entityLabel: "Purchase bill",
+          mode: billId ? "update" : "create",
+          queuedForPost: shouldFinalize,
+        });
         dispatchOutboxChanged();
         broadcastSyncWake();
-        setLocalSaveNotice(
-          shouldFinalize
-            ? "Queued — will post when synchronized"
-            : billId
-              ? "Update saved locally — pending sync"
-              : "Saved locally — pending sync",
-        );
         handleSuccessNavigate(billId);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Save failed");
@@ -614,9 +612,6 @@ export function PurchaseBillFormView({
           </AdminFormSection>
 
           {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-          {localSaveNotice ? (
-            <p className="text-sm text-muted-foreground">{localSaveNotice}</p>
-          ) : null}
 
           {!isModal ? (
             <div className="flex flex-wrap justify-end gap-2">

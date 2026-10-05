@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 
+import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { SortableTableHead, useSortableData } from "@/modules/admin/ui";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -97,7 +98,7 @@ export function AdminReconciliationView() {
     toggleSort: togglePaymentSort,
   } = useSortableData(paymentRows, "payment_number", "asc");
 
-  if (loading) return <p className="p-4 text-sm">Loading reconciliation…</p>;
+  if (loading) return <AdminPageSkeleton />;
   if (!data) return <p className="p-4 text-sm text-destructive">Failed to load reconciliation data.</p>;
 
   const issueCount =

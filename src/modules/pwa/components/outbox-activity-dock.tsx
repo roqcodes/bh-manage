@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import {
   AlertCircle,
+  Check,
   ChevronDown,
   ChevronRight,
   CloudUpload,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { useOutboxQueueActivity } from "@/lib/sync/hooks/use-outbox-queue-activity";
+import { useOutboxSaveFeedback } from "@/lib/sync/hooks/use-outbox-save-feedback";
 import {
   formatOutboxOperationLabel,
   formatOutboxOperationState,
@@ -145,6 +147,7 @@ function summaryLine(
  */
 export function OutboxActivityDock() {
   const { enabled } = useOutboxActivityPreference();
+  const saveFeedback = useOutboxSaveFeedback();
   const {
     operations,
     queuedCount,
@@ -159,18 +162,26 @@ export function OutboxActivityDock() {
   const [isRetrying, startRetry] = useTransition();
 
   const visibleCount = operations.length;
-  const show = enabled && !loading && visibleCount > 0;
+  const showSavedFlash = Boolean(saveFeedback);
+  const show =
+    enabled && (!loading || showSavedFlash) && (visibleCount > 0 || showSavedFlash);
 
   useEffect(() => {
     if (!show) setExpanded(false);
   }, [show]);
 
-  const headline = summaryLine(
+  const queueHeadline = summaryLine(
     queuedCount,
     syncingCount,
     blockedCount,
     estimatedCompletionMs,
   );
+
+  const headline = showSavedFlash ? saveFeedback!.message : queueHeadline;
+  const subline = showSavedFlash
+    ? saveFeedback!.detail ?? (visibleCount > 0 ? queueHeadline : undefined)
+    : undefined;
+  const savedFlashActive = showSavedFlash;
 
   function retryOne(operationId: string) {
     setRetryError(null);
@@ -204,7 +215,11 @@ export function OutboxActivityDock() {
 
             <div className="relative flex min-h-[44px] items-center gap-2.5 px-3 py-1">
               <span className="relative flex size-2.5 shrink-0 items-center justify-center">
-                {syncingCount > 0 ? (
+                {savedFlashActive ? (
+                  <span className="relative flex size-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
+                  </span>
+                ) : syncingCount > 0 ? (
                   <>
                     <span className="absolute inline-flex size-full animate-ping rounded-full bg-cyan-400/70 opacity-75" />
                     <span className="relative inline-flex size-2 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 shadow-[0_0_8px_rgba(56,189,248,0.75)]" />
@@ -217,12 +232,31 @@ export function OutboxActivityDock() {
               </span>
 
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400/90">
-                  DB sync queue
+                <p
+                  className={cn(
+                    "text-[9px] font-bold uppercase tracking-wider",
+                    savedFlashActive
+                      ? "text-emerald-600/90 dark:text-emerald-400/90"
+                      : "text-slate-400 dark:text-slate-400/90",
+                  )}
+                >
+                  {savedFlashActive ? "Saved locally" : "DB sync queue"}
                 </p>
-                <p className="truncate text-xs font-semibold tracking-tight text-slate-800 dark:text-slate-100">
+                <p
+                  className={cn(
+                    "truncate text-xs font-semibold tracking-tight",
+                    savedFlashActive
+                      ? "text-emerald-900 dark:text-emerald-50"
+                      : "text-slate-800 dark:text-slate-100",
+                  )}
+                >
                   {headline}
                 </p>
+                {subline ? (
+                  <p className="truncate text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                    {subline}
+                  </p>
+                ) : null}
               </div>
 
               <div className="flex shrink-0 items-center gap-0.5">

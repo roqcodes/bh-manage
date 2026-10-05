@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import type { ErpSalesProductSearchRow } from "@/common/erp/sales-types";
+import { AdminTableBodySkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
 import { useDebouncedValue } from "@/modules/admin/ui/use-debounced-value";
 import { Button } from "@/components/ui/button";
@@ -418,9 +419,8 @@ export function CreateOnlineTransferDialog({
 
             <div className="min-h-0 flex-1 overflow-auto">
               {catalogQuery.isPending ? (
-                <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" />
-                  Loading products…
+                <div className="px-4 py-6">
+                  <AdminTableBodySkeleton rows={8} />
                 </div>
               ) : catalog.length === 0 ? (
                 <p className="px-4 py-16 text-center text-sm text-muted-foreground">

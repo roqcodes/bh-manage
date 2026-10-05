@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import type { JournalEntryLineRow, SourceJournalGroup } from "@/common/erp/finance-types";
+import { AdminPanelSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import {
@@ -35,7 +36,7 @@ export function JournalLinesPanel({
   }, [sourceType, sourceId]);
 
   if (loading) {
-    return <p className="p-6 text-sm text-muted-foreground">Loading journals…</p>;
+    return <AdminPanelSkeleton rows={5} />;
   }
 
   if (groups.length === 0) {

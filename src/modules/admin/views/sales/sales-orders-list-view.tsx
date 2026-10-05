@@ -36,7 +36,7 @@ export function SalesOrdersListView() {
   const userId = rawUser && rawUser.length > 0 ? rawUser : null;
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
 
-  const { data, isPending, isError, error } = useQuery({
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: adminQueryKeys.salesOrders(status, userId, page, activeStoreId),
     queryFn: () => {
       const q = new URLSearchParams();
@@ -101,6 +101,7 @@ export function SalesOrdersListView() {
           variant="modal"
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

@@ -19,6 +19,7 @@ import {
   purchaseOrderResourceScope,
   type PurchaseOrderDeliverFinalizePayload,
 } from "@/modules/erp/types/purchase-payload";
+import { AdminDetailSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { cancelAdminPurchaseOrderAction } from "@/modules/purchase-orders/actions/admin-purchase-orders.actions";
 import { AdminBreadcrumb } from "@/modules/admin/components/admin-breadcrumb";
@@ -130,6 +131,7 @@ function buildTimeline(po: ErpPurchaseOrderDetail) {
 export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
   const [pending, startTransition] = useTransition();
   const [po, setPo] = useState<ErpPurchaseOrderDetail | null>(null);
+  const [loading, setLoading] = useState(true);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [deliveredQty, setDeliveredQty] = useState<Record<string, number>>({});
@@ -156,7 +158,10 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
   }
 
   useEffect(() => {
-    reload().catch((e) => setError(e instanceof Error ? e.message : "Failed to load"));
+    setLoading(true);
+    reload()
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
+      .finally(() => setLoading(false));
   }, [poId]);
 
   const previewDiscrepancies = useMemo(() => {
@@ -185,7 +190,14 @@ export function PurchaseOrderDetailErpView({ poId }: { poId: string }) {
   );
   const timeline = po ? buildTimeline(po) : [];
 
-  if (!po) return <p className="p-4 text-sm">Loading purchase order…</p>;
+  if (loading && !po) return <AdminDetailSkeleton />;
+  if (!po) {
+    return (
+      <p className="p-4 text-sm text-destructive">
+        {error ?? "Purchase order not found."}
+      </p>
+    );
+  }
 
   const canEdit = po.status === "pending";
   const canCancel = po.status === "pending";

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState, useTransition } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import type { SalesLineFormRow } from "@/common/erp/sales-types";
+import type { CustomerErpProfile, SalesLineFormRow } from "@/common/erp/sales-types";
 import { calcSalesLine, roundSalesMoney } from "@/common/erp/sales-types";
 import { toDateInputValue } from "@/lib/format-date";
 import { createSupabaseBrowserClient } from "@/lib/integrations/supabase/client";
@@ -16,6 +17,7 @@ import { getOrCreateErpTerminalId } from "@/lib/sync/erp-terminal-id";
 import { createOutboxStore } from "@/lib/sync/outbox-store";
 import { OutboxEnqueueError } from "@/lib/sync/outbox-errors";
 import { resolveOutboxUserId } from "@/lib/sync/resolve-outbox-user-id.client";
+import { notifyErpLocalFormSaved } from "@/modules/erp/lib/erp-form-save-feedback.client";
 import type { SalesInvoiceCreatePayload } from "@/modules/erp/types/sales-invoice-payload";
 import type { SalesInvoiceUpdatePayload } from "@/modules/erp/types/sales-invoice-payload";
 import { salesInvoiceResourceScope } from "@/modules/erp/types/sales-invoice-payload";
@@ -49,6 +51,19 @@ import { Input } from "@/components/ui/input";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { coalesceNumber } from "@/lib/numeric-input";
 import { Label } from "@/components/ui/label";
+import { AdminCustomerFormView } from "@/modules/admin/views/admin-customer-form-view";
+import { invalidateAdminCustomerSearchQueries } from "@/modules/erp/lib/entity-live-search.client";
+
+function customerSelectLabel(profile: CustomerErpProfile): string {
+  return (
+    profile.companyName?.trim() ||
+    profile.contactDisplayName?.trim() ||
+    profile.name?.trim() ||
+    profile.phone?.trim() ||
+    profile.email?.trim() ||
+    "Customer"
+  );
+}
 
 export type InvoiceFormViewProps = ErpFormViewBaseProps & {
   mode: "create" | "edit";
@@ -65,13 +80,13 @@ export function InvoiceFormView({
 }: InvoiceFormViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const formId = useId();
   const { stores, activeStoreId, storeId, setStoreId, effectiveStoreId, storeRequiredMessage } =
     useActiveStoreFormField({ mode });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [stockWarning, setStockWarning] = useState<string | null>(null);
-  const [localSaveNotice, setLocalSaveNotice] = useState<string | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(mode === "edit");
 
   const { data: appSettings } = useQuery({
@@ -85,6 +100,7 @@ export function InvoiceFormView({
 
   const [customerId, setCustomerId] = useState("");
   const [customerLabel, setCustomerLabel] = useState("");
+  const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [discount, setDiscount] = useState(0);
@@ -172,6 +188,21 @@ export function InvoiceFormView({
     }
   }
 
+  async function handleCustomerCreated(savedId?: string) {
+    setCustomerCreateOpen(false);
+    if (!savedId) return;
+    setCustomerId(savedId);
+    try {
+      const res = await adminGet<{ profile: CustomerErpProfile }>(
+        `customers/${savedId}/erp`,
+      );
+      setCustomerLabel(customerSelectLabel(res.profile));
+    } catch {
+      setCustomerLabel("");
+    }
+    void invalidateAdminCustomerSearchQueries(queryClient);
+  }
+
   function resetCreateForm() {
     setCustomerId("");
     setCustomerLabel("");
@@ -203,7 +234,6 @@ export function InvoiceFormView({
 
   function handleSubmit(finalize: boolean) {
     setError(null);
-    setLocalSaveNotice(null);
     setStockWarning(null);
     if (!customerId) {
       setError("Customer is required");
@@ -314,13 +344,13 @@ export function InvoiceFormView({
           await store.close();
         }
 
+        notifyErpLocalFormSaved({
+          entityLabel: "Sales invoice",
+          mode: mode === "edit" ? "update" : "create",
+          queuedForPost: finalize,
+        });
         dispatchOutboxChanged();
         broadcastSyncWake();
-        setLocalSaveNotice(
-          finalize
-            ? "Queued — will post when synchronized"
-            : "Saved locally — pending sync",
-        );
         if (mode === "create") {
           handleSuccessNavigate();
         } else {
@@ -385,6 +415,7 @@ export function InvoiceFormView({
   ) : undefined;
 
   return (
+    <>
     <AdminFormShell
       variant={variant}
       open={open}
@@ -413,18 +444,31 @@ export function InvoiceFormView({
           <AdminFormSection title="Invoice details">
             <AdminFormGrid cols={3}>
               <AdminFormField label="Customer" required className="sm:col-span-2">
-                <CustomerSearchSelect
-                  value={customerId || null}
-                  selectedLabel={customerLabel || undefined}
-                  disabled={mode === "edit"}
-                  onChange={(id, option) => {
-                    setCustomerId(id ?? "");
-                    setCustomerLabel(option?.label ?? "");
-                  }}
-                />
-                <Link href="/admin/customers" className="mt-1 inline-block text-xs text-primary hover:underline">
-                  Add customer
-                </Link>
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <CustomerSearchSelect
+                      value={customerId || null}
+                      selectedLabel={customerLabel || undefined}
+                      disabled={mode === "edit"}
+                      onChange={(id, option) => {
+                        setCustomerId(id ?? "");
+                        setCustomerLabel(option?.label ?? "");
+                      }}
+                    />
+                  </div>
+                  {mode === "create" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 shrink-0 whitespace-nowrap px-3"
+                      onClick={() => setCustomerCreateOpen(true)}
+                    >
+                      <UserPlus className="size-4" />
+                      Add customer
+                    </Button>
+                  ) : null}
+                </div>
               </AdminFormField>
               <ErpDocumentNumberField kind="INV" enabled={mode === "create"} />
               <AdminFormField label="Store" required>
@@ -479,9 +523,6 @@ export function InvoiceFormView({
           {stockWarning ? (
             <p className="text-sm text-amber-700 dark:text-amber-400">{stockWarning}</p>
           ) : null}
-          {localSaveNotice ? (
-            <p className="text-sm text-muted-foreground">{localSaveNotice}</p>
-          ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           {!isModal ? (
@@ -502,5 +543,17 @@ export function InvoiceFormView({
         </AdminFormModalLayout>
       </form>
     </AdminFormShell>
+
+    {customerCreateOpen ? (
+      <AdminCustomerFormView
+        variant="modal"
+        mode="create"
+        open={customerCreateOpen}
+        onOpenChange={setCustomerCreateOpen}
+        modalStacked={isModal}
+        onSuccess={handleCustomerCreated}
+      />
+    ) : null}
+    </>
   );
 }

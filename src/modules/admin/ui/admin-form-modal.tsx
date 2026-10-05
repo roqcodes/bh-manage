@@ -34,6 +34,8 @@ export type AdminFormModalProps = {
   title: string;
   description?: string;
   size?: AdminFormModalSize;
+  /** Raise z-index when opened above another dialog (e.g. create customer on invoice). */
+  stacked?: boolean;
   children: ReactNode;
   footer?: ReactNode;
   formId?: string;
@@ -54,6 +56,7 @@ export function AdminFormModal({
   title,
   description,
   size = "lg",
+  stacked = false,
   children,
   footer,
   formId,
@@ -65,6 +68,7 @@ export function AdminFormModal({
       <DialogContent
         showCloseButton
         instant
+        stacked={stacked}
         className={cn(
           "gap-0 p-0",
           SIZE_CLASSES[size],
@@ -109,6 +113,7 @@ export type AdminFormShellProps = {
   loadingFallback?: ReactNode;
   pending?: boolean;
   footer?: ReactNode;
+  stacked?: boolean;
   children: ReactNode;
 };
 
@@ -126,6 +131,7 @@ export function AdminFormShell({
   loadingFallback,
   pending = false,
   footer,
+  stacked = false,
   children,
 }: AdminFormShellProps) {
   if (loading && loadingFallback) {
@@ -137,6 +143,7 @@ export function AdminFormShell({
           title={title}
           description={description}
           size={size}
+          stacked={stacked}
         >
           {loadingFallback}
         </AdminFormModal>
@@ -153,6 +160,7 @@ export function AdminFormShell({
         title={title}
         description={description}
         size={size}
+        stacked={stacked}
         formId={formId}
         footer={footer}
       >

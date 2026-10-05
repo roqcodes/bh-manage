@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import type { OnlineStockTransferRow } from "@/modules/inventory/services/online-stock-transfers.service";
 import { isDefaultSkuName } from "@/modules/products/lib/product-sku-catalog";
+import { AdminTableBodySkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { adminGet, adminPatch } from "@/modules/admin/lib/admin-api-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -157,7 +158,9 @@ export function AllocateOnlineTransferDialog({
         </DialogHeader>
 
         {loadingVariants ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Loading variants…</p>
+          <div className="py-4">
+            <AdminTableBodySkeleton rows={5} />
+          </div>
         ) : allocations.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             No online SKU available for this product.

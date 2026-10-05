@@ -19,7 +19,7 @@ import {
   type ErpFormViewBaseProps,
 } from "@/modules/admin/ui";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -232,12 +232,12 @@ export function CustomerBulkPaymentFormView({
 
   if (isModal && !open) return null;
 
-  const title = "Payment bulk";
+  const title = "Bulk payment";
   const footer = isModal ? (
     <AdminFormActions
       formId={formId}
       onCancel={handleCancel}
-      submitLabel="Save"
+      submitLabel="Save bulk payment"
       pending={isPending}
     />
   ) : undefined;
@@ -248,11 +248,11 @@ export function CustomerBulkPaymentFormView({
       open={open}
       onOpenChange={onOpenChange}
       title={title}
-      description="Allocate payments across invoices. Use FIFO to auto-fill oldest dues first."
+      description="Apply one deposit across multiple customer invoices."
       backHref="/admin/erp/customer-bulk-payments"
       breadcrumb={[
-        { label: "Bulk payments", href: "/admin/erp/customer-bulk-payments" },
-        { label: "Add payment" },
+        { label: "Payment bulk", href: "/admin/erp/customer-bulk-payments" },
+        { label: "Add bulk payment" },
       ]}
       size="landscape"
       formId={formId}
@@ -262,14 +262,6 @@ export function CustomerBulkPaymentFormView({
         <AdminFormColumns cols={2}>
           <AdminFormSection title="Payment details">
             <AdminFormGrid cols={3}>
-              <AdminFormField label="Payment date" required>
-                <Input
-                  type="date"
-                  value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                  required
-                />
-              </AdminFormField>
               <AdminFormField label="Store" required>
                 <ActiveStoreFormField
                   mode="create"
@@ -280,9 +272,16 @@ export function CustomerBulkPaymentFormView({
                   label=""
                 />
               </AdminFormField>
+              <AdminFormField label="Payment date" required>
+                <Input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                />
+              </AdminFormField>
               <AdminFormField label="Payment mode">
                 <select
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-9 w-full rounded-md border px-3 text-sm"
                   value={paymentMode}
                   onChange={(e) => setPaymentMode(e.target.value)}
                 >
@@ -293,9 +292,9 @@ export function CustomerBulkPaymentFormView({
                   ))}
                 </select>
               </AdminFormField>
-              <AdminFormField label="Deposit to" required>
+              <AdminFormField label="Deposit to" required className="sm:col-span-2">
                 <select
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-9 w-full rounded-md border px-3 text-sm"
                   value={accountId}
                   onChange={(e) => setAccountId(e.target.value)}
                   required
@@ -311,37 +310,34 @@ export function CustomerBulkPaymentFormView({
               <AdminFormField label="Bank charges">
                 <Input
                   type="number"
-                  min="0"
                   step="0.01"
                   value={bankCharges}
                   onChange={(e) => setBankCharges(e.target.value)}
                 />
               </AdminFormField>
-              {bankChargesAmount > 0 ? (
-                <AdminFormField label="Bank charges expense account" required>
-                  <select
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    value={bankChargesAccountId}
-                    onChange={(e) => setBankChargesAccountId(e.target.value)}
-                  >
-                    <option value="">Select expense account</option>
-                    {expenseAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </AdminFormField>
-              ) : null}
+              <AdminFormField label="Bank charges account">
+                <select
+                  className="h-9 w-full rounded-md border px-3 text-sm"
+                  value={bankChargesAccountId}
+                  onChange={(e) => setBankChargesAccountId(e.target.value)}
+                >
+                  <option value="">Select expense account</option>
+                  {expenseAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </AdminFormField>
               <AdminFormField label="Notes" className="sm:col-span-2">
-                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
               </AdminFormField>
             </AdminFormGrid>
           </AdminFormSection>
 
-          <AdminFormSection title="Invoice payments">
-            <AdminFormGrid cols={3}>
-              <AdminFormField label="Invoice" required className="sm:col-span-2">
+          <AdminFormSection title="Add invoice payment">
+            <AdminFormGrid cols={1}>
+              <AdminFormField label="Invoice" required>
                 <InvoiceSearchSelect
                   value={selectedInvoiceId || null}
                   selectedLabel={invoiceLabel || undefined}
@@ -359,6 +355,12 @@ export function CustomerBulkPaymentFormView({
                   }}
                 />
               </AdminFormField>
+              {selectedInvoiceId ? (
+                <p className="text-sm text-muted-foreground">
+                  Balance due: {formatCurrencyAmount(selectedInvoiceBalance)}
+                  {selectedInvoiceCustomer ? ` · ${selectedInvoiceCustomer}` : ""}
+                </p>
+              ) : null}
               <AdminFormField label="Receipt #">
                 <Input
                   placeholder="Receipt #"
@@ -366,77 +368,74 @@ export function CustomerBulkPaymentFormView({
                   onChange={(e) => setReceiptRef(e.target.value)}
                 />
               </AdminFormField>
-              <AdminFormField label="Payment amount">
+              <AdminFormField label="Amount">
                 <Input
                   type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Payment amount"
+                  placeholder="Amount"
                   value={lineAmount}
                   onChange={(e) => setLineAmount(e.target.value)}
                 />
               </AdminFormField>
             </AdminFormGrid>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3">
               <Button type="button" variant="outline" onClick={addLine}>
                 Add invoice
               </Button>
-              <div className="flex flex-1 flex-wrap items-center gap-2 sm:justify-end">
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="FIFO amount"
-                  value={fifoAmount}
-                  onChange={(e) => setFifoAmount(e.target.value)}
-                  className="w-full sm:w-[180px]"
-                />
-                <Button type="button" variant="secondary" onClick={() => void applyFifo()}>
-                  FIFO allocate
-                </Button>
-              </div>
             </div>
           </AdminFormSection>
         </AdminFormColumns>
 
+        <AdminFormSection title="FIFO allocation">
+          <div className="flex flex-wrap items-end gap-2">
+            <AdminFormField label="Amount to allocate (oldest invoices first)" className="min-w-[200px]">
+              <Input
+                type="number"
+                value={fifoAmount}
+                onChange={(e) => setFifoAmount(e.target.value)}
+                className="w-40"
+              />
+            </AdminFormField>
+            <Button type="button" variant="secondary" onClick={() => void applyFifo()}>
+              Apply FIFO
+            </Button>
+          </div>
+        </AdminFormSection>
+
         {lines.length > 0 ? (
           <Card>
-            <CardHeader>
-              <CardTitle>Invoices ({lines.length})</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="pt-6">
               <Table>
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-12">#</TableHead>
+                  <TableRow>
                     <TableHead>Invoice</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Receipt #</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="w-16" />
+                    <TableHead className="text-right">Due</TableHead>
+                    <TableHead className="text-right">Paying</TableHead>
+                    <TableHead className="text-right">Remaining</TableHead>
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lines.map((line, index) => (
-                    <TableRow key={line.invoiceId}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">{line.invoiceNumber}</TableCell>
-                      <TableCell>{line.customerName ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {line.receiptRef || "—"}
+                  {lines.map((l) => (
+                    <TableRow key={l.invoiceId}>
+                      <TableCell>{l.invoiceNumber}</TableCell>
+                      <TableCell>{l.customerName ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{l.receiptRef || "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrencyAmount(l.balanceDue)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {formatCurrencyAmount(line.balanceDue)}
+                        {formatCurrencyAmount(l.amount)}
                       </TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">
-                        {formatCurrencyAmount(line.amount)}
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatCurrencyAmount(Math.max(0, l.balanceDue - l.amount))}
                       </TableCell>
                       <TableCell>
                         <button
                           type="button"
-                          className="text-xs text-destructive hover:underline"
-                          onClick={() => removeLine(line.invoiceId)}
+                          className="text-xs text-rose-600"
+                          onClick={() => removeLine(l.invoiceId)}
                         >
                           Remove
                         </button>
@@ -445,17 +444,15 @@ export function CustomerBulkPaymentFormView({
                   ))}
                 </TableBody>
               </Table>
-              <p className="border-t p-4 text-right text-sm font-semibold tabular-nums">
-                Total: {formatCurrencyAmount(total)}
-              </p>
+              <p className="mt-3 text-sm font-medium">Total: {formatCurrencyAmount(total)}</p>
             </CardContent>
           </Card>
         ) : null}
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
         {!isModal ? (
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex gap-2">
             <Link
               href="/admin/erp/customer-bulk-payments"
               className={buttonVariants({ variant: "outline" })}
@@ -463,7 +460,7 @@ export function CustomerBulkPaymentFormView({
               Cancel
             </Link>
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Saving…" : "Save"}
+              {isPending ? "Saving…" : "Save bulk payment"}
             </Button>
           </div>
         ) : null}

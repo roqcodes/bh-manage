@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { SalesLoadingState } from "@/modules/erp/components/sales-module-ui";
+import { AdminDetailSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 
 function formatDisplayDate(value: string | null) {
   if (!value) return "—";
@@ -54,7 +54,7 @@ export function CustomerBulkPaymentDetailView({ batchId }: { batchId: string }) 
   if (loading) {
     return (
       <AdminPageLayout>
-        <p className="text-sm text-muted-foreground">Loading bulk payment…</p>
+        <AdminDetailSkeleton />
       </AdminPageLayout>
     );
   }

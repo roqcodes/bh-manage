@@ -30,7 +30,16 @@ export async function searchCustomersTypeahead(
   limit = 20,
 ): Promise<CustomerTypeaheadRow[]> {
   const trimmed = query.trim();
-  if (!trimmed) return [];
+  if (!trimmed) {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, name, email, phone, customer_number")
+      .or(CUSTOMER_ROLE_OR_FILTER)
+      .order("name")
+      .limit(limit);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as CustomerTypeaheadRow[];
+  }
 
   const { data: rpcRows, error: rpcError } = await supabase.rpc(
     "erp_search_customers" as never,
