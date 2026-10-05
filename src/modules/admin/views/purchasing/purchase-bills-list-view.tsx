@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useTransition } from "react";
 import { Plus } from "lucide-react";
 
 import type { ErpPurchaseBillListRow } from "@/common/erp/purchasing-types";
 import { PAGE_SIZE } from "@/common/admin/types";
-import { adminDelete, adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminDelete } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { Pagination } from "@/modules/admin/components/pagination";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -47,7 +48,6 @@ const STATUS_OPTIONS = [
 
 export function PurchaseBillsListView() {
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/purchase-bills");
-  const [reloadToken, setReloadToken] = useState(0);
   const {
     search,
     setSearch,
@@ -63,11 +63,23 @@ export function PurchaseBillsListView() {
     isFiltering,
     clearFilters,
     activeStoreId,
+    erpContextLoading,
   } = useErpListState();
-  const [rows, setRows] = useState<ErpPurchaseBillListRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const listPath = adminListPath("erp/purchase-bills", { page, ...listParams });
+  const { data, isPending, isError, error, refetch } = useAdminGetQuery<{
+    data: ErpPurchaseBillListRow[];
+    total: number;
+  }>({
+    path: listPath,
+    enabled: !erpContextLoading,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const loadError = isError
+    ? error instanceof Error
+      ? error.message
+      : "Failed to load purchase bills"
+    : null;
   const [cancellingId, startCancel] = useTransition();
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
@@ -75,34 +87,14 @@ export function PurchaseBillsListView() {
     "desc",
   );
 
-  function reload() {
-    const q = new URLSearchParams({ page: String(page), ...listParams });
-    return adminGet<{ data: ErpPurchaseBillListRow[]; total: number }>(
-      `erp/purchase-bills?${q.toString()}`,
-    ).then((res) => {
-      setRows(res.data);
-      setTotal(res.total);
-      setLoadError(null);
-    });
-  }
-
-  useEffect(() => {
-    setLoading(true);
-    reload()
-      .catch((error) => {
-        setLoadError(error instanceof Error ? error.message : "Failed to load purchase bills");
-      })
-      .finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, dateFrom, dateTo, reloadToken, listParams]);
-
   function handleCancel(id: string) {
     startCancel(async () => {
       await adminDelete(`erp/purchase-bills/${id}`);
-      await reload();
+      await refetch();
     });
   }
 
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>
@@ -305,7 +297,7 @@ export function PurchaseBillsListView() {
           billId={editId ?? undefined}
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

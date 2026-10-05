@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { StockDetailRow } from "@/common/erp/inventory-types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { Badge } from "@/components/ui/badge";
@@ -38,13 +38,17 @@ function StockBadge({ value }: { value: number }) {
 
 export function StoreInventoryListView() {
   const { stores } = useErpStores();
-  const { storeId } = useActiveStoreScope();
-  const [rows, setRows] = useState<StockDetailRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const { storeId, erpContextLoading } = useActiveStoreScope();
   const [search, setSearch] = useState("");
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search, 350);
+  const listPath = adminListPath("erp/stock-details", { page: 0, storeId });
+  const { data, isPending } = useAdminGetQuery<{ data: StockDetailRow[]; total: number }>({
+    path: listPath,
+    enabled: !erpContextLoading && Boolean(storeId),
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "product_name",
@@ -53,18 +57,6 @@ export function StoreInventoryListView() {
 
   const activeStoreName =
     stores.find((s) => s.id === storeId)?.name ?? stores[0]?.name ?? "—";
-
-  useEffect(() => {
-    setLoading(true);
-    const q = new URLSearchParams({ page: "0" });
-    if (storeId) q.set("storeId", storeId);
-    adminGet<{ data: StockDetailRow[]; total: number }>(`erp/stock-details?${q.toString()}`)
-      .then((res) => {
-        setRows(res.data);
-        setTotal(res.total);
-      })
-      .finally(() => setLoading(false));
-  }, [storeId]);
 
   const filtered = useMemo(() => {
     if (!debouncedSearch.trim()) return sorted;
@@ -76,7 +68,7 @@ export function StoreInventoryListView() {
     );
   }, [sorted, debouncedSearch]);
 
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>

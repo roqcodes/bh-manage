@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 
 import type { BulkSupplierPaymentBatchRow } from "@/common/erp/purchasing-types";
 import { PAGE_SIZE } from "@/common/admin/types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { Pagination } from "@/modules/admin/components/pagination";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -42,43 +42,35 @@ const PERIOD_OPTIONS = [
 export function SupplierBulkPaymentsListView() {
   const searchParams = useSearchParams();
   const { isOpen, modalProps, openNew } = useErpFormModal("/admin/erp/supplier-bulk-payments");
-  const [reloadToken, setReloadToken] = useState(0);
-  const [rows, setRows] = useState<BulkSupplierPaymentBatchRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [period, setPeriod] = useState(searchParams.get("period") ?? "all");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
+  const listPath = adminListPath("erp/supplier-payments", {
+    view: "bulk",
+    page,
+    period: period !== "all" ? period : undefined,
+    search: debouncedSearch.trim() || undefined,
+  });
+  const { data, isPending, refetch } = useAdminGetQuery<{
+    data: BulkSupplierPaymentBatchRow[];
+    total: number;
+  }>({
+    path: listPath,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "payment_date",
     "desc",
   );
 
-  useEffect(() => {
-    setLoading(true);
-    const q = new URLSearchParams();
-    q.set("view", "bulk");
-    q.set("page", String(page));
-    if (period !== "all") q.set("period", period);
-    if (debouncedSearch.trim()) q.set("search", debouncedSearch.trim());
-
-    adminGet<{ data: BulkSupplierPaymentBatchRow[]; total: number }>(
-      `erp/supplier-payments?${q.toString()}`,
-    )
-      .then((res) => {
-        setRows(res.data);
-        setTotal(res.total);
-      })
-      .finally(() => setLoading(false));
-  }, [page, period, debouncedSearch, reloadToken]);
-
   const listParams: Record<string, string> = {};
   if (period !== "all") listParams.period = period;
   if (debouncedSearch.trim()) listParams.search = debouncedSearch.trim();
 
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>
@@ -213,7 +205,7 @@ export function SupplierBulkPaymentsListView() {
           variant="modal"
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

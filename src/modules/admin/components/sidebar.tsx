@@ -21,7 +21,7 @@ import {
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import { prefetchAdminRoute } from "@/modules/admin/lib/admin-prefetch-nav";
 import { isAdminRouteHidden } from "@/modules/admin/lib/hidden-admin-routes";
-import { useErpContextQuery } from "@/modules/erp/components/use-erp-stores";
+import { useAdminBootstrap } from "@/modules/admin/providers/admin-bootstrap-provider";
 import { BuyHubLogo } from "@/modules/brand/components/buyhub-logo";
 
 const DASHBOARD_ITEM = ADMIN_DASHBOARD_ITEM;
@@ -394,23 +394,11 @@ export function AdminSidebar({
     }
   }, [activeSectionLabel]);
 
-  /**
-   * Badges are non-critical. Do not start until ERP context has settled, then
-   * wait so list/dashboard requests get the connection first.
-   * requestIdleCallback during session wait previously fired immediately.
-   */
-  const { isSuccess: erpContextReady } = useErpContextQuery();
-  const [navBadgesEnabled, setNavBadgesEnabled] = useState(false);
-  useEffect(() => {
-    if (!erpContextReady) return;
-    const t = window.setTimeout(() => setNavBadgesEnabled(true), 4_000);
-    return () => window.clearTimeout(t);
-  }, [erpContextReady]);
-
+  const { secondaryQueriesEnabled } = useAdminBootstrap();
   const { data: navBadgesData } = useQuery({
     queryKey: adminQueryKeys.navBadges(),
     queryFn: fetchAdminNavBadges,
-    enabled: navBadgesEnabled,
+    enabled: secondaryQueriesEnabled,
     ...adminNavBadgesQueryOptions,
   });
 
@@ -418,8 +406,9 @@ export function AdminSidebar({
   const dashboardActive = isNavActive(pathname, DASHBOARD_ITEM.href);
 
   const prefetch = useMemo(
-    () => (href: string) => void prefetchAdminRoute(queryClient, href),
-    [queryClient],
+    () => (href: string) =>
+      void prefetchAdminRoute(queryClient, href, { enabled: secondaryQueriesEnabled }),
+    [queryClient, secondaryQueriesEnabled],
   );
 
   return (

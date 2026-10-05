@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { MoreHorizontal, Plus } from "lucide-react";
 
@@ -9,7 +9,7 @@ import type {
   ErpEstimateListRow,
   ErpPaymentListRow,
 } from "@/common/erp/sales-types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { formatErpDocRef } from "@/lib/erp-document-ref";
@@ -40,20 +40,18 @@ import { EstimateFormView } from "@/modules/admin/views/sales/estimate-form-view
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
 export function AdminErpEstimatesView() {
-  const { activeStoreId } = useErpStores();
+  const { activeStoreId, loading: erpContextLoading } = useErpStores();
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/estimates");
-  const [reloadToken, setReloadToken] = useState(0);
-  const [rows, setRows] = useState<ErpEstimateListRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    const q = new URLSearchParams({ page: "0" });
-    if (activeStoreId) q.set("storeId", activeStoreId);
-    adminGet<{ data: ErpEstimateListRow[] }>(`erp/estimates?${q.toString()}`)
-      .then((res) => setRows(res.data))
-      .finally(() => setLoading(false));
-  }, [reloadToken, activeStoreId]);
+  const listPath = adminListPath("erp/estimates", {
+    page: 0,
+    storeId: activeStoreId,
+  });
+  const { data, isPending, refetch } = useAdminGetQuery<{ data: ErpEstimateListRow[] }>({
+    path: listPath,
+    enabled: !erpContextLoading && Boolean(activeStoreId),
+  });
+  const rows = data?.data ?? [];
 
   const filtered = search.trim()
     ? rows.filter(
@@ -69,7 +67,7 @@ export function AdminErpEstimatesView() {
     "desc",
   );
 
-  if (loading) return <SalesLoadingState />;
+  if (isPending && !data) return <SalesLoadingState />;
 
   return (
     <SalesPageLayout>
@@ -209,7 +207,7 @@ export function AdminErpEstimatesView() {
           estimateId={editId ?? undefined}
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </SalesPageLayout>
@@ -217,15 +215,11 @@ export function AdminErpEstimatesView() {
 }
 
 export function AdminErpPaymentsView() {
-  const [rows, setRows] = useState<ErpPaymentListRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isPending } = useAdminGetQuery<{ data: ErpPaymentListRow[] }>({
+    path: adminListPath("erp/payments", { page: 0 }),
+  });
   const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    adminGet<{ data: ErpPaymentListRow[] }>("erp/payments?page=0")
-      .then((res) => setRows(res.data))
-      .finally(() => setLoading(false));
-  }, []);
+  const rows = data?.data ?? [];
 
   const filtered = search.trim()
     ? rows.filter(
@@ -241,7 +235,7 @@ export function AdminErpPaymentsView() {
     "desc",
   );
 
-  if (loading) return <SalesLoadingState />;
+  if (isPending && !data) return <SalesLoadingState />;
 
   return (
     <SalesPageLayout>
@@ -374,16 +368,12 @@ export function AdminErpPaymentsView() {
 
 /** @deprecated Use CreditNotesListView */
 export function AdminErpCreditNotesView() {
-  const [rows, setRows] = useState<ErpCreditNoteListRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isPending } = useAdminGetQuery<{ data: ErpCreditNoteListRow[] }>({
+    path: adminListPath("erp/credit-notes", { page: 0 }),
+  });
+  const rows = data?.data ?? [];
 
-  useEffect(() => {
-    adminGet<{ data: ErpCreditNoteListRow[] }>("erp/credit-notes?page=0")
-      .then((res) => setRows(res.data))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <SalesLoadingState />;
+  if (isPending && !data) return <SalesLoadingState />;
 
   return (
     <SalesPageLayout>

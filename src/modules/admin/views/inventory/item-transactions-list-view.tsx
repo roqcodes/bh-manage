@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 
 import type { ItemTransactionRow } from "@/common/erp/inventory-types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import {
@@ -37,40 +37,32 @@ const TRANSACTION_TYPES = [
 ];
 
 export function ItemTransactionsListView() {
-  const { activeStoreId, storeId } = useActiveStoreScope();
-  const [rows, setRows] = useState<ItemTransactionRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const { storeId, erpContextLoading } = useActiveStoreScope();
   const [type, setType] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 350);
+  const listPath = adminListPath("erp/item-transactions", {
+    storeId,
+    type: type !== "all" ? type : undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    search: debouncedSearch.trim() || undefined,
+  });
+  const { data, isPending } = useAdminGetQuery<{ data: ItemTransactionRow[]; total: number }>({
+    path: listPath,
+    enabled: !erpContextLoading,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "created_at",
     "desc",
   );
 
-  useEffect(() => {
-    setLoading(true);
-    const q = new URLSearchParams();
-    if (storeId) q.set("storeId", storeId);
-    if (type !== "all") q.set("type", type);
-    if (dateFrom) q.set("dateFrom", dateFrom);
-    if (dateTo) q.set("dateTo", dateTo);
-    if (debouncedSearch.trim()) q.set("search", debouncedSearch.trim());
-    adminGet<{ data: ItemTransactionRow[]; total: number }>(
-      `erp/item-transactions?${q.toString()}`,
-    )
-      .then((res) => {
-        setRows(res.data);
-        setTotal(res.total);
-      })
-      .finally(() => setLoading(false));
-  }, [storeId, type, dateFrom, dateTo, debouncedSearch]);
-
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>

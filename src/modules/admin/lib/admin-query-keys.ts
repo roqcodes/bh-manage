@@ -78,4 +78,6 @@ export const adminQueryKeys = {
   ) => ["admin", "erp-product-search", catalog, storeId ?? "", query] as const,
   entityLiveSearch: (scope: string, query: string) =>
     ["admin", "entity-search", scope, query] as const,
+  /** Full admin GET path including query string — must match the page request. */
+  erpGet: (pathAndQuery: string) => ["admin", "get", pathAndQuery] as const,
 };

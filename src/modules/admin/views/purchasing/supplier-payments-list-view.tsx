@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 
@@ -10,7 +10,7 @@ import type {
 } from "@/common/erp/purchasing-types";
 import { ERP_SUPPLIER_PAYMENT_MODES } from "@/common/erp/purchasing-types";
 import { PAGE_SIZE } from "@/common/admin/types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { Pagination } from "@/modules/admin/components/pagination";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -53,43 +53,33 @@ const PAYMENT_MODE_OPTIONS = [
 export function SupplierPaymentsListView() {
   const searchParams = useSearchParams();
   const { isOpen, modalProps, openNew } = useErpFormModal("/admin/erp/supplier-payments");
-  const [reloadToken, setReloadToken] = useState(0);
-  const [rows, setRows] = useState<ErpSupplierPaymentListRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [modeTotals, setModeTotals] = useState<SupplierPaymentModeTotals | null>(null);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [paymentMode, setPaymentMode] = useState(searchParams.get("paymentMode") ?? "all");
   const [period, setPeriod] = useState(searchParams.get("period") ?? "all");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
+  const listPath = adminListPath("erp/supplier-payments", {
+    page,
+    isBulk: "false",
+    paymentMode: paymentMode !== "all" ? paymentMode : undefined,
+    period: period !== "all" ? period : undefined,
+    search: debouncedSearch.trim() || undefined,
+  });
+  const { data, isPending, refetch } = useAdminGetQuery<{
+    data: ErpSupplierPaymentListRow[];
+    total: number;
+    modeTotals: SupplierPaymentModeTotals;
+  }>({
+    path: listPath,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const modeTotals = data?.modeTotals ?? null;
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "payment_date",
     "desc",
   );
-
-  useEffect(() => {
-    setLoading(true);
-    const q = new URLSearchParams();
-    q.set("page", String(page));
-    q.set("isBulk", "false");
-    if (paymentMode !== "all") q.set("paymentMode", paymentMode);
-    if (period !== "all") q.set("period", period);
-    if (debouncedSearch.trim()) q.set("search", debouncedSearch.trim());
-
-    adminGet<{
-      data: ErpSupplierPaymentListRow[];
-      total: number;
-      modeTotals: SupplierPaymentModeTotals;
-    }>(`erp/supplier-payments?${q.toString()}`)
-      .then((res) => {
-        setRows(res.data);
-        setTotal(res.total);
-        setModeTotals(res.modeTotals);
-      })
-      .finally(() => setLoading(false));
-  }, [page, paymentMode, period, debouncedSearch, reloadToken]);
 
   const listParams: Record<string, string> = {};
   if (paymentMode !== "all") listParams.paymentMode = paymentMode;
@@ -99,7 +89,7 @@ export function SupplierPaymentsListView() {
   const isFiltering =
     Boolean(debouncedSearch.trim()) || paymentMode !== "all" || period !== "all";
 
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>
@@ -302,7 +292,7 @@ export function SupplierPaymentsListView() {
           variant="modal"
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

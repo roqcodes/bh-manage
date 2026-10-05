@@ -1,7 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+
+import { useAdminBootstrap } from "@/modules/admin/providers/admin-bootstrap-provider";
 
 import {
   DEFAULT_CURRENCY_SETTINGS,
@@ -39,19 +41,13 @@ export function CurrencySettingsProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [settingsEnabled, setSettingsEnabled] = useState(false);
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setSettingsEnabled(true), 4_000);
-    return () => window.clearTimeout(t);
-  }, []);
-
+  const { secondaryQueriesEnabled } = useAdminBootstrap();
   const { data, isLoading } = useQuery({
     queryKey: adminQueryKeys.appSettings(),
     queryFn: () =>
       adminGet<{ settings: CurrencySettings }>("settings").then((r) => r.settings),
     staleTime: 5 * 60_000,
-    enabled: settingsEnabled,
+    enabled: secondaryQueriesEnabled,
     placeholderData: DEFAULT_CURRENCY_SETTINGS,
   });
 

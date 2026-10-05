@@ -10,6 +10,7 @@ import type {
   PendingTransferPaymentRow,
 } from "@/common/erp/inventory-types";
 import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { formatErpDocRef } from "@/lib/erp-document-ref";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -32,27 +33,20 @@ import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stor
 
 export function TransferBulkPaymentsListView() {
   const { isOpen, modalProps, openNew } = useErpFormModal("/admin/erp/transfer-bulk-payments");
-  const [reloadToken, setReloadToken] = useState(0);
-  const [rows, setRows] = useState<ErpTransferPaymentListRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const listPath = adminListPath("erp/transfer-payments", {
+    search: search.trim() || undefined,
+  });
+  const { data, isPending, refetch } = useAdminGetQuery<{
+    data: ErpTransferPaymentListRow[];
+    total: number;
+  }>({
+    path: listPath,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
 
-  useEffect(() => {
-    setLoading(true);
-    const q = new URLSearchParams();
-    if (search.trim()) q.set("search", search.trim());
-    adminGet<{ data: ErpTransferPaymentListRow[]; total: number }>(
-      `erp/transfer-payments?${q.toString()}`,
-    )
-      .then((res) => {
-        setRows(res.data);
-        setTotal(res.total);
-      })
-      .finally(() => setLoading(false));
-  }, [search, reloadToken]);
-
-  if (loading) return <p className="p-4 text-sm">Loading payments…</p>;
+  if (isPending && !data) return <p className="p-4 text-sm">Loading payments…</p>;
 
   return (
     <AdminPageLayout>
@@ -120,7 +114,7 @@ export function TransferBulkPaymentsListView() {
           variant="modal"
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

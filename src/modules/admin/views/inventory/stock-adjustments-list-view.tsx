@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 
 import type { ErpStockAdjustmentListRow } from "@/common/erp/inventory-types";
 import { PAGE_SIZE } from "@/common/admin/types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { Pagination } from "@/modules/admin/components/pagination";
@@ -37,42 +37,36 @@ import { StockAdjustmentFormView } from "@/modules/admin/views/inventory/stock-a
 
 export function StockAdjustmentsListView() {
   const searchParams = useSearchParams();
-  const { activeStoreId, storeId } = useActiveStoreScope();
+  const { storeId, erpContextLoading } = useActiveStoreScope();
   const { isOpen, modalProps, openNew } = useErpFormModal("/admin/erp/stock-adjustments");
-  const [reloadToken, setReloadToken] = useState(0);
-  const [rows, setRows] = useState<ErpStockAdjustmentListRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
+  const listPath = adminListPath("erp/stock-adjustments", {
+    page,
+    search: debouncedSearch.trim() || undefined,
+    storeId,
+  });
+  const { data, isPending, refetch } = useAdminGetQuery<{
+    data: ErpStockAdjustmentListRow[];
+    total: number;
+  }>({
+    path: listPath,
+    enabled: !erpContextLoading && Boolean(storeId),
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "adjustment_date",
     "desc",
   );
 
-  useEffect(() => {
-    setLoading(true);
-    const q = new URLSearchParams();
-    q.set("page", String(page));
-    if (debouncedSearch.trim()) q.set("search", debouncedSearch.trim());
-    if (storeId) q.set("storeId", storeId);
-    adminGet<{ data: ErpStockAdjustmentListRow[]; total: number }>(
-      `erp/stock-adjustments?${q.toString()}`,
-    )
-      .then((res) => {
-        setRows(res.data);
-        setTotal(res.total);
-      })
-      .finally(() => setLoading(false));
-  }, [page, debouncedSearch, storeId, reloadToken]);
-
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
   if (debouncedSearch.trim()) listParams.search = debouncedSearch.trim();
 
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>
@@ -195,7 +189,7 @@ export function StockAdjustmentsListView() {
           variant="modal"
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

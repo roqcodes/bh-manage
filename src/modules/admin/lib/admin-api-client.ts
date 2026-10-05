@@ -1,5 +1,9 @@
 /** Browser fetch for `/api/admin/*` — cookies sent on same origin. */
 import {
+  beginAdminPrimaryGet,
+  endAdminPrimaryGet,
+} from "@/modules/admin/lib/admin-primary-get";
+import {
   beginAsyncProgress,
   endAsyncProgress,
 } from "@/modules/navigation/lib/async-progress";
@@ -29,6 +33,8 @@ async function adminFetch<T>(
     path: `/api/admin/${path}`,
     method,
   });
+  const trackPrimaryGet = method === "GET";
+  if (trackPrimaryGet) beginAdminPrimaryGet(path);
   let progressError: string | undefined;
   try {
     const res = await fetch(`/api/admin/${path}`, {
@@ -45,6 +51,7 @@ async function adminFetch<T>(
     progressError = e instanceof Error ? e.message : String(e);
     throw e;
   } finally {
+    if (trackPrimaryGet) endAdminPrimaryGet(path);
     endAsyncProgress(progressToken, progressError);
   }
 }
@@ -90,6 +97,7 @@ export async function adminGetNullable<T>(pathAndQuery: string): Promise<T | nul
     path: `/api/admin/${path}`,
     method: "GET",
   });
+  beginAdminPrimaryGet(path);
   let progressError: string | undefined;
   try {
     const res = await fetch(`/api/admin/${path}`, {
@@ -106,6 +114,7 @@ export async function adminGetNullable<T>(pathAndQuery: string): Promise<T | nul
     progressError = e instanceof Error ? e.message : String(e);
     throw e;
   } finally {
+    endAdminPrimaryGet(path);
     endAsyncProgress(progressToken, progressError);
   }
 }

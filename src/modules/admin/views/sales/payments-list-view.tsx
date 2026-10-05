@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { format, subDays } from "date-fns";
 import { Download, Plus } from "lucide-react";
@@ -8,7 +8,7 @@ import { Download, Plus } from "lucide-react";
 import type { ErpPaymentListRow, ErpPaymentSummary } from "@/common/erp/sales-types";
 import { paymentModeLabel } from "@/common/erp/sales-types";
 import { PAGE_SIZE } from "@/common/admin/types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { Pagination } from "@/modules/admin/components/pagination";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -68,43 +68,36 @@ function SummaryCell({ label, value }: { label: string; value: number }) {
 
 export function PaymentsListView() {
   const searchParams = useSearchParams();
-  const { activeStoreId, storeId } = useActiveStoreScope();
+  const { storeId, erpContextLoading } = useActiveStoreScope();
   const { isOpen, modalProps, openNew } = useErpFormModal("/admin/erp/payments");
-  const [reloadToken, setReloadToken] = useState(0);
-  const [rows, setRows] = useState<ErpPaymentListRow[]>([]);
-  const [summary, setSummary] = useState<ErpPaymentSummary | null>(null);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [period, setPeriod] = useState(searchParams.get("period") ?? "today");
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
-
   const { dateFrom, dateTo } = useMemo(() => periodToDates(period), [period]);
+  const listPath = adminListPath("erp/payments", {
+    page,
+    storeId,
+    dateFrom,
+    dateTo,
+    search: debouncedSearch.trim() || undefined,
+  });
+  const { data, isPending, refetch } = useAdminGetQuery<{
+    data: ErpPaymentListRow[];
+    total: number;
+    summary: ErpPaymentSummary;
+  }>({
+    path: listPath,
+    enabled: !erpContextLoading,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const summary = data?.summary ?? null;
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "payment_date",
     "desc",
   );
-
-  useEffect(() => {
-    setLoading(true);
-    const q = new URLSearchParams();
-    q.set("page", String(page));
-    if (storeId) q.set("storeId", storeId);
-    if (dateFrom) q.set("dateFrom", dateFrom);
-    if (dateTo) q.set("dateTo", dateTo);
-    if (debouncedSearch.trim()) q.set("search", debouncedSearch.trim());
-    adminGet<{ data: ErpPaymentListRow[]; total: number; summary: ErpPaymentSummary }>(
-      `erp/payments?${q.toString()}`,
-    )
-      .then((res) => {
-        setRows(res.data);
-        setTotal(res.total);
-        setSummary(res.summary);
-      })
-      .finally(() => setLoading(false));
-  }, [page, storeId, dateFrom, dateTo, debouncedSearch, reloadToken]);
 
   const listParams: Record<string, string> = {};
   if (storeId) listParams.storeId = storeId;
@@ -120,7 +113,7 @@ export function PaymentsListView() {
         : `${format(new Date(`${dateFrom}T12:00:00`), "MMM d, yyyy")} – ${format(new Date(`${dateTo}T12:00:00`), "MMM d, yyyy")}`
       : "All dates";
 
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>
@@ -325,7 +318,7 @@ export function PaymentsListView() {
           variant="modal"
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

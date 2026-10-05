@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
+import { adminListPath } from "@/modules/admin/lib/use-admin-get-query";
 import type { ErpContextQueryData } from "@/modules/erp/components/use-erp-stores";
 
 const STALE = 90_000;
@@ -12,8 +13,94 @@ function activeStoreIdFromCache(qc: QueryClient): string | undefined {
   return storeId || undefined;
 }
 
+function localYmd() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function prefetchErpGet(qc: QueryClient, path: string) {
+  return qc.prefetchQuery({
+    queryKey: adminQueryKeys.erpGet(path),
+    queryFn: () => adminGet(path),
+    staleTime: STALE,
+  });
+}
+
+/** Default first-page GET matching the destination list’s adminListPath. */
+function erpListPrefetchPath(hrefPath: string, storeId: string | undefined): string | null {
+  const today = localYmd();
+  switch (hrefPath) {
+    case "/admin/erp/invoices":
+    case "/admin/erp/credit-notes":
+    case "/admin/erp/purchase-bills":
+    case "/admin/erp/vendor-credits":
+      if (!storeId) return null;
+      return adminListPath(`erp/${hrefPath.split("/").pop()}`, { page: 0, storeId });
+    case "/admin/erp/estimates":
+      if (!storeId) return null;
+      return adminListPath("erp/estimates", { page: 0, storeId });
+    case "/admin/erp/payments":
+      if (!storeId) return null;
+      return adminListPath("erp/payments", {
+        page: 0,
+        storeId,
+        dateFrom: today,
+        dateTo: today,
+      });
+    case "/admin/erp/customer-bulk-payments":
+      if (!storeId) return null;
+      return adminListPath("erp/customer-bulk-payments", {
+        page: 0,
+        storeId,
+        period: "this_month",
+      });
+    case "/admin/erp/expenses":
+      if (!storeId) return null;
+      return adminListPath("erp/expenses", { page: 0, storeId, period: "this_month" });
+    case "/admin/erp/supplier-payments":
+      return adminListPath("erp/supplier-payments", { page: 0, isBulk: "false" });
+    case "/admin/erp/supplier-bulk-payments":
+      return adminListPath("erp/supplier-payments", { view: "bulk", page: 0 });
+    case "/admin/erp/store-inventory":
+      if (!storeId) return null;
+      return adminListPath("erp/stock-details", { page: 0, storeId });
+    case "/admin/erp/stock-adjustments":
+      if (!storeId) return null;
+      return adminListPath("erp/stock-adjustments", { page: 0, storeId });
+    case "/admin/erp/item-transactions":
+      if (!storeId) return null;
+      return adminListPath("erp/item-transactions", { storeId });
+    case "/admin/erp/store-transfers":
+      if (!storeId) return null;
+      return adminListPath("erp/store-transfers", { page: 0, storeId });
+    case "/admin/erp/transfer-requests":
+      if (!storeId) return null;
+      return adminListPath("erp/transfer-requests", { page: 0, storeId });
+    case "/admin/erp/transfer-approvals":
+      if (!storeId) return null;
+      return adminListPath("erp/transfer-requests", {
+        page: 0,
+        status: "submitted",
+        fromStoreId: storeId,
+      });
+    case "/admin/erp/transfer-statement":
+      if (!storeId) return null;
+      return adminListPath("erp/transfer-statement", { fromStoreId: storeId });
+    case "/admin/erp/transfer-bulk-payments":
+      return adminListPath("erp/transfer-payments", {});
+    default:
+      return null;
+  }
+}
+
 /** Warm TanStack cache on sidebar hover. Cache key + URL must match the destination page. */
-export function prefetchAdminRoute(qc: QueryClient, href: string) {
+export function prefetchAdminRoute(
+  qc: QueryClient,
+  href: string,
+  options?: { enabled?: boolean },
+) {
+  if (options?.enabled === false) return Promise.resolve();
   const p = href.split("?")[0];
   const storeId = activeStoreIdFromCache(qc);
 
@@ -118,6 +205,9 @@ export function prefetchAdminRoute(qc: QueryClient, href: string) {
       staleTime: STALE,
     });
   }
+
+  const erpPath = erpListPrefetchPath(p, storeId);
+  if (erpPath) return prefetchErpGet(qc, erpPath);
 
   return Promise.resolve();
 }

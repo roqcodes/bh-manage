@@ -3,37 +3,35 @@
 import { useEffect, useState } from "react";
 
 import type { TransferStatementSummary } from "@/common/erp/inventory-types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { formatCurrencyAmount } from "@/lib/format-currency";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StoreSelect, useErpStores } from "@/modules/erp/components/use-erp-stores";
 
 export function TransferStatementView() {
-  const { stores, activeStoreId } = useErpStores();
+  const { stores, activeStoreId, loading: erpContextLoading } = useErpStores();
   const [fromStoreId, setFromStoreId] = useState("");
   const [toStoreId, setToStoreId] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [search, setSearch] = useState("");
-  const [summary, setSummary] = useState<TransferStatementSummary | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (activeStoreId && !fromStoreId) setFromStoreId(activeStoreId);
   }, [activeStoreId, fromStoreId]);
 
-  useEffect(() => {
-    if (!fromStoreId) return;
-    setLoading(true);
-    const q = new URLSearchParams({ fromStoreId });
-    if (toStoreId) q.set("toStoreId", toStoreId);
-    if (fromDate) q.set("fromDate", fromDate);
-    if (toDate) q.set("toDate", toDate);
-    adminGet<TransferStatementSummary>(`erp/transfer-statement?${q.toString()}`)
-      .then(setSummary)
-      .finally(() => setLoading(false));
-  }, [fromStoreId, toStoreId, fromDate, toDate]);
+  const listPath = adminListPath("erp/transfer-statement", {
+    fromStoreId,
+    toStoreId: toStoreId || undefined,
+    fromDate: fromDate || undefined,
+    toDate: toDate || undefined,
+  });
+  const { data: summary, isPending } = useAdminGetQuery<TransferStatementSummary>({
+    path: listPath,
+    enabled: !erpContextLoading && Boolean(fromStoreId),
+  });
+  const loading = isPending && !summary;
 
   const lines = (summary?.lines ?? []).filter((line) => {
     if (!search.trim()) return true;

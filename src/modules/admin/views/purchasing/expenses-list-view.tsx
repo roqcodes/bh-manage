@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
@@ -8,7 +8,8 @@ import { Plus } from "lucide-react";
 
 import type { ErpExpenseListRow } from "@/common/erp/purchasing-types";
 import { PAGE_SIZE } from "@/common/admin/types";
-import { adminDelete, adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminDelete } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { Pagination } from "@/modules/admin/components/pagination";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -53,55 +54,43 @@ function formatDisplayDate(value: string) {
 
 export function ExpensesListView() {
   const searchParams = useSearchParams();
-  const { activeStoreId, storeId } = useActiveStoreScope();
+  const { storeId, erpContextLoading } = useActiveStoreScope();
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/expenses");
-  const [reloadToken, setReloadToken] = useState(0);
-  const [rows, setRows] = useState<ErpExpenseListRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalAmount, setTotalAmount] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [period, setPeriod] = useState(searchParams.get("period") ?? "this_month");
   const [accountId, setAccountId] = useState(searchParams.get("accountId") ?? "");
-  const [expenseAccounts, setExpenseAccounts] = useState<Array<{ id: string; name: string }>>([]);
   const debouncedSearch = useDebouncedValue(search, 350);
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
-
+  const accountsPath = adminListPath("erp/expenses", { view: "accounts", storeId });
+  const { data: accountsData } = useAdminGetQuery<{ data: Array<{ id: string; name: string }> }>({
+    path: accountsPath,
+    enabled: !erpContextLoading,
+  });
+  const expenseAccounts = accountsData?.data ?? [];
+  const listPath = adminListPath("erp/expenses", {
+    page,
+    storeId,
+    period: period !== "all" ? period : undefined,
+    accountId: accountId || undefined,
+    search: debouncedSearch.trim() || undefined,
+  });
+  const { data, isPending, refetch } = useAdminGetQuery<{
+    data: ErpExpenseListRow[];
+    total: number;
+    totalAmount: number;
+  }>({
+    path: listPath,
+    enabled: !erpContextLoading,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const totalAmount = data?.totalAmount ?? 0;
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "expense_date",
     "desc",
   );
-
-  useEffect(() => {
-    const q = storeId
-      ? `?view=accounts&storeId=${encodeURIComponent(storeId)}`
-      : "?view=accounts";
-    adminGet<{ data: Array<{ id: string; name: string }> }>(`erp/expenses${q}`).then((res) =>
-      setExpenseAccounts(res.data),
-    );
-  }, [storeId]);
-
-  useEffect(() => {
-    setLoading(true);
-    const q = new URLSearchParams();
-    q.set("page", String(page));
-    if (storeId) q.set("storeId", storeId);
-    if (period !== "all") q.set("period", period);
-    if (accountId) q.set("accountId", accountId);
-    if (debouncedSearch.trim()) q.set("search", debouncedSearch.trim());
-
-    adminGet<{ data: ErpExpenseListRow[]; total: number; totalAmount: number }>(
-      `erp/expenses?${q.toString()}`,
-    )
-      .then((res) => {
-        setRows(res.data);
-        setTotal(res.total);
-        setTotalAmount(res.totalAmount);
-      })
-      .finally(() => setLoading(false));
-  }, [page, storeId, period, accountId, debouncedSearch, reloadToken]);
 
   const accountOptions = useMemo(
     () => [
@@ -122,8 +111,7 @@ export function ExpensesListView() {
     setDeletingId(id);
     try {
       await adminDelete(`erp/expenses/${id}`);
-      setRows((prev) => prev.filter((r) => r.id !== id));
-      setTotal((t) => Math.max(0, t - 1));
+      await refetch();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Couldn't delete expense");
     } finally {
@@ -131,7 +119,7 @@ export function ExpensesListView() {
     }
   }
 
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>
@@ -325,7 +313,7 @@ export function ExpensesListView() {
           expenseId={editId ?? undefined}
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

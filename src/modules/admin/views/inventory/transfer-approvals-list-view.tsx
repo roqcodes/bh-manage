@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import type { ErpTransferRequestListRow } from "@/common/erp/inventory-types";
-import { adminGet, adminPost } from "@/modules/admin/lib/admin-api-client";
+import { adminPost } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { Button } from "@/components/ui/button";
@@ -25,12 +26,22 @@ import {
 import { useErpStores } from "@/modules/erp/components/use-erp-stores";
 
 export function TransferApprovalsListView() {
-  const { stores, activeStoreId } = useErpStores();
-  const [rows, setRows] = useState<ErpTransferRequestListRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { stores, activeStoreId, loading: erpContextLoading } = useErpStores();
   const [fromStoreId, setFromStoreId] = useState(activeStoreId ?? "");
   const [actingId, startAction] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const listPath = adminListPath("erp/transfer-requests", {
+    page: 0,
+    status: "submitted",
+    fromStoreId: fromStoreId || undefined,
+  });
+  const { data, isPending, refetch } = useAdminGetQuery<{
+    data: ErpTransferRequestListRow[];
+  }>({
+    path: listPath,
+    enabled: !erpContextLoading,
+  });
+  const rows = data?.data ?? [];
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "request_date",
@@ -40,19 +51,6 @@ export function TransferApprovalsListView() {
   useEffect(() => {
     if (activeStoreId && !fromStoreId) setFromStoreId(activeStoreId);
   }, [activeStoreId, fromStoreId]);
-
-  function reload() {
-    setLoading(true);
-    const q = new URLSearchParams({ page: "0", status: "submitted" });
-    if (fromStoreId) q.set("fromStoreId", fromStoreId);
-    adminGet<{ data: ErpTransferRequestListRow[] }>(`erp/transfer-requests?${q.toString()}`)
-      .then((res) => setRows(res.data))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    reload();
-  }, [fromStoreId]);
 
   const storeOptions = useMemo(
     () => [
@@ -67,7 +65,7 @@ export function TransferApprovalsListView() {
     startAction(async () => {
       try {
         await adminPost(`erp/transfer-requests/${id}`, { action: "approve" });
-        reload();
+        await refetch();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Approval failed");
       }
@@ -80,14 +78,14 @@ export function TransferApprovalsListView() {
     startAction(async () => {
       try {
         await adminPost(`erp/transfer-requests/${id}`, { action: "reject" });
-        reload();
+        await refetch();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Rejection failed");
       }
     });
   }
 
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>

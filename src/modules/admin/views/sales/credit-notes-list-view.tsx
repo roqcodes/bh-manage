@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Plus } from "lucide-react";
 
 import type { ErpCreditNoteListRow } from "@/common/erp/sales-types";
 import { PAGE_SIZE } from "@/common/admin/types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { StatusBadge } from "@/modules/admin/components/status-badge";
 import { Pagination } from "@/modules/admin/components/pagination";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
@@ -44,7 +44,6 @@ const STATUS_OPTIONS = [
 
 export function CreditNotesListView() {
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/credit-notes");
-  const [reloadToken, setReloadToken] = useState(0);
   const {
     search,
     setSearch,
@@ -62,30 +61,25 @@ export function CreditNotesListView() {
     isFiltering,
     clearFilters,
     activeStoreId,
+    erpContextLoading,
   } = useErpListState();
-  const [rows, setRows] = useState<ErpCreditNoteListRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const listPath = adminListPath("erp/credit-notes", { page, ...listParams });
+  const { data, isPending, refetch } = useAdminGetQuery<{
+    data: ErpCreditNoteListRow[];
+    total: number;
+  }>({
+    path: listPath,
+    enabled: !erpContextLoading,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "credit_note_date",
     "desc",
   );
 
-  useEffect(() => {
-    setLoading(true);
-    const q = new URLSearchParams({ page: String(page), ...listParams });
-    adminGet<{ data: ErpCreditNoteListRow[]; total: number }>(
-      `erp/credit-notes?${q.toString()}`,
-    )
-      .then((res) => {
-        setRows(res.data);
-        setTotal(res.total);
-      })
-      .finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, storeId, dateFrom, dateTo, reloadToken]);
-
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>
@@ -250,7 +244,7 @@ export function CreditNotesListView() {
           creditNoteId={editId ?? undefined}
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

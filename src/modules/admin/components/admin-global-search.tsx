@@ -34,6 +34,7 @@ import { adminGet } from "@/modules/admin/lib/admin-api-client";
 import { filterSearchIndex } from "@/modules/admin/lib/admin-search-client";
 import { adminQueryKeys } from "@/modules/admin/lib/admin-query-keys";
 import type { AdminSearchIndexResponse } from "@/modules/admin/types/admin-search";
+import { useAdminBootstrap } from "@/modules/admin/providers/admin-bootstrap-provider";
 import { cn } from "@/lib/utils";
 
 type AdminGlobalSearchContextValue = {
@@ -70,8 +71,10 @@ function useSearchIndex(enabled: boolean) {
 export function AdminGlobalSearchProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { secondaryQueriesEnabled } = useAdminBootstrap();
 
   useEffect(() => {
+    if (!secondaryQueriesEnabled) return;
     const prefetch = () => {
       void queryClient.prefetchQuery({
         queryKey: adminQueryKeys.searchIndex(),
@@ -85,7 +88,7 @@ export function AdminGlobalSearchProvider({ children }: { children: ReactNode })
     }
     const timeoutId = window.setTimeout(prefetch, 8_000);
     return () => window.clearTimeout(timeoutId);
-  }, [queryClient]);
+  }, [queryClient, secondaryQueriesEnabled]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

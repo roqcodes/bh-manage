@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Plus } from "lucide-react";
 
 import type { ErpVendorCreditListRow } from "@/common/erp/purchasing-types";
 import { PAGE_SIZE } from "@/common/admin/types";
-import { adminGet } from "@/modules/admin/lib/admin-api-client";
+import { adminListPath, useAdminGetQuery } from "@/modules/admin/lib/use-admin-get-query";
 import { AdminPageSkeleton } from "@/modules/admin/components/admin-page-skeleton";
 import { Pagination } from "@/modules/admin/components/pagination";
 import { formatCurrencyAmount } from "@/lib/format-currency";
@@ -36,7 +36,6 @@ import { useErpListState } from "@/modules/admin/ui/use-erp-list-state";
 
 export function VendorCreditsListView() {
   const { isOpen, mode, editId, modalProps, openNew } = useErpFormModal("/admin/erp/vendor-credits");
-  const [reloadToken, setReloadToken] = useState(0);
   const {
     search,
     setSearch,
@@ -49,29 +48,23 @@ export function VendorCreditsListView() {
     listParams,
     isFiltering,
     clearFilters,
-    activeStoreId,
+    erpContextLoading,
   } = useErpListState();
-  const [rows, setRows] = useState<ErpVendorCreditListRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const listPath = adminListPath("erp/vendor-credits", { page, ...listParams });
+  const { data, isPending, refetch } = useAdminGetQuery<{
+    data: ErpVendorCreditListRow[];
+    total: number;
+  }>({
+    path: listPath,
+    enabled: !erpContextLoading,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
   const { sorted, sortKey, sortDirection, toggleSort } = useSortableData(
     rows,
     "credit_date",
     "desc",
   );
-
-  useEffect(() => {
-    setLoading(true);
-    const q = new URLSearchParams({ page: String(page), ...listParams });
-    adminGet<{ data: ErpVendorCreditListRow[]; total: number }>(
-      `erp/vendor-credits?${q.toString()}`,
-    )
-      .then((res) => {
-        setRows(res.data);
-        setTotal(res.total);
-      })
-      .finally(() => setLoading(false));
-  }, [page, debouncedSearch, dateFrom, dateTo, reloadToken, listParams]);
 
   const filteredRows = useMemo(() => {
     if (!debouncedSearch.trim()) return sorted;
@@ -85,7 +78,7 @@ export function VendorCreditsListView() {
     );
   }, [sorted, debouncedSearch]);
 
-  if (loading && rows.length === 0) return <AdminPageSkeleton />;
+  if (isPending && !data) return <AdminPageSkeleton />;
 
   return (
     <AdminPageLayout>
@@ -235,7 +228,7 @@ export function VendorCreditsListView() {
           creditId={editId ?? undefined}
           open={modalProps.open}
           onOpenChange={modalProps.onOpenChange}
-          onSuccess={() => setReloadToken((t) => t + 1)}
+          onSuccess={() => void refetch()}
         />
       ) : null}
     </AdminPageLayout>

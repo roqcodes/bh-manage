@@ -897,6 +897,7 @@ export function AdminDashboardView() {
     error,
     isPending,
     isFetching: coreFetching,
+    isSuccess: coreReady,
   } = useQuery({
     queryKey: adminQueryKeys.dashboard(storeId, dateFrom, dateTo, granularity, "core"),
     queryFn: () => {
@@ -924,10 +925,8 @@ export function AdminDashboardView() {
       return adminGet<AdminDashboardPayload>(`dashboard?${q.toString()}`);
     },
     placeholderData: keepPreviousData,
-    enabled: dashboardEnabled,
+    enabled: dashboardEnabled && coreReady,
   });
-
-  const isFetching = coreFetching || extendedFetching;
   const data = coreData
     ? {
         ...coreData,
@@ -941,6 +940,8 @@ export function AdminDashboardView() {
           : coreData.recentErpInvoices,
       }
     : undefined;
+
+  const isFetching = coreFetching || extendedFetching;
 
   useEffect(() => {
     function onStoreChanged() {

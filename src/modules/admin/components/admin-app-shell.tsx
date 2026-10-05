@@ -13,6 +13,7 @@ import { AdminGlobalSearchProvider } from "@/modules/admin/components/admin-glob
 import { AdminAlertProvider } from "@/modules/admin/components/admin-alert-provider";
 import { AdminSidebar } from "@/modules/admin/components/sidebar";
 import { useIsMdUp } from "@/modules/admin/hooks/use-is-md-up";
+import { AdminBootstrapProvider } from "@/modules/admin/providers/admin-bootstrap-provider";
 import { AdminSessionProvider } from "@/modules/admin/providers/admin-session-provider";
 import { CurrencySettingsProvider } from "@/modules/settings/providers/currency-settings-provider";
 import { adminGet } from "@/modules/admin/lib/admin-api-client";
@@ -95,6 +96,7 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AdminSessionProvider profile={data.profile}>
+      <AdminBootstrapProvider>
       <CurrencySettingsProvider>
       <AdminAlertProvider>
       <AdminGlobalSearchProvider>
@@ -137,6 +139,7 @@ export function AdminAppShell({ children }: { children: React.ReactNode }) {
       </AdminGlobalSearchProvider>
       </AdminAlertProvider>
       </CurrencySettingsProvider>
+      </AdminBootstrapProvider>
     </AdminSessionProvider>
   );
 }
